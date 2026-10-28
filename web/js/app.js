@@ -11,6 +11,7 @@ import { IMPOSTAZIONI_TAGLIO, schemaDiTaglio } from './taglio.js';
 import { descriviGiunto, unioni } from './unioni.js';
 import { INTERASSI, LATI, MODELLI_CERNIERA, cerniere, maniglia } from './ferramenta.js';
 import { listaSpesa } from './spesa.js';
+import { CARICO_RIPIANI, controlli } from './controlli.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -181,6 +182,8 @@ function aggiornaValori(el, p) {
   el.querySelectorAll('[data-campo]').forEach(i => { if (i !== document.activeElement) i.value = valoreCampo(p, i.dataset.campo); });
   const info = el.querySelector('[data-info]');
   if (info && p) info.innerHTML = htmlInfo(p);
+  const ct = el.querySelector('[data-controlli]');
+  if (ct && !p) ct.innerHTML = htmlControlli();
   const un = el.querySelector('[data-unioni]');
   if (un && p) un.innerHTML = htmlUnioni(p);
   el.querySelectorAll('[data-orient]').forEach(b => {
@@ -195,8 +198,10 @@ function htmlInfo(p) {
   const L = g.max[0] - g.min[0], W = g.max[1] - g.min[1];
   const prezzo = materiale(p.mat);
   const costo = p.tipo === 'listello' ? (L / 1000) * prezzo.prezzoM : (L * W / 1e6) * prezzo.prezzoM2;
+  const fr = controlli(stato.progetto).frecce.find(x => x.p.id === p.id);
+  const testoFreccia = fr ? `<div class="${fr.giudizio === 'troppo' ? 'avviso' : 'ok'}">${fr.giudizio === 'troppo' ? '⚠' : '✓'} Con ${fr.carico} kg/m si piega di ${f1(fr.nelTempo)} mm nel tempo (${{ ottimo: 'ottimo', accettabile: 'si nota appena', troppo: 'troppo' }[fr.giudizio]}).</div>` : '';
   return `<div class="chipline"><span>Misura finita</span><b>${f1(L)} × ${f1(W)} × ${f1(T)}</b></div>
-    <div class="chipline"><span>Costo del pezzo</span><b>${euro(costo)}</b></div>`;
+    <div class="chipline"><span>Costo del pezzo</span><b>${euro(costo)}</b></div>${testoFreccia}`;
 }
 
 function htmlPezzo(p) {
@@ -278,6 +283,17 @@ function htmlUnioni(p) {
   return `<h3>Unioni e viti</h3>${righe || '<p class="nota">Non tocca altri pezzi. Usa Accosta per appoggiarlo: le viti arrivano da sole.</p>'}${avvisi}`;
 }
 
+function htmlControlli() {
+  const c = controlli(stato.progetto);
+  if (!stato.progetto.pezzi.length) return '<h3>Controlli</h3><p class="nota">Ancora nessun pezzo.</p>';
+  const frecce = c.frecce.map(f => `<div class="chipline"><span>${esc(f.p.nome)}</span><b class="${f.giudizio === 'troppo' ? 'avviso-mini' : ''}">${f1(f.nelTempo)} mm</b></div>`).join('');
+  return `<h3>Controlli</h3>
+    <div class="chipline"><span>Peso stimato</span><b>${f1(c.peso)} kg</b></div>
+    ${c.avvisi.map(a => `<div class="avviso">⚠ ${esc(a)}</div>`).join('')}${c.note.map(n => `<div class="ok">✓ ${esc(n)}</div>`).join('')}
+    ${c.frecce.length ? `<div class="field"><label>Carico sui ripiani (libri ≈ 30)</label><div class="input"><input data-carico inputmode="decimal" value="${f1(stato.progetto.caricoRipiani ?? CARICO_RIPIANI)}"><small>kg/m</small></div></div>
+      <p class="nota">Quanto si piegano i ripiani nel tempo:</p>${frecce}` : ''}`;
+}
+
 function htmlProgetto() {
   const r = riepilogo(stato.progetto);
   const mats = r.materiali.map(m => `<div class="chipline"><span>${esc(m.nome)}</span><b>${f1(m.qta)} ${m.tipo === 'listello' ? 'm' : 'm²'}</b></div>`).join('');
@@ -287,7 +303,8 @@ function htmlProgetto() {
     <div class="group"><h3>Come si costruisce</h3>
       <p class="nota"><b>Accosta</b>: scegli un pezzo, poi tocca la faccia di un altro: ci si appoggia sopra.</p>
       <p class="nota"><b>Adatta</b>: scegli un pezzo, poi tocca quello contro cui deve finire: si allunga o accorcia e prende il taglio con l'angolo giusto.</p></div>
-    <div class="group"><h3>Materiali</h3>${mats || '<p class="nota">Ancora nessun pezzo.</p>'}</div>`;
+    <div class="group"><h3>Materiali</h3>${mats || '<p class="nota">Ancora nessun pezzo.</p>'}</div>
+    <div class="group" data-controlli></div>`;
 }
 
 function applicaCampo(campo, valore) {
@@ -314,6 +331,11 @@ function eventiProprieta() {
     const c = e.target.dataset.campo, p = pezzoSel();
     if (c) applicaCampo(c, e.target.value);
     else if (e.target.hasAttribute('data-man-interasse') && p) modifica(() => { ferr(p, 'maniglia').interasse = +e.target.value; });
+    else if (e.target.hasAttribute('data-carico')) {
+      const v = numero(e.target.value);
+      if (v === null || v < 0 || v > 500) return avvisa('Scrivi un carico tra 0 e 500 kg/m.', true);
+      modifica(() => { stato.progetto.caricoRipiani = v; });
+    }
   });
   el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.campo) e.target.blur(); });
   el.addEventListener('click', e => {
@@ -352,9 +374,9 @@ function disegnaPiede() {
   const comprare = schemaDiTaglio(stato.progetto), lastre = comprare.filter(g => g.tipo === 'pannello').reduce((t, g) => t + g.fogli.length, 0);
   const barre = comprare.filter(g => g.tipo === 'listello').reduce((t, g) => t + g.fogli.length, 0);
   const totale = comprare.reduce((t, g) => t + g.totale, 0);
-  const u = unioni(stato.progetto), spesa = listaSpesa(stato.progetto, u);
+  const u = unioni(stato.progetto), spesa = listaSpesa(stato.progetto, u), ctr = controlli(stato.progetto);
   $('#piede').innerHTML = `<span><b>${r.pezzi}</b> pezzi</span><span>Da comprare: <b>${lastre}</b> lastr${lastre === 1 ? 'a' : 'e'} · <b>${barre}</b> barr${barre === 1 ? 'a' : 'e'}</span>
-    <span>Viti: <b>${u.viti.length}</b></span>${u.avvisi.length ? `<button class="link avviso-link" id="vedi-avvisi">⚠ ${u.avvisi.length} da controllare</button>` : ''}
+    <span>Viti: <b>${u.viti.length}</b></span>${u.avvisi.length + ctr.avvisi.length ? `<button class="link avviso-link" id="vedi-avvisi">⚠ ${u.avvisi.length + ctr.avvisi.length} da controllare</button>` : ''}
     <span class="sp"></span><span>Costo dei pezzi <b>${euro(r.costo)}</b></span><span class="costo">Da comprare <b>${euro(totale + spesa.totale)}</b></span>`;
   $('#vedi-avvisi')?.addEventListener('click', () => { mostraDistinta('ferramenta'); $('#dlg-distinta').showModal(); });
 }
@@ -410,7 +432,9 @@ function htmlSchema(perStampa = false) {
 
 function htmlFerramentaProgetto() {
   const u = unioni(stato.progetto), sp = listaSpesa(stato.progetto, u);
-  const avvisi = u.avvisi.map(a => `<div class="avviso">⚠ ${esc(a)}</div>`).join('');
+  const ctr = controlli(stato.progetto);
+  const avvisi = [...ctr.avvisi, ...u.avvisi].map(a => `<div class="avviso">⚠ ${esc(a)}</div>`).join('') + ctr.note.map(n => `<div class="ok">✓ ${esc(n)}</div>`).join('')
+    + `<p class="nota">Peso stimato: <b>${f1(ctr.peso)} kg</b>.${ctr.frecce.length ? ` Ripiani: ${ctr.frecce.map(f => `${esc(f.p.nome)} ${f1(f.nelTempo)} mm`).join(', ')} (carico ${f1(stato.progetto.caricoRipiani ?? CARICO_RIPIANI)} kg/m, nel tempo).` : ''}</p>`;
   const spesa = sp.righe.map(r => `<tr><td>${esc(r.voce)}${r.nota ? `<br><small class="nota">${esc(r.nota)}</small>` : ''}</td><td class="num">${r.qta}</td><td class="num">${euro(r.qta * r.prezzo)}</td></tr>`).join('');
   const giunti = u.giunti.map(g => `<tr><td>${esc(g.a.nome)} + ${esc(g.b.nome)}</td><td>${esc(g.tipo || '')}</td><td>${esc(descriviGiunto(g))}${g.note.map(n => `<br><small class="nota">${esc(n)}</small>`).join('')}</td></tr>`).join('');
   return `${avvisi}

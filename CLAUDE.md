@@ -43,6 +43,10 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     numero (50 mm dalle estremità, passo ≤ 200), preforo; casi speciali: anta con cerniere, testa contro testa
     (angolari), bordo < 8 mm (chiodini), viti in vista sopra un piano, viti in testa al massello; collisioni
     tra viti e con scodelle/fori. Esclusioni in `progetto.unioniEscluse`. `js/spesa.js` — lista della spesa.
+  - `js/controlli.js` — peso e baricentro (volumi × densità), stabilità (base = inviluppo dei vertici a terra;
+    25 kg sul bordo dei pezzi della metà alta; "fissalo al muro" se alto > 1 m e > 3 × la base), freccia dei
+    ripiani orizzontali avvitati alle due teste (trave appoggiata, E e viscosità dal materiale, carico
+    `progetto.caricoRipiani`, 30 kg/m; ottimo ≤ L/600, accettabile ≤ L/300).
   - `js/archivio.js` — copia in `localStorage` + server, e file di progetto `.mpm.json`
     (`{formato: 'myplanmaker', versione: 1, progetto}`, Esporta/Importa nel menu Progetti; all'import nuovo id).
     `sw.js` — funzionamento senza rete: **aggiungere lì ogni nuovo file JS** e cambiare `VERSIONE`.
@@ -78,7 +82,8 @@ comprare (anche nel piede e nella stampa).
 0.3 (2026-10-28): ferramenta (cerniere, maniglie, fori scavati) e viti automatiche con controlli, viti nel 3D
 (pulsante Viti), scheda "Ferramenta e viti" con lista della spesa, avvisi nel piede.
 0.4 (2026-10-28): Dividi (scegli un pezzo, tocca quello opposto, quanti in mezzo); finestre centrate.
+0.5 (2026-10-28): controlli di peso, stabilità e freccia dei ripiani (pannello del progetto, del pezzo, piede).
 Per preparare un progetto per Salvo: costruirlo con le funzioni di `modello.js` (come `esempi.js`), controllarlo
 con `prove-ui.html` e consegnarlo come `.mpm.json` in `MyPlanMaker/progetti/`.
-Prossimi passi (vedi `docs/PIANO.md`): guide e cassetti, sagome libere e dime 1:1, magazzino avanzi, freccia dei
-ripiani e ribaltamento.
+Prossimi passi (vedi `docs/PIANO.md`): guide e cassetti, sagome libere e dime 1:1, magazzino avanzi, piani in
+massello da tavole incollate.

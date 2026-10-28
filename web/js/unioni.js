@@ -169,6 +169,7 @@ export function unioni(progetto) {
       continue;
     }
     g.tipo = `${cp.tipo} su ${cr.tipo}`;
+    g.comePassa = cp.tipo; g.comeRiceve = cr.tipo;
     g.passa = passa; g.riceve = riceve;
     const mr = materiale(riceve.mat), dr = dimensioni(riceve);
     const r = rettangolo(c.punti);

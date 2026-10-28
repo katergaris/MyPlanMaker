@@ -12,6 +12,7 @@ import { schemaDiTaglio } from './js/taglio.js';
 import { daFile, versoFile } from './js/archivio.js';
 import { unioni } from './js/unioni.js';
 import { cerniere, maniglia } from './js/ferramenta.js';
+import { controlli, freccia } from './js/controlli.js';
 
 const esiti = [];
 const vicino = (a, b, tol = 0.6) => Math.abs(a - b) <= tol;
@@ -165,6 +166,25 @@ function controllaLastre(gruppi, lama) {
   prova('dividi: i nuovi pezzi prendono le viti dai fianchi', g.filter(x => x.viti.length === 3).length === 4, `${g.length}`);
   const fs = pr.pezzi.find(p => p.nome === 'Fianco sinistro'), piano = pr.pezzi.find(p => p.nome === 'Piano inclinato');
   prova('dividi tra pezzi non paralleli: rifiuta', !mod.spazioTra(fs, piano, vm(fs), vm(piano), 1).ok);
+}
+
+// 11. Controlli
+{
+  const pr = mobilettoLeggio(), c = controlli(pr);
+  const r = c.frecce.find(f => f.p.nome === 'Ripiano');
+  prova('freccia del ripiano 764×490×18 multistrato con 30 kg/m: ~0,6 mm subito', r && Math.abs(r.subito - 0.61) < 0.05 && r.giudizio === 'ottimo', r && `${r.subito.toFixed(2)} / ${r.nelTempo.toFixed(2)} ${r.giudizio}`);
+  prova('mobiletto: peso plausibile (25-40 kg) e stabile', c.peso > 25 && c.peso < 40 && !c.avvisi.length, `${c.peso.toFixed(1)} kg · ${c.avvisi.join(' ')}`);
+  const lungo = mod.nuovoProgetto(); const p = mod.nuovoPezzo(lungo, 'pannello'); p.mat = 'tn18'; p.L = 1200; p.W = 300;
+  const f = freccia(p, 40);
+  prova('ripiano truciolare 1200×300 con 40 kg/m: troppo', f.giudizio === 'troppo', `${f.nelTempo.toFixed(1)} mm`);
+}
+{
+  const pr = tavoloRotondo(), c = controlli(pr);
+  prova('tavolo a 4 gambe: stabile con 25 kg sul bordo', !c.avvisi.length, c.avvisi.join(' ') + c.note.join(' '));
+  for (const g of pr.pezzi.filter(p => p.nome.startsWith('Gamba'))) { g.pos[0] = 500 + (g.pos[0] - 500) * 0.25; g.pos[2] = -500 + (g.pos[2] + 500) * 0.25; }
+  pr.pezzi = pr.pezzi.filter(p => !p.nome.startsWith('Fascia'));
+  const c2 = controlli(pr);
+  prova('gambe strette al centro: si ribalta appoggiandosi', c2.avvisi.some(a => /ribalta/.test(a)), c2.avvisi.join(' '));
 }
 
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');

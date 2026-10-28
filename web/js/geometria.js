@@ -72,7 +72,15 @@ export function geometriaPezzo(p) {
     const bb = solido.boundingBox();
     const vertici = [];
     for (let i = 0; i < vp.length; i += np) vertici.push([vp[i], vp[i + 1], vp[i + 2]]);
-    risultato = { geometria: g, bordi: new EdgesGeometry(g, 25), min: bb.min, max: bb.max, vertici, volume: solido.volume() };
+    // baricentro del solido (somma dei tetraedri con l'origine)
+    let vol = 0, cx = 0, cy = 0, cz = 0;
+    for (let i = 0; i < pos.length; i += 9) {
+      const [ax, ay, az, bx, by, bz, qx, qy, qz] = pos.subarray(i, i + 9);
+      const v = (ax * (by * qz - bz * qy) - ay * (bx * qz - bz * qx) + az * (bx * qy - by * qx)) / 6;
+      vol += v; cx += v * (ax + bx + qx) / 4; cy += v * (ay + by + qy) / 4; cz += v * (az + bz + qz) / 4;
+    }
+    const centro = vol ? [cx / vol, cy / vol, cz / vol] : [0, 0, 0];
+    risultato = { geometria: g, bordi: new EdgesGeometry(g, 25), min: bb.min, max: bb.max, vertici, volume: solido.volume(), centro };
   }
   solido.delete();
   if (cache.size > 400) {

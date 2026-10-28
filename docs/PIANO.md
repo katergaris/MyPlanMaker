@@ -84,3 +84,4 @@ pezzi, istruzioni di montaggio con vista esplosa, dime di foratura stampabili 1:
   reggipiani, sistema 32, viti nascoste a scelta.
 - 2026-10-28, 0.4: Dividi come "n pezzi alla stessa distanza tra due pezzi paralleli" (al posto della
   divisione dei vani pensata all'inizio: più semplice e funziona anche per divisori verticali).
+- 2026-10-28, 0.5: peso, stabilità (ribaltamento con 25 kg sul bordo, fissaggio al muro) e freccia dei ripiani.
