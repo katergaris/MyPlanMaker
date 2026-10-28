@@ -1,8 +1,8 @@
 <!doctype html><html lang="it"><head><meta charset="utf-8"><title>MyPlanMaker — prova dell'interfaccia</title></head>
-<body style="margin:0"><iframe id="f" src="index.html" style="border:0;width:1280px;height:800px"></iframe>
+<body style="margin:0"><iframe id="f" src="index.html" style="border:0;width:100vw;height:100vh"></iframe>
 <script>
 // Pilota l'app per le prove con chromium headless. Passi nell'hash, separati da virgole:
-// esempio:N  sel:Nome  cmd:comando  tocca:Nome  vista:nome  distinta  schema  progetti
+// esempio:N  sel:Nome  cmd:comando  tocca:Nome  vista:nome  distinta  schema  ferramenta  progetti
 const f = document.getElementById('f');
 const attendi = ms => new Promise(r => setTimeout(r, ms));
 f.onload = async () => {
@@ -17,6 +17,7 @@ f.onload = async () => {
     if (p.startsWith('vista:')) d.querySelector(`[data-vista="${p.slice(6)}"]`).click();
     if (p === 'distinta') d.getElementById('apri-distinta').click();
     if (p === 'schema') { d.getElementById('apri-distinta').click(); d.querySelector('[data-scheda="schema"]').click(); }
+    if (p === 'ferramenta') { d.getElementById('apri-distinta').click(); d.querySelector('[data-scheda="ferramenta"]').click(); }
     if (p === 'progetti') d.getElementById('apri-progetti').click();
     await attendi(400);
   }

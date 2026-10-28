@@ -10,6 +10,8 @@ import { mobilettoLeggio, tavoloRotondo } from './js/esempi.js';
 import { righeDistinta } from './js/distinta.js';
 import { schemaDiTaglio } from './js/taglio.js';
 import { daFile, versoFile } from './js/archivio.js';
+import { unioni } from './js/unioni.js';
+import { cerniere, maniglia } from './js/ferramenta.js';
 
 const esiti = [];
 const vicino = (a, b, tol = 0.6) => Math.abs(a - b) <= tol;
@@ -117,6 +119,37 @@ function controllaLastre(gruppi, lama) {
   let errore = '';
   try { daFile('{"ciao": 1}'); } catch (e) { errore = e.message; }
   prova('file sbagliato: messaggio chiaro', /non contiene/.test(errore), errore);
+}
+
+// 9. Unioni e viti
+{
+  const pr = mobilettoLeggio(), u = unioni(pr);
+  const trova = (x, y) => u.giunti.find(g => [g.a.nome, g.b.nome].sort().join('|') === [x, y].sort().join('|'));
+  const g1 = trova('Fianco sinistro', 'Fondo');
+  prova('fianco → fondo: 3 viti 4×40 dal fianco', g1 && g1.passa.nome === 'Fianco sinistro' && g1.viti.length === 3 && g1.vite.misura === '4×40', g1 && `${g1.tipo} · ${g1.viti.length} × ${g1.vite?.misura}`);
+  const g2 = trova('Fianco destro', 'Ripiano');
+  prova('fianco destro → ripiano: viti', g2 && g2.viti.length === 3, g2 && g2.tipo);
+  const g3 = trova('Piano inclinato', 'Fianco sinistro');
+  prova('piano inclinato sui fianchi: viti con avviso "in vista"', g3 && g3.viti.length >= 2 && g3.note.some(n => /in vista/.test(n)), g3 && `${g3.tipo} · ${g3.note.join(' ')}`);
+  const g4 = trova('Schienale', 'Fianco sinistro');
+  prova('schienale da 3 mm: chiodini, niente viti', g4 && g4.chiodini, g4 && g4.note.join(' '));
+  const g5 = trova('Anta', 'Fondo');
+  prova('anta con cerniere: niente viti', !g5 || g5.tipo === 'cerniere', g5 && g5.tipo);
+  prova('nessuna collisione nel mobiletto', u.avvisi.length === 0, u.avvisi.join(' '));
+  const v = g1.viti[0], lungo = v.testa.distanceTo(v.punta);
+  prova('vite: parte fuori dal fianco e entra nel fondo', Math.abs(v.testa.x - 0) < 0.5 && Math.abs(v.punta.x - 40) < 0.5 && Math.abs(lungo - 40) < 0.5, `${v.testa.x.toFixed(1)} → ${v.punta.x.toFixed(1)}`);
+  const anta = pr.pezzi.find(p => p.nome === 'Anta'), c = cerniere(anta), m = maniglia(anta);
+  prova('anta 330 mm: 2 cerniere a 22,5 mm dal bordo', c.n === 2 && c.punti.every(p => Math.abs(p[0] - 22.5) < 0.01), JSON.stringify(c.punti));
+  prova('maniglia dal lato opposto alle cerniere, interasse 128', m.lato === 'B' && Math.abs(m.fori[1].c[1] - m.fori[0].c[1] - 128) < 0.01 && !m.avvisi.length, JSON.stringify(m.fori.map(f => f.c)));
+  const g = geometriaPezzo(anta);
+  prova('scodelle e fori scavati nell\'anta', g.volume < 796 * 330 * 18 - 2 * Math.PI * 17.5 ** 2 * 12, `${Math.round(g.volume)}`);
+}
+{
+  const pr = tavoloRotondo(), u = unioni(pr);
+  const g = u.giunti.find(g => /Gamba 1/.test(g.a.nome + g.b.nome) && /Piano/.test(g.a.nome + g.b.nome));
+  prova('tavolo: gamba sotto il piano → avviso viti in vista e massello', g && g.note.some(n => /in vista/.test(n)), g && `${g.tipo} · ${g.note.join(' ')}`);
+  const f = u.giunti.find(g => /Fascia davanti/.test(g.a.nome + g.b.nome) && /Gamba/.test(g.a.nome + g.b.nome));
+  prova('tavolo: fascia contro gamba trovata', !!f, f && `${f.tipo} · ${f.note.join(' ')}`);
 }
 
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');

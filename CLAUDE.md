@@ -34,6 +34,14 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     (per i pannelli anche lastra commerciale e venatura, per i listelli la barra).
   - `js/taglio.js` — schema di taglio: MaxRects (lato corto migliore) sulle lastre, barre "prima dove entra" dal
     pezzo più lungo; lama e rifilo in `progetto.taglio`; con venatura i pezzi non si ruotano.
+  - `js/ferramenta.js` — cerniere (lato A/B/basso/alto, numero dall'altezza, scodella Ø 35 a 22,5 mm dal bordo
+    sulla faccia interna z = 0) e maniglie (interasse, lato opposto alle cerniere, fori Ø 5): posizioni, fori
+    scavati nel solido (`foriPezzo`, usati da `geometria.js`), catalogo con prezzi indicativi.
+  - `js/unioni.js` — trova i contatti (facce complanari opposte, area vera con `CrossSection.intersect`) e
+    propone viti: passa dal pezzo che tocca di faccia/fianco, va nella testa o nel bordo dell'altro; misura,
+    numero (50 mm dalle estremità, passo ≤ 200), preforo; casi speciali: anta con cerniere, testa contro testa
+    (angolari), bordo < 8 mm (chiodini), viti in vista sopra un piano, viti in testa al massello; collisioni
+    tra viti e con scodelle/fori. Esclusioni in `progetto.unioniEscluse`. `js/spesa.js` — lista della spesa.
   - `js/archivio.js` — copia in `localStorage` + server, e file di progetto `.mpm.json`
     (`{formato: 'myplanmaker', versione: 1, progetto}`, Esporta/Importa nel menu Progetti; all'import nuovo id).
     `sw.js` — funzionamento senza rete: **aggiungere lì ogni nuovo file JS** e cambiare `VERSIONE`.
@@ -66,6 +74,8 @@ Limiti noti: i tagli restano fissi se poi si cambia la lunghezza (non sono ancor
 solo lungo la lunghezza del pezzo; un progetto eliminato senza rete ricompare dal server.
 0.2 (2026-10-28): Esporta/Importa progetto (`.mpm.json`), schema di taglio con lama/rifilo/venatura e conto da
 comprare (anche nel piede e nella stampa).
+0.3 (2026-10-28): ferramenta (cerniere, maniglie, fori scavati) e viti automatiche con controlli, viti nel 3D
+(pulsante Viti), scheda "Ferramenta e viti" con lista della spesa, avvisi nel piede.
 Per preparare un progetto per Salvo: costruirlo con le funzioni di `modello.js` (come `esempi.js`), controllarlo
 con `prove-ui.html` e consegnarlo come `.mpm.json` in `MyPlanMaker/progetti/`.
-Prossimi passi (vedi `docs/PIANO.md`): ferramenta e viti automatiche, Dividi, sagome libere e dime 1:1.
+Prossimi passi (vedi `docs/PIANO.md`): guide e cassetti, Dividi, sagome libere e dime 1:1, magazzino avanzi.

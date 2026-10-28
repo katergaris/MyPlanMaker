@@ -4,8 +4,38 @@ import { OrbitControls } from '../vendor/OrbitControls.js';
 import { materiale } from './materiali.js';
 import { matrice } from './modello.js';
 import { geometriaPezzo } from './geometria.js';
+import { cerniere, maniglia } from './ferramenta.js';
 
 const ACCENTO = new THREE.Color('#1f5fbf');
+const METALLO = new THREE.MeshStandardMaterial({ color: '#9aa1a8', roughness: 0.4, metalness: 0.6 });
+const VITE = new THREE.MeshBasicMaterial({ color: '#1f5fbf', depthTest: false, transparent: true, opacity: 0.9 });
+const VITE_ERR = new THREE.MeshBasicMaterial({ color: '#c0392b', depthTest: false, transparent: true, opacity: 0.95 });
+
+// Un cilindro (o una barra a sezione quadrata) dal punto a al punto b.
+function asta(a, b, raggio, materiale, quadrata = false) {
+  const dir = new THREE.Vector3().subVectors(b, a), l = dir.length();
+  const geo = quadrata ? new THREE.BoxGeometry(raggio * 2, l, raggio * 2) : new THREE.CylinderGeometry(raggio, raggio, l, 12);
+  const m = new THREE.Mesh(geo, materiale);
+  m.userData.propria = true;
+  m.position.copy(a).addScaledVector(dir, 0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  return m;
+}
+
+function ferramentaPezzo(p) {
+  const g = new THREE.Group(), v = a => new THREE.Vector3(...a);
+  const c = cerniere(p);
+  if (c) for (const b of c.bracci) g.add(asta(v(b.da), v(b.a), b.largo / 2, METALLO, true));
+  const m = maniglia(p);
+  if (m) {
+    const s = m.barra.sporgenza, a = v(m.barra.da), b = v(m.barra.a);
+    const su = new THREE.Vector3(0, 0, s);
+    g.add(asta(a, a.clone().add(su), 4, METALLO), asta(b, b.clone().add(su), 4, METALLO));
+    const d = b.clone().sub(a).normalize().multiplyScalar(25);
+    g.add(asta(a.clone().add(su).sub(d), b.clone().add(su).add(d), 6, METALLO));
+  }
+  return g;
+}
 
 export class Vista3D {
   constructor(contenitore, { onTocco }) {
@@ -61,8 +91,11 @@ export class Vista3D {
     this.ortogonale.updateProjectionMatrix();
   }
 
-  aggiorna(progetto, selezionato) {
-    for (const c of [...this.gruppo.children]) { this.gruppo.remove(c); c.traverse(o => o.material?.dispose?.()); }
+  aggiorna(progetto, selezionato, { viti = [], mostraViti = true, vitiErrate = new Set() } = {}) {
+    for (const c of [...this.gruppo.children]) {
+      this.gruppo.remove(c);
+      c.traverse(o => { if (o.material && o.material !== METALLO && o.material !== VITE && o.material !== VITE_ERR) o.material.dispose(); if (o.geometry && o.userData.propria) o.geometry.dispose(); });
+    }
     for (const p of progetto.pezzi) {
       const g = geometriaPezzo(p);
       if (!g) continue;
@@ -73,11 +106,20 @@ export class Vista3D {
       mesh.userData.id = p.id;
       const linee = new THREE.LineSegments(g.bordi, new THREE.LineBasicMaterial({ color: sel ? ACCENTO : '#8a6b45', transparent: !sel, opacity: sel ? 1 : 0.55 }));
       const obj = new THREE.Group();
-      obj.add(mesh, linee);
+      obj.add(mesh, linee, ferramentaPezzo(p));
       obj.matrixAutoUpdate = false;
       obj.matrix.copy(matrice(p));
       obj.updateMatrixWorld(true);
       this.gruppo.add(obj);
+    }
+    if (mostraViti) {
+      // Le viti si vedono anche attraverso il legno: sono disegnate sopra, come in trasparenza.
+      for (const x of viti) {
+        const mat = vitiErrate.has(x) ? VITE_ERR : VITE;
+        const corpo = asta(x.testa, x.punta, x.d / 2, mat), testa = asta(x.testa, x.testa.clone().lerp(x.punta, 2.5 / x.testa.distanceTo(x.punta)), x.d, mat);
+        for (const o of [corpo, testa]) { o.renderOrder = 10; o.material = mat; o.userData.propria = true; }
+        this.gruppo.add(corpo, testa);
+      }
     }
     this.disegna();
   }
@@ -88,7 +130,7 @@ export class Vista3D {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(ndc, this.camera);
     const meshes = [];
-    this.gruppo.traverse(o => { if (o.isMesh) meshes.push(o); });
+    this.gruppo.traverse(o => { if (o.isMesh && o.userData.id) meshes.push(o); });
     const hit = ray.intersectObjects(meshes, false)[0];
     if (!hit) return this.onTocco(null, null);
     const normale = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();

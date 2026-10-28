@@ -3,8 +3,11 @@
 import Module from '../vendor/manifold.js';
 import { BufferGeometry, Float32BufferAttribute, EdgesGeometry } from '../vendor/three.module.js';
 import { dimensioni } from './modello.js';
+import { foriPezzo } from './ferramenta.js';
 
 let M = null;
+export const moduloManifold = () => M;
+
 export async function avviaGeometria() {
   if (M) return;
   const wasm = await Module();
@@ -33,7 +36,7 @@ export function profilo(p) {
 }
 
 const cache = new Map();
-const chiave = p => JSON.stringify([p.tipo, p.mat, p.forma, p.L, p.W, p.D, p.r, p.tagli.map(t => [t.n, t.d])]);
+export const chiave = p => JSON.stringify([p.tipo, p.mat, p.forma, p.L, p.W, p.D, p.r, p.tagli.map(t => [t.n, t.d]), foriPezzo(p)]);
 
 // Restituisce { geometria, bordi, min, max, vertici } nel sistema locale del pezzo, o null se i tagli
 // hanno tolto tutto.
@@ -47,6 +50,12 @@ export function geometriaPezzo(p) {
   for (const t of p.tagli) {
     const s = solido.trimByPlane(t.n, t.d);
     solido.delete();
+    solido = s;
+  }
+  for (const f of foriPezzo(p)) {
+    const cil = M.Manifold.cylinder(f.z1 - f.z0, f.r, f.r, 32).translate([f.c[0], f.c[1], f.z0]);
+    const s = solido.subtract(cil);
+    cil.delete(); solido.delete();
     solido = s;
   }
   let risultato = null;

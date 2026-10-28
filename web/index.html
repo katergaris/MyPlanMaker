@@ -35,7 +35,7 @@
 
   <main>
     <div class="views" id="viste">
-      <button data-vista="3d" class="on">3D</button><button data-vista="fronte">Fronte</button><button data-vista="lato">Lato</button><button data-vista="sopra">Sopra</button><button data-vista="inquadra" title="Inquadra tutti i pezzi">⤢</button>
+      <button data-vista="3d" class="on">3D</button><button data-vista="fronte">Fronte</button><button data-vista="lato">Lato</button><button data-vista="sopra">Sopra</button><button data-vista="viti" title="Mostra o nascondi le viti">Viti</button><button data-vista="inquadra" title="Inquadra tutti i pezzi">⤢</button>
     </div>
     <div id="vista3d"></div>
     <div class="toast" id="toast" hidden><span class="dot"></span><span id="toast-testo"></span><button id="toast-chiudi" class="link" hidden>Annulla</button></div>
@@ -60,7 +60,7 @@
 </dialog>
 
 <dialog id="dlg-distinta" class="dlg larga">
-  <div class="dlg-testa"><h2>Distinta e tagli</h2><div class="seg schede" id="schede-distinta"><button data-scheda="pezzi" class="on">Pezzi</button><button data-scheda="schema">Schema di taglio</button></div><span class="sp"></span><button class="btn" id="stampa">Stampa o salva PDF</button><button class="btn icon" data-chiudi>✕</button></div>
+  <div class="dlg-testa"><h2>Distinta e tagli</h2><div class="seg schede" id="schede-distinta"><button data-scheda="pezzi" class="on">Pezzi</button><button data-scheda="schema">Schema di taglio</button><button data-scheda="ferramenta">Ferramenta e viti</button></div><span class="sp"></span><button class="btn" id="stampa">Stampa o salva PDF</button><button class="btn icon" data-chiudi>✕</button></div>
   <div class="dlg-corpo" id="distinta"></div>
 </dialog>
 

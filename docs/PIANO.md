@@ -79,3 +79,6 @@ pezzi, istruzioni di montaggio con vista esplosa, dime di foratura stampabili 1:
   Dettagli e limiti nel `CLAUDE.md` del progetto.
 - 2026-10-28, 0.2: Esporta/Importa progetto, schema di taglio (lastre e barre, lama, rifilo, venatura).
   Manca ancora: magazzino avanzi nello schema.
+- 2026-10-28, 0.3: cerniere e maniglie con fori, viti automatiche (tipo, misura, numero, posizione,
+  preforo) con controlli e collisioni, lista della spesa. Mancano: guide, angolari disegnati, piedini,
+  reggipiani, sistema 32, viti nascoste a scelta.

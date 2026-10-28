@@ -8,13 +8,16 @@ import { euro, riepilogo, righeDistinta } from './distinta.js';
 import * as archivio from './archivio.js';
 import { ESEMPI } from './esempi.js';
 import { IMPOSTAZIONI_TAGLIO, schemaDiTaglio } from './taglio.js';
+import { descriviGiunto, unioni } from './unioni.js';
+import { INTERASSI, LATI, MODELLI_CERNIERA, cerniere, maniglia } from './ferramenta.js';
+import { listaSpesa } from './spesa.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const numero = s => { const v = parseFloat(String(s).replace(/\s/g, '').replace(',', '.')); return Number.isFinite(v) ? v : null; };
 const f1 = v => mod.fmt(v, 1);
 
-const stato = { progetto: null, sel: null, modo: null };
+const stato = { progetto: null, sel: null, modo: null, mostraViti: localStorage.getItem('mpm:viti') !== 'no' };
 const storico = new mod.Storico();
 let vista;
 
@@ -36,7 +39,9 @@ function modifica(fn) {
 }
 
 function aggiorna() {
-  vista.aggiorna(stato.progetto, stato.sel);
+  const u = unioni(stato.progetto);
+  vista.aggiorna(stato.progetto, stato.sel, { viti: u.viti, mostraViti: stato.mostraViti, vitiErrate: u.errate });
+  document.querySelector('[data-vista="viti"]')?.classList.toggle('on', stato.mostraViti);
   $('#nome-progetto').textContent = stato.progetto.nome;
   document.title = `${stato.progetto.nome} — MyPlanMaker`;
   disegnaProprieta();
@@ -130,7 +135,7 @@ const campoNum = (campo, etichetta, valore, unita = 'mm') =>
 
 function disegnaProprieta() {
   const el = $('#proprieta'), p = pezzoSel();
-  const chiave = p ? JSON.stringify([p.id, p.tipo, p.forma, p.tagli.length, p.mat]) : 'progetto' + JSON.stringify(riepilogo(stato.progetto).materiali);
+  const chiave = p ? JSON.stringify([p.id, p.tipo, p.forma, p.tagli.length, p.mat, p.ferramenta]) : 'progetto' + JSON.stringify(riepilogo(stato.progetto).materiali);
   if (chiave === chiavePannello) return aggiornaValori(el, p);
   chiavePannello = chiave;
   el.innerHTML = p ? htmlPezzo(p) : htmlProgetto();
@@ -150,6 +155,8 @@ function aggiornaValori(el, p) {
   el.querySelectorAll('[data-campo]').forEach(i => { if (i !== document.activeElement) i.value = valoreCampo(p, i.dataset.campo); });
   const info = el.querySelector('[data-info]');
   if (info && p) info.innerHTML = htmlInfo(p);
+  const un = el.querySelector('[data-unioni]');
+  if (un && p) un.innerHTML = htmlUnioni(p);
   el.querySelectorAll('[data-orient]').forEach(b => {
     const r = mod.rotazioneDa(b.dataset.orient);
     b.classList.toggle('on', r.every((v, i) => Math.abs(v - p.rot[i]) < 0.01));
@@ -204,7 +211,45 @@ function htmlPezzo(p) {
       <button class="btn" data-azione="terra">Appoggia a terra</button>
     </div>
     <div class="group"><h3>Tagli</h3>${tagli}</div>
+    ${p.tipo === 'pannello' ? htmlFerramenta(p) : ''}
+    <div class="group" data-unioni></div>
     <div class="azioni"><button class="btn" data-azione="duplica">Duplica</button><button class="btn danger" data-azione="elimina">Elimina</button></div>`;
+}
+
+function htmlFerramenta(p) {
+  const c = cerniere(p), m = maniglia(p);
+  const seg = (attr, voci, attivo) => `<div class="seg">${Object.entries(voci).map(([k, v]) => `<button data-${attr}="${k}" class="${k === attivo ? 'on' : ''}">${v}</button>`).join('')}</div>`;
+  let h = '<div class="group"><h3>Ferramenta</h3>';
+  if (c) {
+    h += `<div class="field"><label>Cerniere: su quale lato (visti di fronte)</label>${seg('cern-lato', LATI, c.lato)}</div>
+      ${seg('cern-modello', MODELLI_CERNIERA, c.modello || 'sovrapposta')}
+      <div class="stepper"><button class="btn icon" data-cern-n="-1">−</button><div class="input"><span>${c.n} cerniere${c.numero ? '' : ' (scelte dall\'altezza)'}</span></div><button class="btn icon" data-cern-n="1">+</button></div>
+      ${c.avvisi.map(a => `<div class="avviso">${esc(a)}</div>`).join('')}
+      <button class="link" data-togli-ferr="cerniere">Togli le cerniere</button>`;
+  } else h += `<button class="btn" data-aggiungi-ferr="cerniere">+ Cerniere (diventa un'anta)</button>`;
+  if (m) {
+    const verticale = m.lato === 'A' || m.lato === 'B';
+    const pos = verticale ? { inizio: 'In basso', centro: 'Al centro', fine: 'In alto' } : { inizio: 'A sinistra', centro: 'Al centro', fine: 'A destra' };
+    h += `<div class="field"><label>Maniglia: interasse</label><div class="input"><select data-man-interasse>${INTERASSI.map(i => `<option value="${i}" ${i === (m.interasse || 128) ? 'selected' : ''}>${i} mm</option>`).join('')}</select><small>▾</small></div></div>
+      <div class="field"><label>Posizione della maniglia${c ? ' (sul lato opposto alle cerniere)' : ''}</label>${seg('man-pos', pos, m.posizione || 'fine')}</div>
+      ${seg('man-dir', { parallela: 'Parallela al bordo', perpendicolare: 'Perpendicolare' }, m.direzione || 'parallela')}
+      <p class="nota">2 fori Ø 5 passanti, viti ${esc(m.vite)}.</p>
+      ${m.avvisi.map(a => `<div class="avviso">${esc(a)}</div>`).join('')}
+      <button class="link" data-togli-ferr="maniglia">Togli la maniglia</button>`;
+  } else h += `<button class="btn" data-aggiungi-ferr="maniglia">+ Maniglia</button>`;
+  return h + '</div>';
+}
+
+function htmlUnioni(p) {
+  const u = unioni(stato.progetto), miei = u.giunti.filter(g => g.a.id === p.id || g.b.id === p.id);
+  const righe = miei.map(g => {
+    const altro = g.a.id === p.id ? g.b : g.a;
+    const puo = g.vite && g.tipo !== 'cerniere';
+    return `<div class="giunto"><div class="chipline"><span>con «${esc(altro.nome)}»</span>${puo ? `<button class="link" data-escludi="${g.chiave}">${g.escluso ? 'Rimetti le viti' : 'Niente viti'}</button>` : ''}</div>
+      <div class="nota">${esc(descriviGiunto(g))}</div>${g.note.map(n => `<div class="nota avviso-mini">${esc(n)}</div>`).join('')}</div>`;
+  }).join('');
+  const avvisi = u.avvisi.filter(a => a.includes(`«${p.nome}»`)).map(a => `<div class="avviso">${esc(a)}</div>`).join('');
+  return `<h3>Unioni e viti</h3>${righe || '<p class="nota">Non tocca altri pezzi. Usa Accosta per appoggiarlo: le viti arrivano da sole.</p>'}${avvisi}`;
 }
 
 function htmlProgetto() {
@@ -235,9 +280,15 @@ function applicaCampo(campo, valore) {
   if (p.tagli.length && ['L', 'W', 'D'].includes(campo)) avvisa('Il pezzo ha dei tagli: restano dove sono. Se serve, toglili e rifai Adatta.');
 }
 
+const ferr = (p, tipo) => p.ferramenta.find(f => f.tipo === tipo);
+
 function eventiProprieta() {
   const el = $('#proprieta');
-  el.addEventListener('change', e => { const c = e.target.dataset.campo; if (c) applicaCampo(c, e.target.value); });
+  el.addEventListener('change', e => {
+    const c = e.target.dataset.campo, p = pezzoSel();
+    if (c) applicaCampo(c, e.target.value);
+    else if (e.target.hasAttribute('data-man-interasse') && p) modifica(() => { ferr(p, 'maniglia').interasse = +e.target.value; });
+  });
   el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.campo) e.target.blur(); });
   el.addEventListener('click', e => {
     const b = e.target.closest('button');
@@ -247,6 +298,21 @@ function eventiProprieta() {
     else if (b.dataset.orient && p) modifica(() => { p.rot = mod.rotazioneDa(b.dataset.orient); });
     else if (b.dataset.inclina && p) modifica(() => { p.rot[0] = Math.round((p.rot[0] + +b.dataset.inclina) * 1000) / 1000; });
     else if (b.dataset.togli && p) modifica(() => { p.tagli.splice(+b.dataset.togli, 1); });
+    else if (b.dataset.aggiungiFerr && p) modifica(() => {
+      p.ferramenta = (p.ferramenta || []).filter(f => f.tipo !== b.dataset.aggiungiFerr);
+      p.ferramenta.push(b.dataset.aggiungiFerr === 'cerniere' ? { tipo: 'cerniere', lato: 'A', modello: 'sovrapposta' } : { tipo: 'maniglia', interasse: 128, posizione: 'fine', direzione: 'parallela' });
+    });
+    else if (b.dataset.togliFerr && p) modifica(() => { p.ferramenta = p.ferramenta.filter(f => f.tipo !== b.dataset.togliFerr); });
+    else if (b.dataset.cernLato && p) modifica(() => { ferr(p, 'cerniere').lato = b.dataset.cernLato; });
+    else if (b.dataset.cernModello && p) modifica(() => { ferr(p, 'cerniere').modello = b.dataset.cernModello; });
+    else if (b.dataset.cernN && p) modifica(() => { const f = ferr(p, 'cerniere'); f.numero = Math.max(1, Math.min(8, cerniere(p).n + +b.dataset.cernN)); });
+    else if (b.dataset.manPos && p) modifica(() => { ferr(p, 'maniglia').posizione = b.dataset.manPos; });
+    else if (b.dataset.manDir && p) modifica(() => { ferr(p, 'maniglia').direzione = b.dataset.manDir; });
+    else if (b.dataset.escludi) modifica(() => {
+      const l = new Set(stato.progetto.unioniEscluse || []);
+      l.has(b.dataset.escludi) ? l.delete(b.dataset.escludi) : l.add(b.dataset.escludi);
+      stato.progetto.unioniEscluse = [...l];
+    });
     else if (b.dataset.azione === 'terra' && p) {
       const min = Math.min(...verticiMondo(p).map(v => v.y));
       modifica(() => { p.pos[1] = Math.round((p.pos[1] - min) * 1000) / 1000; });
@@ -260,8 +326,11 @@ function disegnaPiede() {
   const comprare = schemaDiTaglio(stato.progetto), lastre = comprare.filter(g => g.tipo === 'pannello').reduce((t, g) => t + g.fogli.length, 0);
   const barre = comprare.filter(g => g.tipo === 'listello').reduce((t, g) => t + g.fogli.length, 0);
   const totale = comprare.reduce((t, g) => t + g.totale, 0);
+  const u = unioni(stato.progetto), spesa = listaSpesa(stato.progetto, u);
   $('#piede').innerHTML = `<span><b>${r.pezzi}</b> pezzi</span><span>Da comprare: <b>${lastre}</b> lastr${lastre === 1 ? 'a' : 'e'} · <b>${barre}</b> barr${barre === 1 ? 'a' : 'e'}</span>
-    <span class="sp"></span><span>Costo dei pezzi <b>${euro(r.costo)}</b></span><span class="costo">Da comprare <b>${euro(totale)}</b></span>`;
+    <span>Viti: <b>${u.viti.length}</b></span>${u.avvisi.length ? `<button class="link avviso-link" id="vedi-avvisi">⚠ ${u.avvisi.length} da controllare</button>` : ''}
+    <span class="sp"></span><span>Costo dei pezzi <b>${euro(r.costo)}</b></span><span class="costo">Da comprare <b>${euro(totale + spesa.totale)}</b></span>`;
+  $('#vedi-avvisi')?.addEventListener('click', () => { mostraDistinta('ferramenta'); $('#dlg-distinta').showModal(); });
 }
 
 function htmlDistinta() {
@@ -313,14 +382,28 @@ function htmlSchema(perStampa = false) {
     ${html || '<p class="nota">Ancora nessun pezzo.</p>'}`;
 }
 
+function htmlFerramentaProgetto() {
+  const u = unioni(stato.progetto), sp = listaSpesa(stato.progetto, u);
+  const avvisi = u.avvisi.map(a => `<div class="avviso">⚠ ${esc(a)}</div>`).join('');
+  const spesa = sp.righe.map(r => `<tr><td>${esc(r.voce)}${r.nota ? `<br><small class="nota">${esc(r.nota)}</small>` : ''}</td><td class="num">${r.qta}</td><td class="num">${euro(r.qta * r.prezzo)}</td></tr>`).join('');
+  const giunti = u.giunti.map(g => `<tr><td>${esc(g.a.nome)} + ${esc(g.b.nome)}</td><td>${esc(g.tipo || '')}</td><td>${esc(descriviGiunto(g))}${g.note.map(n => `<br><small class="nota">${esc(n)}</small>`).join('')}</td></tr>`).join('');
+  return `${avvisi}
+    <h3>Lista della spesa</h3>
+    <table class="distinta"><thead><tr><th>Voce</th><th style="text-align:right">Quantità</th><th style="text-align:right">Costo</th></tr></thead><tbody>${spesa || '<tr><td colspan="3" class="nota">Ancora niente.</td></tr>'}</tbody></table>
+    <p class="nota">Totale ferramenta: <b>${euro(sp.totale)}</b> (prezzi indicativi).</p>
+    <h3>Unioni trovate</h3>
+    <table class="distinta"><thead><tr><th>Pezzi</th><th>Come si toccano</th><th>Fissaggio proposto</th></tr></thead><tbody>${giunti || '<tr><td colspan="3" class="nota">Nessun pezzo tocca un altro.</td></tr>'}</tbody></table>
+    <p class="nota">Le viti sono proposte con regole indicative: controllale prima di forare. Le blu sono nel 3D (pulsante Viti), le rosse si scontrano con qualcosa.</p>`;
+}
+
 function mostraDistinta(scheda) {
   document.querySelectorAll('#schede-distinta button').forEach(b => b.classList.toggle('on', b.dataset.scheda === scheda));
-  $('#distinta').innerHTML = scheda === 'schema' ? htmlSchema() : htmlDistinta();
+  $('#distinta').innerHTML = scheda === 'schema' ? htmlSchema() : scheda === 'ferramenta' ? htmlFerramentaProgetto() : htmlDistinta();
   $('#distinta').dataset.scheda = scheda;
 }
 
 function stampa() {
-  $('#stampa-area').innerHTML = `<h1>${esc(stato.progetto.nome)}</h1><p class="nota">MyPlanMaker · ${new Date().toLocaleDateString('it-IT')}</p>${htmlDistinta()}<div class="stampa-schema"><h1>Schema di taglio</h1>${htmlSchema(true)}</div>`;
+  $('#stampa-area').innerHTML = `<h1>${esc(stato.progetto.nome)}</h1><p class="nota">MyPlanMaker · ${new Date().toLocaleDateString('it-IT')}</p>${htmlDistinta()}<div class="stampa-schema"><h1>Schema di taglio</h1>${htmlSchema(true)}</div><div class="stampa-schema"><h1>Ferramenta e viti</h1>${htmlFerramentaProgetto()}</div>`;
   window.print();
 }
 
@@ -354,7 +437,7 @@ function apri(progetto) {
   localStorage.setItem('mpm:ultimo', progetto.id);
   aggiorna();
   vista.vista('3d');
-  document.querySelectorAll('#viste button').forEach(b => b.classList.toggle('on', b.dataset.vista === '3d'));
+  document.querySelectorAll('#viste button:not([data-vista="viti"]):not([data-vista="inquadra"])').forEach(b => b.classList.toggle('on', b.dataset.vista === '3d'));
 }
 
 function crea(progetto) {
@@ -430,7 +513,8 @@ async function avvio() {
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.vista === 'inquadra') return vista.vista(vista.nomeVista);
-    document.querySelectorAll('#viste button').forEach(x => x.classList.toggle('on', x === b));
+    if (b.dataset.vista === 'viti') { stato.mostraViti = !stato.mostraViti; localStorage.setItem('mpm:viti', stato.mostraViti ? 'si' : 'no'); return aggiorna(); }
+    document.querySelectorAll('#viste button:not([data-vista="viti"]):not([data-vista="inquadra"])').forEach(x => x.classList.toggle('on', x === b));
     vista.vista(b.dataset.vista);
   });
   const annulla = () => { const s = storico.annulla(stato.progetto); if (s) { stato.progetto = s; aggiorna(); salvaPresto(); } };

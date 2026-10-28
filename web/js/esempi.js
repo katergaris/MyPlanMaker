@@ -18,7 +18,8 @@ export function mobilettoLeggio() {
   pezzo(pr, { nome: 'Fondo', tipo: 'pannello', mat: 'mb18', L: W - 2 * T, W: D - 10, rot: 'orizzontale', pos: [T, 50, 0] });
   pezzo(pr, { nome: 'Ripiano', tipo: 'pannello', mat: 'mb18', L: W - 2 * T, W: D - 10, rot: 'orizzontale', pos: [T, 386, 0] });
   const sch = pezzo(pr, { nome: 'Schienale', tipo: 'pannello', mat: 'hdf3', L: 1000, W: W - 2 * T, rot: 'verticale', pos: [W - T, 50, -D] });
-  pezzo(pr, { nome: 'Anta', tipo: 'pannello', mat: 'mb18', L: W - 4, W: 330, r: 0, rot: 'frontale', pos: [2, 52, 0] });
+  pezzo(pr, { nome: 'Anta', tipo: 'pannello', mat: 'mb18', L: W - 4, W: 330, r: 0, rot: 'frontale', pos: [2, 52, 0],
+    ferramenta: [{ tipo: 'cerniere', lato: 'A', modello: 'sovrapposta' }, { tipo: 'maniglia', interasse: 128, posizione: 'fine', direzione: 'parallela' }] });
   adatta(fsx, piano);
   adatta(fdx, piano);
   adatta(sch, piano);
@@ -43,6 +44,6 @@ export function tavoloRotondo() {
 }
 
 export const ESEMPI = [
-  { nome: 'Mobiletto con leggio', crea: mobilettoLeggio, nota: 'piano inclinato, fianchi e schienale adattati' },
+  { nome: 'Mobiletto con leggio', crea: mobilettoLeggio, nota: 'piano inclinato, fianchi e schienale adattati, anta con cerniere' },
   { nome: 'Tavolo rotondo', crea: tavoloRotondo, nota: 'piano Ø 100 in rovere, 4 gambe e fascia' },
 ];
