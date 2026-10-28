@@ -77,3 +77,5 @@ pezzi, istruzioni di montaggio con vista esplosa, dime di foratura stampabili 1:
 ## Avanzamento
 - 2026-10-28, prototipo 0.1: pezzi, Accosta, Adatta, cerchi e angoli arrotondati, distinta, salvataggio.
   Dettagli e limiti nel `CLAUDE.md` del progetto.
+- 2026-10-28, 0.2: Esporta/Importa progetto, schema di taglio (lastre e barre, lama, rifilo, venatura).
+  Manca ancora: magazzino avanzi nello schema.

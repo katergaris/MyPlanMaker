@@ -30,13 +30,20 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     Rotazioni in gradi, ordine sugli assi del mondo X → Y → Z (Euler three.js `'ZYX'`).
   - `js/geometria.js` — Manifold: profilo (rettangolo, angoli arrotondati, cerchio) estruso + `trimByPlane`.
   - `js/vista3d.js` — three.js: disegno, selezione col tocco (con la faccia toccata), viste 3D/Fronte/Lato/Sopra.
-  - `js/distinta.js` — misure finite dai solidi tagliati, tagli, costi. `js/materiali.js` — catalogo di partenza.
-  - `js/archivio.js` — copia in `localStorage` + server; `sw.js` — funzionamento senza rete.
+  - `js/distinta.js` — misure finite dai solidi tagliati, tagli, costi. `js/materiali.js` — catalogo di partenza
+    (per i pannelli anche lastra commerciale e venatura, per i listelli la barra).
+  - `js/taglio.js` — schema di taglio: MaxRects (lato corto migliore) sulle lastre, barre "prima dove entra" dal
+    pezzo più lungo; lama e rifilo in `progetto.taglio`; con venatura i pezzi non si ruotano.
+  - `js/archivio.js` — copia in `localStorage` + server, e file di progetto `.mpm.json`
+    (`{formato: 'myplanmaker', versione: 1, progetto}`, Esporta/Importa nel menu Progetti; all'import nuovo id).
+    `sw.js` — funzionamento senza rete: **aggiungere lì ogni nuovo file JS** e cambiare `VERSIONE`.
   - `js/esempi.js` — "Mobiletto con leggio" e "Tavolo rotondo", costruiti con gli stessi comandi.
-  - `prove.html` — prove automatiche di modello e geometria (aprirla col server avviato: "TUTTE OK").
+  - `prove.html` — prove automatiche di modello, geometria, schema di taglio e file (col server avviato: "TUTTE OK").
+  - `prove-ui.html#passo,passo` — pilota l'app per gli screenshot (esempio:N, sel:Nome, cmd:x, tocca:Nome,
+    vista:x, distinta, schema, progetti).
   - `vendor/` — three.js 0.186.1 e manifold-3d 3.5.4 copiati dal registro npm (`VERSIONI.txt`).
 - `tests/test_server.py` — `python3 -m unittest discover -s tests`.
-- `windows/` — **versione portable per Windows** (2026-10-28): `crea-portable.sh` (da Linux) scarica Python
+- `windows/` — **versione portable per Windows** (2026-10-28, versione in `windows/VERSIONE`): `crea-portable.sh` (da Linux) scarica Python
   3.13.17 embeddable da python.org (cache in `dist/cache`) e crea `dist/MyPlanMaker-portable-<VERSIONE>.zip`
   con `python/`, `app/` (server + web + `avvia.pyw`), `MyPlanMaker.bat`, `LEGGIMI.txt`. `avvia.pyw` usa la
   prima porta libera da 8099 (o riapre l'istanza già avviata, riconosciuta da `/api/ping`), ascolta solo su
@@ -57,4 +64,8 @@ distinta con tagli e costi, stampa/PDF, salvataggio PC ↔ tablet, Annulla/Ripet
 ZimaOS. Repository privato `katergaris/MyPlanMaker`, branch `main` (creato il 2026-10-28).
 Limiti noti: i tagli restano fissi se poi si cambia la lunghezza (non sono ancora relazioni vive); Adatta lavora
 solo lungo la lunghezza del pezzo; un progetto eliminato senza rete ricompare dal server.
-Prossimi passi (vedi `docs/PIANO.md`): Dividi, ferramenta e viti automatiche, schema di taglio, sagome libere.
+0.2 (2026-10-28): Esporta/Importa progetto (`.mpm.json`), schema di taglio con lama/rifilo/venatura e conto da
+comprare (anche nel piede e nella stampa).
+Per preparare un progetto per Salvo: costruirlo con le funzioni di `modello.js` (come `esempi.js`), controllarlo
+con `prove-ui.html` e consegnarlo come `.mpm.json` in `MyPlanMaker/progetti/`.
+Prossimi passi (vedi `docs/PIANO.md`): ferramenta e viti automatiche, Dividi, sagome libere e dime 1:1.

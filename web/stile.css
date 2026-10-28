@@ -69,6 +69,7 @@ aside.props { background: var(--panel); border-left: 1px solid var(--line); padd
 .group h3 { font-size: 15px; font-weight: 600; }
 .chipline { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 15px; }
 .nota { font-size: 14px; color: var(--muted); }
+.chipline b { white-space: nowrap; }
 .ok { background: var(--ok-soft); color: var(--ok); border-radius: 10px; padding: 12px 14px; font-size: 15px; }
 .avviso { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 12px 14px; font-size: 15px; }
 .azioni { display: flex; gap: 10px; }
@@ -103,6 +104,20 @@ table.distinta { width: 100%; border-collapse: collapse; font-size: 15px; }
 .distinta-totali b { color: var(--text); }
 
 #stampa-area { display: none; }
+.schede { flex: none; }
+.schede button { padding: 0 16px; }
+.impost { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+.impost .field { width: 150px; }
+.gruppo-taglio { border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.gruppo-taglio h3 { font-size: 16px; color: var(--text); margin: 0; }
+.gruppo-taglio .riga { display: flex; gap: 22px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
+.gruppo-taglio .riga b { color: var(--text); }
+.lastre { display: flex; flex-wrap: wrap; gap: 16px; }
+.lastra { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.lastra svg { display: block; background: #f7f2ea; border: 1px solid #cdbfa9; border-radius: 4px; }
+.lastra svg .pz { fill: #e9d3ac; stroke: #8a6b45; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.lastra svg text { font: 600 12px system-ui, sans-serif; fill: #2b2722; }
+.lastra svg text.mis { font-weight: 400; font-size: 10px; fill: #5c5247; }
 
 @media (max-width: 1100px) {
   .app { grid-template-columns: 88px 1fr 300px; }
@@ -125,4 +140,6 @@ table.distinta { width: 100%; border-collapse: collapse; font-size: 15px; }
   #stampa-area .nota { margin-bottom: 14px; }
   table.distinta { font-size: 12px; }
   .distinta tr { break-inside: avoid; }
+  .gruppo-taglio, .lastra { break-inside: avoid; }
+  .stampa-schema { break-before: page; }
 }

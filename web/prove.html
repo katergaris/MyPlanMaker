@@ -8,6 +8,8 @@ import { avviaGeometria, geometriaPezzo } from './js/geometria.js';
 import * as mod from './js/modello.js';
 import { mobilettoLeggio, tavoloRotondo } from './js/esempi.js';
 import { righeDistinta } from './js/distinta.js';
+import { schemaDiTaglio } from './js/taglio.js';
+import { daFile, versoFile } from './js/archivio.js';
 
 const esiti = [];
 const vicino = (a, b, tol = 0.6) => Math.abs(a - b) <= tol;
@@ -67,6 +69,54 @@ await avviaGeometria();
   const pr = tavoloRotondo(), righe = righeDistinta(pr), p = righe.find(x => x.nome === 'Piano rotondo');
   prova('piano rotondo Ø 1000', vicino(p.L, 1000, 1) && /^rotondo Ø 1\.?000$/.test(p.forma[0]), `${p.L} · ${p.forma}`);
   prova('tavolo: 9 pezzi', righe.length === 9);
+}
+
+// 7. Schema di taglio
+function controllaLastre(gruppi, lama) {
+  for (const g of gruppi) for (const f of g.fogli) {
+    if (!f.H) continue;
+    for (const [i, a] of f.pezzi.entries()) {
+      if (a.x < 0 || a.y < 0 || a.x + a.w > f.L + 1e-6 || a.y + a.h > f.H + 1e-6) return `n° ${a.n} esce dalla lastra`;
+      for (const b of f.pezzi.slice(i + 1)) {
+        const staccati = a.x + a.w + lama <= b.x + 1e-6 || b.x + b.w + lama <= a.x + 1e-6 || a.y + a.h + lama <= b.y + 1e-6 || b.y + b.h + lama <= a.y + 1e-6;
+        if (!staccati) return `n° ${a.n} e n° ${b.n} si sovrappongono (o manca la lama)`;
+      }
+    }
+  }
+  return '';
+}
+{
+  const pr = mobilettoLeggio(), g = schemaDiTaglio(pr);
+  const posati = g.reduce((s, x) => s + x.fogli.reduce((t, f) => t + f.pezzi.length, 0), 0);
+  prova('mobiletto: tutti i 7 pezzi sulle lastre', posati === 7 && g.every(x => !x.fuori.length), `${posati}`);
+  const err = controllaLastre(g, 3.2);
+  prova('mobiletto: nessuna sovrapposizione, lama rispettata', !err, err);
+  prova('multistrato: venatura rispettata (nessun pezzo ruotato)', g.find(x => x.materiale.id === 'mb18').fogli.every(f => f.pezzi.every(p => !p.ruotato)));
+}
+{
+  const pr = tavoloRotondo(), g = schemaDiTaglio(pr), gambe = g.find(x => x.materiale.id === 'ro6060');
+  prova('tavolo: 4 gambe da 723 in 2 barre da 2500', gambe.fogli.length === 2, `${gambe.fogli.length}`);
+  const piano = g.find(x => x.materiale.id === 'ro27');
+  prova('tavolo: il piano Ø 1000 entra in una lastra 2500×1200', piano.fuori.length === 0 && piano.fogli.length === 1, `${piano.fuori.length}`);
+  const pr2 = tavoloRotondo(); pr2.pezzi[0].D = 1400;
+  prova('piano Ø 1400 troppo grande: viene segnalato', schemaDiTaglio(pr2).find(x => x.materiale.id === 'ro27').fuori.length === 1);
+}
+{
+  const pr = mod.nuovoProgetto();
+  for (let i = 0; i < 30; i++) { const p = mod.nuovoPezzo(pr, 'pannello'); p.mat = 'tn18'; p.L = 300 + (i * 97) % 700; p.W = 200 + (i * 53) % 400; }
+  const g = schemaDiTaglio(pr), err = controllaLastre(g, 3.2);
+  const posati = g[0].fogli.reduce((t, f) => t + f.pezzi.length, 0);
+  prova('30 pezzi misti: tutti posati senza sovrapposizioni', posati === 30 && !err, `${posati} ${err} · ${g[0].fogli.length} lastre`);
+}
+
+// 8. File di progetto
+{
+  const pr = mobilettoLeggio(); pr.id = 'x';
+  const p2 = daFile(versoFile(pr));
+  prova('esporta → importa: stessi pezzi e tagli', JSON.stringify(p2.pezzi) === JSON.stringify(pr.pezzi));
+  let errore = '';
+  try { daFile('{"ciao": 1}'); } catch (e) { errore = e.message; }
+  prova('file sbagliato: messaggio chiaro', /non contiene/.test(errore), errore);
 }
 
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');

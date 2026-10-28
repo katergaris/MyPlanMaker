@@ -50,6 +50,8 @@
   <div class="dlg-testa"><h2>Progetti</h2><button class="btn icon" data-chiudi>✕</button></div>
   <div class="dlg-corpo">
     <button class="btn primary" id="nuovo-progetto">+ Nuovo progetto vuoto</button>
+    <div class="azioni"><button class="btn" id="importa">Importa da file…</button><button class="btn" id="esporta-file">Esporta questo progetto</button></div>
+    <input type="file" id="file-importa" accept=".json,application/json" hidden>
     <h3>I tuoi progetti</h3>
     <ul class="lista" id="lista-progetti"></ul>
     <h3>Parti da un esempio</h3>
@@ -58,7 +60,7 @@
 </dialog>
 
 <dialog id="dlg-distinta" class="dlg larga">
-  <div class="dlg-testa"><h2>Distinta e tagli</h2><span class="sp"></span><button class="btn" id="stampa">Stampa o salva PDF</button><button class="btn icon" data-chiudi>✕</button></div>
+  <div class="dlg-testa"><h2>Distinta e tagli</h2><div class="seg schede" id="schede-distinta"><button data-scheda="pezzi" class="on">Pezzi</button><button data-scheda="schema">Schema di taglio</button></div><span class="sp"></span><button class="btn" id="stampa">Stampa o salva PDF</button><button class="btn icon" data-chiudi>✕</button></div>
   <div class="dlg-corpo" id="distinta"></div>
 </dialog>
 

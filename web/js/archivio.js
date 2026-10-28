@@ -59,3 +59,23 @@ export async function elimina(id) {
   localStorage.removeItem(PREF + id);
   try { await api('DELETE', `/api/projects/${id}`); } catch { /* verrà rimosso solo in locale */ }
 }
+
+// File di progetto (.mpm.json): per passare progetti tra portable, server e tablet, o prepararli a parte.
+export function versoFile(progetto) {
+  const { _sporco, ...dati } = progetto;
+  return JSON.stringify({ formato: 'myplanmaker', versione: 1, esportato: new Date().toISOString(), progetto: dati }, null, 1);
+}
+
+export function daFile(testo) {
+  let j;
+  try { j = JSON.parse(testo); } catch { throw new Error('Il file non è un progetto MyPlanMaker (JSON non valido).'); }
+  const p = j && j.formato === 'myplanmaker' ? j.progetto : j;
+  if (!p || !Array.isArray(p.pezzi)) throw new Error('Il file non contiene un progetto MyPlanMaker.');
+  for (const x of p.pezzi) {
+    if (!x || typeof x.id !== 'string' || !Array.isArray(x.pos) || !Array.isArray(x.rot)) throw new Error('Un pezzo del file è incompleto.');
+    x.tagli = Array.isArray(x.tagli) ? x.tagli : [];
+  }
+  p.prossimoN = Math.max(p.prossimoN || 1, ...p.pezzi.map(x => (x.n || 0) + 1));
+  p.nome = String(p.nome || 'Progetto importato');
+  return p;
+}

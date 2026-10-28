@@ -7,6 +7,7 @@ import { materiale, materialiPer } from './materiali.js';
 import { euro, riepilogo, righeDistinta } from './distinta.js';
 import * as archivio from './archivio.js';
 import { ESEMPI } from './esempi.js';
+import { IMPOSTAZIONI_TAGLIO, schemaDiTaglio } from './taglio.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -256,8 +257,11 @@ function eventiProprieta() {
 // ---------- piede e distinta ----------
 function disegnaPiede() {
   const r = riepilogo(stato.progetto);
-  $('#piede').innerHTML = `<span><b>${r.pezzi}</b> pezzi</span><span><b>${r.materiali.length}</b> materiali</span>
-    <span class="sp"></span><span class="costo">Costo stimato <b>${euro(r.costo)}</b></span>`;
+  const comprare = schemaDiTaglio(stato.progetto), lastre = comprare.filter(g => g.tipo === 'pannello').reduce((t, g) => t + g.fogli.length, 0);
+  const barre = comprare.filter(g => g.tipo === 'listello').reduce((t, g) => t + g.fogli.length, 0);
+  const totale = comprare.reduce((t, g) => t + g.totale, 0);
+  $('#piede').innerHTML = `<span><b>${r.pezzi}</b> pezzi</span><span>Da comprare: <b>${lastre}</b> lastr${lastre === 1 ? 'a' : 'e'} · <b>${barre}</b> barr${barre === 1 ? 'a' : 'e'}</span>
+    <span class="sp"></span><span>Costo dei pezzi <b>${euro(r.costo)}</b></span><span class="costo">Da comprare <b>${euro(totale)}</b></span>`;
 }
 
 function htmlDistinta() {
@@ -271,8 +275,52 @@ function htmlDistinta() {
     <p class="nota">Misure finite dopo i tagli (L × larghezza × spessore). Testa A = inizio del pezzo, Testa B = fine. Costi indicativi, senza sfrido.</p>`;
 }
 
+function svgLastra(f, larghezza) {
+  const sc = larghezza / f.L, barra = !f.H, alto = barra ? 30 : f.H * sc;
+  const pezzi = f.pezzi.map(p => {
+    const x = p.x * sc, w = p.w * sc, y = barra ? 3 : p.y * sc, h = barra ? 24 : p.h * sc, cx = x + w / 2, cy = y + h / 2;
+    let testo = '';
+    if (barra) testo = w > 18 ? `<text x="${cx}" y="${cy + 4}" text-anchor="middle">${w > 70 ? `${p.n} · ${Math.round(p.w)}` : p.n}</text>` : '';
+    else if (w > 18 && h > 14) {
+      testo = `<text x="${cx}" y="${cy + (h > 34 ? -2 : 4)}" text-anchor="middle">${p.n}</text>`;
+      if (w > 70 && h > 34) testo += `<text class="mis" x="${cx}" y="${cy + 12}" text-anchor="middle">${Math.round(p.w)}×${Math.round(p.h)}${p.ruotato ? ' ↻' : ''}</text>`;
+    }
+    const forma = p.rotondo ? `<ellipse class="pz" cx="${cx}" cy="${cy}" rx="${w / 2}" ry="${h / 2}"><title>${esc(p.nome)}</title></ellipse>`
+      : `<rect class="pz" x="${x}" y="${y}" width="${w}" height="${h}" rx="${(p.raggio || 0) * sc}"><title>${esc(p.nome)}</title></rect>`;
+    return forma + testo;
+  }).join('');
+  return `<svg width="${larghezza}" height="${alto}" viewBox="0 0 ${larghezza} ${alto}">${pezzi}</svg>`;
+}
+
+function htmlSchema(perStampa = false) {
+  const imp = { ...IMPOSTAZIONI_TAGLIO, ...(stato.progetto.taglio || {}) };
+  const gruppi = schemaDiTaglio(stato.progetto);
+  const totale = gruppi.reduce((s, g) => s + g.totale, 0);
+  const html = gruppi.map(g => {
+    const m = g.materiale, lastra = g.tipo === 'pannello';
+    const unita = lastra ? `lastr${g.fogli.length === 1 ? 'a' : 'e'} ${m.lastra[0]}×${m.lastra[1]}` : `barr${g.fogli.length === 1 ? 'a' : 'e'} da ${mod.fmt(m.barra)} mm`;
+    const fuori = g.fuori.length ? `<div class="avviso">Non ${g.fuori.length === 1 ? 'entra' : 'entrano'} in ${lastra ? 'una lastra' : 'una barra'}: ${g.fuori.map(p => `n° ${p.n} ${esc(p.nome)} (${p.L}${lastra ? `×${p.W}` : ''})`).join(', ')}. Va giuntato o comprato a parte.</div>` : '';
+    const disegni = g.fogli.map((f, i) => `<div class="lastra">${svgLastra(f, lastra ? 460 : 640)}<span>${lastra ? 'Lastra' : 'Barra'} ${i + 1} · usata al ${Math.round(f.uso * 100)}%</span></div>`).join('');
+    return `<div class="gruppo-taglio"><h3>${esc(m.nome)}</h3>
+      <div class="riga"><span>Da comprare: <b>${g.fogli.length} ${unita}</b></span><span>Costo: <b>${euro(g.totale)}</b></span>${lastra ? `<span>${m.venatura ? 'Venatura rispettata: pezzi non ruotati' : 'Pezzi ruotabili (↻ = ruotato)'}</span>` : ''}</div>
+      ${fuori}<div class="lastre">${disegni}</div></div>`;
+  }).join('');
+  if (perStampa) return `<p class="nota">Lama ${f1(imp.lama)} mm · rifilo ${f1(imp.rifilo)} mm · totale da comprare ${euro(totale)}</p>${html}`;
+  return `<div class="impost">
+      <div class="field"><label>Spessore della lama</label><div class="input"><input data-taglio="lama" inputmode="decimal" value="${f1(imp.lama)}"><small>mm</small></div></div>
+      <div class="field"><label>Rifilo dei bordi</label><div class="input"><input data-taglio="rifilo" inputmode="decimal" value="${f1(imp.rifilo)}"><small>mm</small></div></div>
+      <p class="nota" style="flex:1;min-width:220px">Totale da comprare: <b>${euro(totale)}</b>. I numeri sui disegni sono quelli della distinta.</p></div>
+    ${html || '<p class="nota">Ancora nessun pezzo.</p>'}`;
+}
+
+function mostraDistinta(scheda) {
+  document.querySelectorAll('#schede-distinta button').forEach(b => b.classList.toggle('on', b.dataset.scheda === scheda));
+  $('#distinta').innerHTML = scheda === 'schema' ? htmlSchema() : htmlDistinta();
+  $('#distinta').dataset.scheda = scheda;
+}
+
 function stampa() {
-  $('#stampa-area').innerHTML = `<h1>${esc(stato.progetto.nome)}</h1><p class="nota">MyPlanMaker · ${new Date().toLocaleDateString('it-IT')}</p>${htmlDistinta()}`;
+  $('#stampa-area').innerHTML = `<h1>${esc(stato.progetto.nome)}</h1><p class="nota">MyPlanMaker · ${new Date().toLocaleDateString('it-IT')}</p>${htmlDistinta()}<div class="stampa-schema"><h1>Schema di taglio</h1>${htmlSchema(true)}</div>`;
   window.print();
 }
 
@@ -340,7 +388,35 @@ function eventiDialoghi() {
       dialogoProgetti();
     }
   });
-  $('#apri-distinta').addEventListener('click', () => { $('#distinta').innerHTML = htmlDistinta(); $('#dlg-distinta').showModal(); });
+  $('#esporta-file').addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([archivio.versoFile(stato.progetto)], { type: 'application/json' }));
+    a.download = `${stato.progetto.nome.replace(/[\\/:*?"<>|]+/g, '-')}.mpm.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+  $('#importa').addEventListener('click', () => $('#file-importa').click());
+  $('#file-importa').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const p = archivio.daFile(await f.text());
+      $('#dlg-progetti').close();
+      crea(p);
+      avvisa(`Importato «${p.nome}» come nuovo progetto.`);
+    } catch (err) { avvisa(err.message, true, 8000); }
+  });
+  $('#apri-distinta').addEventListener('click', () => { mostraDistinta('pezzi'); $('#dlg-distinta').showModal(); });
+  $('#schede-distinta').addEventListener('click', e => { const b = e.target.closest('button'); if (b) mostraDistinta(b.dataset.scheda); });
+  $('#distinta').addEventListener('change', e => {
+    const k = e.target.dataset.taglio;
+    if (!k) return;
+    const v = numero(e.target.value);
+    if (v === null || v < 0 || v > 100) { avvisa('Scrivi un numero tra 0 e 100.', true); return mostraDistinta('schema'); }
+    modifica(() => { stato.progetto.taglio = { ...IMPOSTAZIONI_TAGLIO, ...(stato.progetto.taglio || {}), [k]: v }; });
+    mostraDistinta('schema');
+  });
   $('#stampa').addEventListener('click', stampa);
   $('#esporta').addEventListener('click', stampa);
 }

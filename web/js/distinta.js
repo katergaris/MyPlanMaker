@@ -16,6 +16,8 @@ export function righeDistinta(progetto) {
       n: p.n, nome: p.nome, tipo: p.tipo, materiale: m.nome,
       L: Math.round(L), W: Math.round(p.tipo === 'listello' ? base.W : W), T: base.T,
       grezzoL: base.L, forma, tagli, costo, vuoto: !g,
+      rotondo: p.tipo === 'pannello' && p.forma === 'cerchio' && !p.tagli.length,
+      raggio: p.tipo === 'pannello' && p.forma !== 'cerchio' ? (p.r || 0) : 0,
     };
   });
 }
