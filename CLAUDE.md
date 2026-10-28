@@ -47,7 +47,7 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
 Prototipo 0.1 (2026-10-28): pannelli e listelli, misure a numero, orientamenti rapidi, rotazioni libere,
 Accosta, Adatta (allunga/accorcia e taglia con l'angolo della faccia), forme rotonde e angoli arrotondati,
 distinta con tagli e costi, stampa/PDF, salvataggio PC ↔ tablet, Annulla/Ripeti. Non ancora installato su
-ZimaOS, non è un repository git.
+ZimaOS. Repository privato `katergaris/MyPlanMaker`, branch `main` (creato il 2026-10-28).
 Limiti noti: i tagli restano fissi se poi si cambia la lunghezza (non sono ancora relazioni vive); Adatta lavora
 solo lungo la lunghezza del pezzo; un progetto eliminato senza rete ricompare dal server.
 Prossimi passi (vedi `docs/PIANO.md`): Dividi, ferramenta e viti automatiche, schema di taglio, sagome libere.
