@@ -80,15 +80,23 @@ export function geometriaPezzo(p) {
       vol += v; cx += v * (ax + bx + qx) / 4; cy += v * (ay + by + qy) / 4; cz += v * (az + bz + qz) / 4;
     }
     const centro = vol ? [cx / vol, cy / vol, cz / vol] : [0, 0, 0];
-    risultato = { geometria: g, bordi: new EdgesGeometry(g, 25), min: bb.min, max: bb.max, vertici, volume: solido.volume(), centro };
+    risultato = { geometria: g, bordi: new EdgesGeometry(g, 25), min: bb.min, max: bb.max, vertici, volume: solido.volume(), centro, solido };
   }
-  solido.delete();
+  if (!risultato) solido.delete();
   if (cache.size > 400) {
     const [vecchia] = cache.keys();
     const v = cache.get(vecchia);
-    if (v) { v.geometria.dispose(); v.bordi.dispose(); }
+    if (v) { v.geometria.dispose(); v.bordi.dispose(); v.solido.delete(); }
     cache.delete(vecchia);
   }
   cache.set(k, risultato);
   return risultato;
+}
+
+// Volume (mm³) della parte comune tra due pezzi, già messi al loro posto (matrici three.js).
+export function volumeComune(ga, ma, gb, mb) {
+  const a = ga.solido.transform(ma.elements), b = gb.solido.transform(mb.elements), c = a.intersect(b);
+  const v = c.volume();
+  a.delete(); b.delete(); c.delete();
+  return v;
 }

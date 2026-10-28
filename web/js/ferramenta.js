@@ -9,6 +9,7 @@ export const CATALOGO = {
   vite: { nome: 'Vite truciolare', prezzo: 0.06 },
   viteManiglia: { nome: 'Vite per maniglia', prezzo: 0.1 },
   angolare: { nome: 'Angolare 40×40 con 4 viti 3,5×16', prezzo: 0.7 },
+  guida: { nome: 'Coppia di guide a sfere, estrazione totale', prezzo: 9 },
 };
 
 export const MODELLI_CERNIERA = { sovrapposta: 'Sovrapposta', semi: 'Semi sovrapposta', filo: 'A filo (interna)' };

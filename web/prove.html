@@ -13,6 +13,8 @@ import { daFile, versoFile } from './js/archivio.js';
 import { unioni } from './js/unioni.js';
 import { cerniere, maniglia } from './js/ferramenta.js';
 import { controlli, freccia } from './js/controlli.js';
+import { MODELLI, valoriDefault } from './js/modelli.js';
+import { listaSpesa } from './js/spesa.js';
 
 const esiti = [];
 const vicino = (a, b, tol = 0.6) => Math.abs(a - b) <= tol;
@@ -209,6 +211,33 @@ function controllaLastre(gruppi, lama) {
   const topFianco = Math.max(...g1.vertici.map(v => new T.Vector3(...v).applyMatrix4(mod.matrice(c1)).y));
   prova('copia specchiata: il taglio obliquo resta in cima (900 dietro)', Math.abs(topFianco - 900) < 0.6, `${topFianco.toFixed(1)}`);
   prova('copia specchiata dell\'anta: cerniere sul lato B', cerniere(c2).lato === 'B', cerniere(c2).lato);
+}
+
+// 13. Modelli pronti e cassetti
+for (const m of MODELLI) {
+  const pr = mod.nuovoProgetto(m.nome);
+  let errore = '';
+  try { m.crea(pr, valoriDefault(m), 0); } catch (e) { errore = e.message; }
+  const righe = righeDistinta(pr), c = controlli(pr), u = unioni(pr);
+  const vuoti = righe.filter(r => r.vuoto).length;
+  const conViti = u.giunti.filter(g => g.viti.length).length;
+  prova(`modello «${m.nome}»: ${pr.pezzi.length} pezzi, nessun errore, nessuna compenetrazione`, !errore && pr.pezzi.length >= 3 && !vuoti && !c.avvisi.some(a => /compenetrano/.test(a)) && !u.avvisi.length,
+    `${errore} ${vuoti} vuoti · ${c.avvisi.join(' ')} ${u.avvisi.join(' ')} · ${conViti} unioni con viti · ${c.peso.toFixed(1)} kg`);
+}
+{
+  const m = MODELLI.find(x => x.id === 'cassettiera'), pr = mod.nuovoProgetto();
+  m.crea(pr, valoriDefault(m), 0);
+  const fr = pr.pezzi.filter(p => /frontale/.test(p.nome)), sp = listaSpesa(pr, unioni(pr));
+  prova('cassettiera: 4 frontali e 4 coppie di guide da 400 (450 meno il frontale a filo)', fr.length === 4 && sp.righe.some(r => /guide.*400/.test(r.voce) && r.qta === 4), sp.righe.map(r => `${r.qta}× ${r.voce}`).join('; '));
+  const u = unioni(pr), mobili = u.giunti.filter(g => g.tipo === 'parte mobile');
+  prova('cassetti: nessuna vite tra cassetto e mobile', u.giunti.every(g => !(g.a.mobile ^ g.b.mobile) || g.tipo === 'parte mobile' || !g.viti.length), `${mobili.length} contatti mobili`);
+  const interne = u.giunti.filter(g => g.a.gruppo && g.a.gruppo === g.b.gruppo && g.viti.length);
+  prova('cassetto: fianchi avvitati a fronte e retro, frontale avvitato da dentro', interne.length >= 4 * 3, `${interne.length} unioni avvitate nei cassetti · ${interne.slice(0, 3).map(g => g.vite.misura).join(', ')}`);
+}
+{
+  const pr = mobilettoLeggio(), a = pr.pezzi[0], b = mod.duplica(pr, a);
+  b.pos = [...a.pos]; b.pos[0] -= 5;
+  prova('due fianchi uno dentro l\'altro: «si compenetrano»', controlli(pr).avvisi.some(x => /compenetrano/.test(x)));
 }
 
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');

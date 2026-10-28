@@ -11,6 +11,8 @@ import { IMPOSTAZIONI_TAGLIO, schemaDiTaglio } from './taglio.js';
 import { descriviGiunto, unioni } from './unioni.js';
 import { INTERASSI, LATI, MODELLI_CERNIERA, cerniere, maniglia } from './ferramenta.js';
 import { listaSpesa } from './spesa.js';
+import { MODELLI, modello, valoriDefault } from './modelli.js';
+import { creaCassetti, lunghezzaGuida } from './cassetti.js';
 import { CARICO_RIPIANI, controlli } from './controlli.js';
 
 const $ = s => document.querySelector(s);
@@ -106,13 +108,17 @@ function comando(cmd) {
     modifica(() => seleziona(mod.nuovoPezzo(pr, cmd, vicino).id));
     vista.vista(vista.nomeVista);
     avvisa(`Aggiunto: scrivi le misure a destra, poi usa Accosta per metterlo contro un altro pezzo.`);
-  } else if (cmd === 'accosta' || cmd === 'adatta' || cmd === 'dividi') {
+  } else if (cmd === 'modelli') {
+    esciModo();
+    apriModelli();
+  } else if (cmd === 'accosta' || cmd === 'adatta' || cmd === 'dividi' || cmd === 'cassetto') {
     if (!p) return;
     if (stato.modo === cmd) return esciModo();
     stato.modo = cmd;
     aggiornaAttrezzi();
     avvisa(cmd === 'accosta'
       ? `Tocca la faccia dove appoggiare «${p.nome}». Esc per annullare.`
+      : cmd === 'cassetto' ? `Tocca l'altro fianco del vano: i cassetti vanno tra «${p.nome}» e quello.`
       : cmd === 'dividi' ? `Tocca il pezzo opposto a «${p.nome}» (per esempio il piano, o l'altro fianco): ti chiedo quanti pezzi mettere in mezzo.`
       : `Tocca il pezzo contro cui adattare «${p.nome}»: lo allungo o accorcio e lo taglio con l'angolo giusto.`, false, 0);
   } else if (cmd === 'duplica') {
@@ -168,6 +174,12 @@ function tocco(id, faccia, evento) {
   if (stato.modo && p) {
     if (!id || id === p.id) return avvisa('Tocca un altro pezzo, oppure premi di nuovo il comando per uscire.', true, 4000);
     const b = stato.progetto.pezzi.find(x => x.id === id);
+    if (stato.modo === 'cassetto') {
+      stato.modo = null;
+      aggiornaAttrezzi();
+      $('#toast').hidden = true;
+      return apriCassetto(p, b);
+    }
     if (stato.modo === 'dividi') {
       stato.modo = null;
       aggiornaAttrezzi();
@@ -214,6 +226,108 @@ function disegnaBarraSel() {
   b.querySelector('[data-cmd="ruota"]').classList.toggle('on', stato.gizmo === 'rotate');
   b.querySelector('[data-cmd="multipla"]').classList.toggle('on', stato.aggiungiSel);
   b.querySelector('.conta').textContent = n > 1 ? `${n} pezzi` : '';
+}
+
+// ---------- Modelli ----------
+let modelloScelto = MODELLI[0].id, valoriModello = valoriDefault(MODELLI[0]);
+function campoParametro(par, v) {
+  if (par.tipo === 'mat') return `<div class="field"><label>${par.nome}</label><div class="input"><select data-par="${par.k}">${materialiPer(par.filtro).map(m => `<option value="${m.id}" ${m.id === v ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select><small>▾</small></div></div>`;
+  if (par.tipo === 'scelta') return `<div class="field"><label>${par.nome}</label><div class="input"><select data-par="${par.k}">${Object.entries(par.opzioni).map(([k, t]) => `<option value="${k}" ${k === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select><small>▾</small></div></div>`;
+  return `<div class="field"><label>${par.nome}</label><div class="input"><input data-par="${par.k}" inputmode="decimal" value="${esc(f1(v))}"><small>${par.tipo === 'mm' ? 'mm' : ''}</small></div></div>`;
+}
+function apriModelli() {
+  $('#lista-modelli').innerHTML = MODELLI.map(m => `<li><button data-modello="${m.id}" class="${m.id === modelloScelto ? 'on' : ''}"><b>${esc(m.nome)}</b><span>${esc(m.descr)}</span></button></li>`).join('');
+  const m = modello(modelloScelto);
+  $('#form-modello').innerHTML = `<h3 style="font-size:18px;color:var(--text);margin:0">${esc(m.nome)}</h3><p class="nota">${esc(m.descr)} Dopo puoi cambiare ogni pezzo come vuoi.</p>
+    <div class="griglia">${m.parametri.map(p => campoParametro(p, valoriModello[p.k] ?? p.def)).join('')}</div>
+    <div class="azioni"><button class="btn" data-crea="nuovo">Crea in un nuovo progetto</button><button class="btn primary" data-crea="qui">Aggiungi a questo progetto</button></div>`;
+  if (!$('#dlg-modelli').open) $('#dlg-modelli').showModal();
+}
+function leggiModello() {
+  const m = modello(modelloScelto), v = {};
+  for (const p of m.parametri) {
+    const el = document.querySelector(`#form-modello [data-par="${p.k}"]`);
+    if (p.tipo === 'mm' || p.tipo === 'n') {
+      const x = numero(el.value);
+      if (x === null || x < p.min || x > p.max) throw new Error(`${p.nome}: scrivi un valore tra ${f1(p.min)} e ${f1(p.max)}.`);
+      v[p.k] = p.tipo === 'n' ? Math.round(x) : x;
+    } else v[p.k] = el.value;
+  }
+  return v;
+}
+function creaModello(dove) {
+  let v;
+  try { v = leggiModello(); } catch (err) { return avvisa(err.message, true); }
+  valoriModello = v;
+  const m = modello(modelloScelto);
+  const costruisci = pr => {
+    const destra = pr.pezzi.length ? Math.max(...pr.pezzi.map(x => ingombroMondo(x).max.x)) + 200 : 0;
+    const prima = pr.pezzi.length;
+    m.crea(pr, v, Math.round(destra));
+    return pr.pezzi.slice(prima);
+  };
+  try {
+    if (dove === 'nuovo') {
+      const pr = mod.nuovoProgetto(m.nome);
+      const nuovi = costruisci(pr);
+      $('#dlg-modelli').close();
+      crea(pr);
+      avvisa(`Creato «${m.nome}» con ${nuovi.length} pezzi. Viti, distinta e tagli sono già pronti.`);
+    } else {
+      const prova = structuredClone(stato.progetto);
+      costruisci(prova);
+      modifica(() => { const nuovi = costruisci(stato.progetto); stato.multi = new Set(nuovi.map(x => x.id)); stato.sel = nuovi[0]?.id || null; });
+      $('#dlg-modelli').close();
+      vista.vista(vista.nomeVista);
+      avvisa(`Aggiunto «${m.nome}» a destra. È tutto selezionato: puoi spostarlo col gizmo.`);
+    }
+  } catch (err) { avvisa(`Non riesco a creare il modello: ${err.message}`, true, 8000); }
+}
+
+// ---------- Cassetti ----------
+let cassettoTra = null;
+function vanoTra(a, b) {
+  const va = verticiMondo(a), vb = verticiMondo(b), s = mod.spazioTra(a, b, va, vb, 1);
+  if (!s.ok) return { ok: false, msg: s.msg };
+  if (Math.abs(s.asse.x) < 0.99) return { ok: false, msg: 'Per ora i cassetti vanno tra due fianchi affiancati in larghezza (sinistra e destra).' };
+  const A = mod.ingombro(a, va), B = mod.ingombro(b, vb);
+  const x0 = Math.min(A.max.x, B.max.x), x1 = Math.max(A.min.x, B.min.x);
+  const y0 = Math.max(A.min.y, B.min.y), y1 = Math.min(A.max.y, B.max.y), z0 = Math.max(A.min.z, B.min.z), z1 = Math.min(A.max.z, B.max.z);
+  // spazi già occupati da pezzi orizzontali tra i due fianchi
+  const occupati = stato.progetto.pezzi.filter(p => p !== a && p !== b).map(ingombroMondo)
+    .filter(q => q.min.x < x1 - 1 && q.max.x > x0 + 1 && q.min.z < z1 - 1 && q.max.z > z0 + 1 && q.max.y > y0 && q.min.y < y1)
+    .map(q => [q.min.y, q.max.y]).sort((p, q) => p[0] - q[0]);
+  let liberi = [], y = y0;
+  for (const [lo, hi] of occupati) { if (lo > y + 1) liberi.push([y, lo]); y = Math.max(y, hi); }
+  if (y1 > y + 1) liberi.push([y, y1]);
+  const vano = liberi.sort((p, q) => (q[1] - q[0]) - (p[1] - p[0]))[0] || [y0, y1];
+  return { ok: true, x0, x1, y0: vano[0], y1: vano[1], zFronte: z1, profondita: z1 - z0, spessore: Math.min(A.max.x - A.min.x, B.max.x - B.min.x) };
+}
+function apriCassetto(a, b) {
+  const v = vanoTra(a, b);
+  if (!v.ok) return avvisa(v.msg, true, 8000);
+  cassettoTra = v;
+  const lg = lunghezzaGuida(v.profondita);
+  $('#form-cassetto').innerHTML = `<p>Spazio tra i fianchi: <b>${f1(v.x1 - v.x0)} mm</b>, profondità ${f1(v.profondita)} mm${lg ? ` → guide da <b>${lg} mm</b>` : ''}.</p>
+    <div class="row"><div class="field"><label>Dal basso (Y)</label><div class="input"><input data-cas="y0" inputmode="decimal" value="${f1(v.y0)}"><small>mm</small></div></div>
+    <div class="field"><label>Fino a (Y)</label><div class="input"><input data-cas="y1" inputmode="decimal" value="${f1(v.y1)}"><small>mm</small></div></div></div>
+    <div class="row"><div class="field"><label>Quanti cassetti</label><div class="input"><input data-cas="n" inputmode="numeric" value="${Math.max(1, Math.min(6, Math.floor((v.y1 - v.y0) / 160)))}"></div></div>
+    <div class="field"><label>Frontali</label><div class="input"><select data-cas="frontale"><option value="sovrapposto">Sovrapposti ai fianchi</option><option value="filo">A filo, dentro il vano</option></select><small>▾</small></div></div></div>
+    <div class="row"><div class="field"><label>Cassone</label><div class="input"><select data-cas="matCassone">${materialiPer('pannello').map(m => `<option value="${m.id}" ${m.id === 'mb12' ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select><small>▾</small></div></div>
+    <div class="field"><label>Frontali</label><div class="input"><select data-cas="matFrontale">${materialiPer('pannello').map(m => `<option value="${m.id}" ${m.id === 'mb18' ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select><small>▾</small></div></div></div>
+    <p class="nota">Gioco per le guide ${f1(12.5)} mm per lato, fuga tra i frontali 3 mm. Ogni cassetto è una parte mobile: niente viti verso il mobile.</p>
+    <div class="azioni"><button class="btn" data-chiudi-cassetto>Annulla</button><button class="btn primary" id="crea-cassetti">Crea i cassetti</button></div>`;
+  $('#dlg-cassetto').showModal();
+}
+function creaCassettiOra() {
+  const q = k => document.querySelector(`#form-cassetto [data-cas="${k}"]`).value;
+  const v = { ...cassettoTra, y0: numero(q('y0')), y1: numero(q('y1')), n: numero(q('n')), frontale: q('frontale'), matCassone: q('matCassone'), matFrontale: q('matFrontale'), spessoreFianchi: cassettoTra.spessore };
+  if ([v.y0, v.y1, v.n].some(x => x === null) || v.y1 <= v.y0) return avvisa('Controlla le misure: «Fino a» deve essere più in alto di «Dal basso».', true);
+  const prova = structuredClone(stato.progetto), r = creaCassetti(prova, v);
+  if (!r.ok) return avvisa(r.msg, true, 8000);
+  modifica(() => { const x = creaCassetti(stato.progetto, v); stato.multi = new Set(x.nuovi.map(p => p.id)); stato.sel = x.nuovi.at(-1).id; });
+  $('#dlg-cassetto').close();
+  avvisa(`Creat${v.n > 1 ? `i ${v.n} cassetti` : 'o il cassetto'} con guide da ${r.guida} mm.`);
 }
 
 // ---------- Dividi ----------
@@ -657,6 +771,16 @@ function eventiDialoghi() {
     } catch (err) { avvisa(err.message, true, 8000); }
   });
   $('#apri-distinta').addEventListener('click', () => { mostraDistinta('pezzi'); $('#dlg-distinta').showModal(); });
+  $('#dlg-modelli').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.modello) { try { valoriModello = leggiModello(); } catch { /* valori incompleti: si riparte dai predefiniti */ } modelloScelto = b.dataset.modello; valoriModello = valoriDefault(modello(modelloScelto)); apriModelli(); }
+    if (b.dataset.crea) creaModello(b.dataset.crea);
+  });
+  $('#dlg-cassetto').addEventListener('click', e => {
+    if (e.target.closest('#crea-cassetti')) creaCassettiOra();
+    if (e.target.closest('[data-chiudi-cassetto]')) $('#dlg-cassetto').close();
+  });
   $('#dividi-n').addEventListener('input', anteprimaDividi);
   $('#dividi-meno').addEventListener('click', () => { $('#dividi-n').value = Math.max(1, (numero($('#dividi-n').value) || 1) - 1); anteprimaDividi(); });
   $('#dividi-piu').addEventListener('click', () => { $('#dividi-n').value = Math.min(50, (numero($('#dividi-n').value) || 1) + 1); anteprimaDividi(); });

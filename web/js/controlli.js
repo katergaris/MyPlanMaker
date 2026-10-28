@@ -1,8 +1,8 @@
 // Controlli del progetto: peso, stabilità (si ribalta?) e freccia dei ripiani. Valori indicativi.
 import { Matrix4, Vector3 } from '../vendor/three.module.js';
 import { materiale } from './materiali.js';
-import { dimensioni, fmt, matrice } from './modello.js';
-import { geometriaPezzo } from './geometria.js';
+import { dimensioni, fmt, ingombro, matrice } from './modello.js';
+import { geometriaPezzo, volumeComune } from './geometria.js';
 import { unioni } from './unioni.js';
 
 export const CARICO_RIPIANI = 30;   // kg per metro di ripiano (libri)
@@ -91,6 +91,15 @@ export function controlli(progetto) {
     if (altezza > 1000 && altezza > 3 * profondita) esito.avvisi.push(`Alto ${fmt(altezza)} mm su una base profonda ${fmt(profondita)} mm: va fissato al muro.`);
   }
 
+  // Pezzi che si compenetrano (più di 1 cm³ in comune)
+  const scatole = tutti.map(t => ({ ...t, b: ingombro(t.p, t.v) }));
+  for (let i = 0; i < scatole.length; i++) for (let j = i + 1; j < scatole.length; j++) {
+    const A = scatole[i], B = scatole[j];
+    if (A.b.max.x <= B.b.min.x + 0.5 || B.b.max.x <= A.b.min.x + 0.5 || A.b.max.y <= B.b.min.y + 0.5 || B.b.max.y <= A.b.min.y + 0.5 || A.b.max.z <= B.b.min.z + 0.5 || B.b.max.z <= A.b.min.z + 0.5) continue;
+    const v = volumeComune(geometriaPezzo(A.p), matrice(A.p), geometriaPezzo(B.p), matrice(B.p));
+    if (v > 1000) esito.avvisi.push(`«${A.p.nome}» e «${B.p.nome}» si compenetrano (${fmt(v / 1000, 1)} cm³): spostane uno o usa Adatta.`);
+  }
+
   // Freccia dei ripiani: pannelli orizzontali che ricevono viti in entrambe le teste
   for (const p of pezzi) {
     if (p.tipo !== 'pannello') continue;
@@ -98,6 +107,9 @@ export function controlli(progetto) {
     if (Math.abs(T.y) < 0.95) continue;
     const appoggi = u.giunti.filter(g => g.riceve?.id === p.id && g.comeRiceve === 'testa');
     if (appoggi.length < 2) continue;
+    // solo ripiani liberi: se sopra o sotto tocca un altro pezzo (zoccolo, piano, listello) è già sostenuto
+    const coperto = u.giunti.some(g => (g.a.id === p.id || g.b.id === p.id) && Math.abs(g.normale?.y || 0) > 0.95);
+    if (coperto) continue;
     const f = freccia(p, progetto.caricoRipiani ?? CARICO_RIPIANI);
     if (!f) continue;
     esito.frecce.push({ p, ...f });

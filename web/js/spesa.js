@@ -20,6 +20,8 @@ export function listaSpesa(progetto, u) {
   for (const p of progetto.pezzi) {
     const c = cerniere(p);
     if (c) aggiungi(`${CATALOGO.cerniera.nome} · ${MODELLI_CERNIERA[c.modello] || MODELLI_CERNIERA.sovrapposta}`, c.n, CATALOGO.cerniera.prezzo, 'con base e viti');
+    const g = (p.ferramenta || []).find(f => f.tipo === 'guida' && f.faccia === 'z0');
+    if (g) aggiungi(`${CATALOGO.guida.nome} ${g.lunghezza} mm`, 1, CATALOGO.guida.prezzo, 'con viti');
     const m = maniglia(p);
     if (m) {
       aggiungi(`${CATALOGO.maniglia.nome} interasse ${m.interasse || 128} mm`, 1, CATALOGO.maniglia.prezzo);

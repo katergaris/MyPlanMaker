@@ -125,6 +125,15 @@ table.distinta { width: 100%; border-collapse: collapse; font-size: 15px; }
 .barra-sel .sep { width: 1px; align-self: stretch; background: var(--line); margin: 6px 4px; }
 .barra-sel .conta { font-size: 13px; color: var(--muted); padding: 0 6px; }
 .barra-sel .conta:empty { display: none; }
+.modelli { flex-direction: row; gap: 20px; align-items: flex-start; }
+.schede-modelli { list-style: none; padding: 0; display: grid; grid-template-columns: 1fr; gap: 8px; width: 300px; flex: none; }
+.schede-modelli button { width: 100%; text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
+.schede-modelli button b { font-size: 15px; }
+.schede-modelli button span { font-size: 13px; color: var(--muted); }
+.schede-modelli button.on { border-color: var(--accent); background: var(--accent-soft); }
+.form-modello { flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.form-modello .griglia { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .modelli { flex-direction: column; } .schede-modelli { width: 100%; } }
 .titolo-fisso { font-size: 22px; font-weight: 650; }
 .toast { bottom: 80px; }
 .schede { flex: none; }

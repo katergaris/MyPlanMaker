@@ -18,6 +18,8 @@ f.onload = async () => {
     if (p === 'distinta') d.getElementById('apri-distinta').click();
     if (p === 'schema') { d.getElementById('apri-distinta').click(); d.querySelector('[data-scheda="schema"]').click(); }
     if (p === 'ferramenta') { d.getElementById('apri-distinta').click(); d.querySelector('[data-scheda="ferramenta"]').click(); }
+    if (p.startsWith('modello:')) { comando('modelli'); await attendi(200); d.querySelector(`[data-modello="${p.slice(8)}"]`).click(); }
+    if (p === 'crea') d.querySelector('[data-crea="nuovo"]').click();
     if (p === 'progetti') d.getElementById('apri-progetti').click();
     await attendi(400);
   }
