@@ -1,5 +1,5 @@
 // MyPlanMaker: collega modello, vista 3D, pannello delle proprietà e salvataggio.
-import { Vector3 } from '../vendor/three.module.js';
+import { Box3, Vector3 } from '../vendor/three.module.js';
 import { avviaGeometria, geometriaPezzo } from './geometria.js';
 import { Vista3D } from './vista3d.js';
 import * as mod from './modello.js';
@@ -18,11 +18,24 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const numero = s => { const v = parseFloat(String(s).replace(/\s/g, '').replace(',', '.')); return Number.isFinite(v) ? v : null; };
 const f1 = v => mod.fmt(v, 1);
 
-const stato = { progetto: null, sel: null, modo: null, mostraViti: localStorage.getItem('mpm:viti') !== 'no' };
+const stato = {
+  progetto: null, sel: null, multi: new Set(), modo: null, misura: null, esploso: false, gizmo: 'translate', aggiungiSel: false,
+  mostraViti: localStorage.getItem('mpm:viti') !== 'no',
+};
 const storico = new mod.Storico();
 let vista;
 
 const pezzoSel = () => stato.progetto.pezzi.find(p => p.id === stato.sel) || null;
+const selezione = () => { const s = new Set([...stato.multi].filter(id => stato.progetto.pezzi.some(p => p.id === id))); if (pezzoSel()) s.add(stato.sel); return s; };
+const pezziSel = () => { const s = selezione(); return stato.progetto.pezzi.filter(p => s.has(p.id)); };
+function seleziona(id, aggiungi = false) {
+  if (!aggiungi) { stato.sel = id; stato.multi = new Set(id ? [id] : []); return; }
+  if (!id) return;
+  const s = selezione();
+  if (s.has(id)) { s.delete(id); stato.sel = s.size ? [...s].at(-1) : null; } else { s.add(id); stato.sel = id; }
+  stato.multi = s;
+}
+const ingombroMondo = p => { const v = verticiMondo(p); return v ? mod.ingombro(p, v) : mod.ingombro(p); };
 
 function verticiMondo(p) {
   const g = geometriaPezzo(p);
@@ -41,7 +54,12 @@ function modifica(fn) {
 
 function aggiorna() {
   const u = unioni(stato.progetto);
-  vista.aggiorna(stato.progetto, stato.sel, { viti: u.viti, mostraViti: stato.mostraViti, vitiErrate: u.errate });
+  vista.aggiorna(stato.progetto, {
+    selezione: selezione(), primario: stato.sel, viti: u.viti, mostraViti: stato.mostraViti, vitiErrate: u.errate,
+    esploso: stato.esploso, gizmo: stato.modo ? null : stato.gizmo, misura: stato.misura,
+  });
+  document.querySelector('[data-vista="esploso"]')?.classList.toggle('on', stato.esploso);
+  disegnaBarraSel();
   document.querySelector('[data-vista="viti"]')?.classList.toggle('on', stato.mostraViti);
   $('#nome-progetto').textContent = stato.progetto.nome;
   document.title = `${stato.progetto.nome} — MyPlanMaker`;
@@ -74,6 +92,7 @@ function aggiornaAttrezzi() {
 
 function esciModo() {
   if (!stato.modo) return;
+  if (stato.modo === 'misura') { stato.misura = null; stato.modo = null; $('#toast').hidden = true; aggiornaAttrezzi(); return aggiorna(); }
   stato.modo = null;
   $('#toast').hidden = true;
   aggiornaAttrezzi();
@@ -84,10 +103,11 @@ function comando(cmd) {
   if (cmd === 'pannello' || cmd === 'listello') {
     esciModo();
     const vicino = p || pr.pezzi.reduce((a, b) => (!a || mod.ingombro(b).max.x > mod.ingombro(a).max.x ? b : a), null);
-    modifica(() => { stato.sel = mod.nuovoPezzo(pr, cmd, vicino).id; });
+    modifica(() => seleziona(mod.nuovoPezzo(pr, cmd, vicino).id));
     vista.vista(vista.nomeVista);
     avvisa(`Aggiunto: scrivi le misure a destra, poi usa Accosta per metterlo contro un altro pezzo.`);
   } else if (cmd === 'accosta' || cmd === 'adatta' || cmd === 'dividi') {
+    if (!p) return;
     if (stato.modo === cmd) return esciModo();
     stato.modo = cmd;
     aggiornaAttrezzi();
@@ -96,16 +116,55 @@ function comando(cmd) {
       : cmd === 'dividi' ? `Tocca il pezzo opposto a «${p.nome}» (per esempio il piano, o l'altro fianco): ti chiedo quanti pezzi mettere in mezzo.`
       : `Tocca il pezzo contro cui adattare «${p.nome}»: lo allungo o accorcio e lo taglio con l'angolo giusto.`, false, 0);
   } else if (cmd === 'duplica') {
-    modifica(() => { stato.sel = mod.duplica(pr, p).id; });
-    avvisa(`Duplicato. I tagli sono rimasti, ma non sono più legati al pezzo di prima.`);
+    const sel = pezziSel();
+    if (sel.length > 1) {
+      const b = sel.map(ingombroMondo).reduce((a, x) => ({ min: a.min.clone().min(x.min), max: a.max.clone().max(x.max) }));
+      const dx = Math.round(b.max.x - b.min.x + 50);
+      modifica(() => {
+        const copie = sel.map(x => { const c = mod.duplica(pr, x); c.pos = [x.pos[0] + dx, x.pos[1], x.pos[2]]; return c; });
+        stato.multi = new Set(copie.map(c => c.id)); stato.sel = copie[0].id;
+      });
+      avvisa(`Duplicati ${sel.length} pezzi, ${dx} mm più a destra.`);
+    } else {
+      modifica(() => seleziona(mod.duplica(pr, p).id));
+      avvisa(`Duplicato. I tagli sono rimasti, ma non sono più legati al pezzo di prima.`);
+    }
   } else if (cmd === 'elimina') {
-    modifica(() => { pr.pezzi = pr.pezzi.filter(x => x !== p); stato.sel = null; });
-    avvisa(`Eliminato «${p.nome}». Puoi sempre annullare.`);
+    const sel = selezione();
+    modifica(() => { pr.pezzi = pr.pezzi.filter(x => !sel.has(x.id)); seleziona(null); });
+    avvisa(sel.size > 1 ? `Eliminati ${sel.size} pezzi. Puoi sempre annullare.` : `Eliminato «${p.nome}». Puoi sempre annullare.`);
+  } else if (cmd === 'specchia') {
+    const sel = pezziSel();
+    const asse = Math.max(...sel.map(x => ingombroMondo(x).max.x));
+    modifica(() => { const c = mod.copiaSpecchiata(pr, sel, asse); stato.multi = new Set(c.map(x => x.id)); stato.sel = c[0].id; });
+    avvisa(`Copia specchiata a destra di ${sel.length === 1 ? `«${p.nome}»` : `${sel.length} pezzi`}: lati delle cerniere e tagli sono girati.`);
+  } else if (cmd === 'sposta' || cmd === 'ruota') {
+    stato.gizmo = stato.gizmo === (cmd === 'sposta' ? 'translate' : 'rotate') ? null : (cmd === 'sposta' ? 'translate' : 'rotate');
+    aggiorna();
+  } else if (cmd === 'multipla') {
+    stato.aggiungiSel = !stato.aggiungiSel;
+    disegnaBarraSel();
+    avvisa(stato.aggiungiSel ? 'Selezione multipla: ogni pezzo che tocchi si aggiunge o si toglie. (Sul PC: Maiusc + clic.)' : 'Selezione singola.');
+  } else if (cmd === 'misura') {
+    if (stato.modo === 'misura') { stato.misura = null; esciModo(); return aggiorna(); }
+    stato.modo = 'misura'; stato.misura = null;
+    aggiornaAttrezzi(); aggiorna();
+    avvisa('Misura: tocca il primo punto e poi il secondo. Vicino a uno spigolo il punto si aggancia allo spigolo. Esc per uscire.', false, 0);
   }
 }
 
-function tocco(id, faccia) {
+function tocco(id, faccia, evento) {
   const p = pezzoSel();
+  if (stato.modo === 'misura') {
+    if (!id) return;
+    const punto = faccia.spigolo || faccia.punto;
+    stato.misura = !stato.misura || stato.misura.b ? { a: punto } : { a: stato.misura.a, b: punto };
+    if (stato.misura.b) {
+      const d = stato.misura.a.distanceTo(stato.misura.b);
+      avvisa(`Distanza ${f1(d)} mm. Tocca di nuovo per una nuova misura, Esc per uscire.`, false, 0);
+    }
+    return aggiorna();
+  }
   if (stato.modo && p) {
     if (!id || id === p.id) return avvisa('Tocca un altro pezzo, oppure premi di nuovo il comando per uscire.', true, 4000);
     const b = stato.progetto.pezzi.find(x => x.id === id);
@@ -131,8 +190,30 @@ function tocco(id, faccia) {
     aggiornaAttrezzi();
     return;
   }
-  stato.sel = id;
+  seleziona(id, stato.aggiungiSel || evento?.shiftKey || evento?.ctrlKey || evento?.metaKey);
   aggiorna();
+}
+
+// Fine di un trascinamento col gizmo: applica la trasformazione a tutti i pezzi selezionati, poi la calamita.
+function trasformato(delta) {
+  const sel = pezziSel();
+  if (!sel.length) return aggiorna();
+  let spinta = [0, 0, 0];
+  modifica(() => {
+    for (const p of sel) mod.trasforma(p, delta);
+    if (stato.gizmo === 'translate') spinta = mod.calamita(stato.progetto, new Set(sel.map(p => p.id)), ingombroMondo);
+  });
+  if (spinta.some(v => v)) avvisa(`Agganciato al pezzo vicino (${spinta.map((v, i) => (v ? `${'XYZ'[i]} ${v > 0 ? '+' : ''}${f1(v)}` : '')).filter(Boolean).join(', ')} mm).`, false, 3000);
+}
+
+function disegnaBarraSel() {
+  const b = $('#barra-sel'), n = selezione().size;
+  b.hidden = !n || !!stato.modo;
+  if (b.hidden) return;
+  b.querySelector('[data-cmd="sposta"]').classList.toggle('on', stato.gizmo === 'translate');
+  b.querySelector('[data-cmd="ruota"]').classList.toggle('on', stato.gizmo === 'rotate');
+  b.querySelector('[data-cmd="multipla"]').classList.toggle('on', stato.aggiungiSel);
+  b.querySelector('.conta').textContent = n > 1 ? `${n} pezzi` : '';
 }
 
 // ---------- Dividi ----------
@@ -161,7 +242,12 @@ const campoNum = (campo, etichetta, valore, unita = 'mm') =>
   `<div class="field"><label>${etichetta}</label><div class="input"><input data-campo="${campo}" inputmode="decimal" value="${esc(f1(valore))}"><small>${unita}</small></div></div>`;
 
 function disegnaProprieta() {
-  const el = $('#proprieta'), p = pezzoSel();
+  const el = $('#proprieta'), p = pezzoSel(), sel = selezione();
+  if (sel.size > 1) {
+    const k = 'multi' + [...sel].join();
+    if (k !== chiavePannello) { chiavePannello = k; el.innerHTML = htmlMulti(pezziSel()); }
+    return;
+  }
   const chiave = p ? JSON.stringify([p.id, p.tipo, p.forma, p.tagli.length, p.mat, p.ferramenta]) : 'progetto' + JSON.stringify(riepilogo(stato.progetto).materiali);
   if (chiave === chiavePannello) return aggiornaValori(el, p);
   chiavePannello = chiave;
@@ -294,6 +380,23 @@ function htmlControlli() {
       <p class="nota">Quanto si piegano i ripiani nel tempo:</p>${frecce}` : ''}`;
 }
 
+function htmlMulti(pezzi) {
+  const b = pezzi.map(ingombroMondo).reduce((a, x) => ({ min: a.min.clone().min(x.min), max: a.max.clone().max(x.max) }));
+  return `<div><div class="kicker">Selezione</div><h2 class="titolo-fisso">${pezzi.length} pezzi</h2></div>
+    <p class="nota">${pezzi.map(p => esc(p.nome)).join(', ')}</p>
+    <div class="chipline"><span>Ingombro</span><b>${f1(b.max.x - b.min.x)} × ${f1(b.max.y - b.min.y)} × ${f1(b.max.z - b.min.z)}</b></div>
+    <div class="group"><h3>Sposta tutti di</h3>
+      <div class="row3">
+        <div class="field"><label>X destra</label><div class="input"><input data-sposta="0" inputmode="decimal" value="0"></div></div>
+        <div class="field"><label>Y altezza</label><div class="input"><input data-sposta="1" inputmode="decimal" value="0"></div></div>
+        <div class="field"><label>Z verso di te</label><div class="input"><input data-sposta="2" inputmode="decimal" value="0"></div></div>
+      </div>
+      <p class="nota">Oppure trascina le frecce del gizmo nel 3D (passo 5 mm, poi si aggancia ai pezzi vicini).</p></div>
+    <div class="group"><h3>Materiale per tutti</h3><div class="input"><select data-mat-multi><option value="">— scegli —</option>${['pannello', 'listello'].filter(t => pezzi.some(p => p.tipo === t)).map(t => materialiPer(t).map(m => `<option value="${m.id}">${esc(m.nome)}</option>`).join('')).join('')}</select><small>▾</small></div></div>
+    <div class="azioni"><button class="btn" data-azione="duplica">Duplica</button><button class="btn" data-azione="specchia">Copia specchiata</button></div>
+    <div class="azioni"><button class="btn danger" data-azione="elimina">Elimina tutti</button></div>`;
+}
+
 function htmlProgetto() {
   const r = riepilogo(stato.progetto);
   const mats = r.materiali.map(m => `<div class="chipline"><span>${esc(m.nome)}</span><b>${f1(m.qta)} ${m.tipo === 'listello' ? 'm' : 'm²'}</b></div>`).join('');
@@ -331,6 +434,17 @@ function eventiProprieta() {
     const c = e.target.dataset.campo, p = pezzoSel();
     if (c) applicaCampo(c, e.target.value);
     else if (e.target.hasAttribute('data-man-interasse') && p) modifica(() => { ferr(p, 'maniglia').interasse = +e.target.value; });
+    else if (e.target.dataset.sposta !== undefined) {
+      const v = numero(e.target.value);
+      if (!v) return;
+      const d = [0, 0, 0]; d[+e.target.dataset.sposta] = v;
+      modifica(() => pezziSel().forEach(x => mod.sposta(x, d)));
+      e.target.value = '0';
+    } else if (e.target.hasAttribute('data-mat-multi') && e.target.value) {
+      const id = e.target.value, tipo = materiale(id).tipo;
+      modifica(() => pezziSel().filter(x => x.tipo === tipo).forEach(x => { x.mat = id; }));
+      chiavePannello = '';
+    }
     else if (e.target.hasAttribute('data-carico')) {
       const v = numero(e.target.value);
       if (v === null || v < 0 || v > 500) return avvisa('Scrivi un carico tra 0 e 500 kg/m.', true);
@@ -480,8 +594,10 @@ async function salvaOra() {
 
 function apri(progetto) {
   stato.progetto = progetto;
-  stato.sel = null;
+  seleziona(null);
   stato.modo = null;
+  stato.misura = null;
+  stato.esploso = false;
   storico.indietro = []; storico.avanti = [];
   chiavePannello = '';
   localStorage.setItem('mpm:ultimo', progetto.id);
@@ -548,7 +664,7 @@ function eventiDialoghi() {
     const { n, s } = anteprimaDividi();
     if (!s.ok) return;
     const { a } = dividiDa;
-    modifica(() => { const nuovi = mod.dividi(stato.progetto, a, s, n); stato.sel = nuovi[0].id; });
+    modifica(() => { const nuovi = mod.dividi(stato.progetto, a, s, n); stato.multi = new Set(nuovi.map(x => x.id)); stato.sel = nuovi[0].id; });
     $('#dlg-dividi').close();
     avvisa(`Aggiunt${n === 1 ? 'o 1 pezzo' : `i ${n} pezzi`} alla stessa distanza (luce ${f1(s.passo)} mm). Viti e distinta sono già aggiornate.`);
   });
@@ -568,12 +684,14 @@ function eventiDialoghi() {
 // ---------- avvio ----------
 async function avvio() {
   await avviaGeometria();
-  vista = new Vista3D($('#vista3d'), { onTocco: tocco });
+  vista = new Vista3D($('#vista3d'), { onTocco: tocco, onTrasforma: trasformato });
+  $('#barra-sel').addEventListener('click', e => { const b = e.target.closest('button'); if (b) comando(b.dataset.cmd); });
   document.querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => comando(b.dataset.cmd)));
   $('#viste').addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.vista === 'inquadra') return vista.vista(vista.nomeVista);
+    if (b.dataset.vista === 'esploso') { stato.esploso = !stato.esploso; aggiorna(); return vista.vista(vista.nomeVista); }
     if (b.dataset.vista === 'viti') { stato.mostraViti = !stato.mostraViti; localStorage.setItem('mpm:viti', stato.mostraViti ? 'si' : 'no'); return aggiorna(); }
     document.querySelectorAll('#viste button:not([data-vista="viti"]):not([data-vista="inquadra"])').forEach(x => x.classList.toggle('on', x === b));
     vista.vista(b.dataset.vista);
@@ -583,11 +701,26 @@ async function avvio() {
   $('#annulla').addEventListener('click', annulla);
   $('#ripeti').addEventListener('click', ripeti);
   document.addEventListener('keydown', e => {
-    if (e.target.matches('input, select, textarea')) return;
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? ripeti() : annulla(); }
-    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); ripeti(); }
-    else if (e.key === 'Escape') esciModo();
+    if (e.target.matches('input, select, textarea') || document.querySelector('dialog[open]')) return;
+    const k = e.key.toLowerCase(), ctrl = e.ctrlKey || e.metaKey;
+    if (ctrl && k === 'z') { e.preventDefault(); e.shiftKey ? ripeti() : annulla(); }
+    else if (ctrl && k === 'y') { e.preventDefault(); ripeti(); }
+    else if (ctrl && k === 'd') { e.preventDefault(); if (pezzoSel()) comando('duplica'); }
+    else if (ctrl && k === 'a') { e.preventDefault(); stato.multi = new Set(stato.progetto.pezzi.map(p => p.id)); stato.sel = stato.progetto.pezzi[0]?.id || null; aggiorna(); }
+    else if (e.key === 'Escape') { if (stato.modo) esciModo(); else { seleziona(null); aggiorna(); } }
     else if ((e.key === 'Delete' || e.key === 'Backspace') && pezzoSel()) comando('elimina');
+    else if (ctrl || e.altKey) return;
+    else if (e.key.startsWith('Arrow') || e.key === 'PageUp' || e.key === 'PageDown') {
+      const sel = pezziSel();
+      if (!sel.length) return;
+      e.preventDefault();
+      const passo = e.shiftKey ? 10 : 1;
+      const d = { ArrowLeft: [-passo, 0, 0], ArrowRight: [passo, 0, 0], ArrowUp: [0, 0, -passo], ArrowDown: [0, 0, passo], PageUp: [0, passo, 0], PageDown: [0, -passo, 0] }[e.key];
+      modifica(() => sel.forEach(p => mod.sposta(p, d)));
+    } else {
+      const tasti = { p: 'pannello', l: 'listello', c: 'accosta', a: 'adatta', d: 'dividi', m: 'misura', g: 'sposta', r: 'ruota', s: 'specchia', t: 'modelli', k: 'cassetto' };
+      if (tasti[k]) { e.preventDefault(); comando(tasti[k]); }
+    }
   });
   eventiProprieta();
   eventiDialoghi();

@@ -28,9 +28,9 @@ header { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; pad
 .link { border: 0; background: none; color: var(--accent); font-weight: 500; padding: 4px 2px; }
 
 aside.tools { background: var(--panel); border-right: 1px solid var(--line); padding: 14px 12px; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
-.tool { height: 76px; border-radius: 14px; border: 0; background: transparent; font-size: 13px; font-weight: 500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; flex: none; }
+.tool { height: 64px; border-radius: 14px; border: 0; background: transparent; font-size: 13px; font-weight: 500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; flex: none; }
 .tool:hover:not(:disabled) { background: var(--bg); }
-.tool svg { width: 30px; height: 30px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tool svg { width: 26px; height: 26px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tool.on { background: var(--accent-soft); color: var(--accent); }
 .tools hr { border: 0; border-top: 1px solid var(--line); margin: 6px 8px; }
 
@@ -109,6 +109,24 @@ table.distinta { width: 100%; border-collapse: collapse; font-size: 15px; }
 .distinta-totali b { color: var(--text); }
 
 #stampa-area { display: none; }
+.sovra { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.quote-linee { position: absolute; inset: 0; width: 100%; height: 100%; }
+.quote-linee line { stroke: #5c5247; stroke-width: 1.2; }
+.quota { position: absolute; transform: translate(-50%, -50%); background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; padding: 2px 7px; border-radius: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.quota.tot { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+.quota.misura { background: #c0392b; text-align: center; }
+.quota.misura small { display: block; font-weight: 400; font-size: 11px; opacity: .9; }
+.quota.movimento { background: var(--text); }
+.barra-sel { position: absolute; z-index: 3; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 5px; box-shadow: 0 6px 20px rgba(60,40,20,.12); }
+.barra-sel button { height: 40px; border: 0; border-radius: 10px; background: none; padding: 0 12px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.barra-sel button:hover { background: var(--bg); }
+.barra-sel button.on { background: var(--accent-soft); color: var(--accent); }
+.barra-sel button.danger { color: #a3342a; }
+.barra-sel .sep { width: 1px; align-self: stretch; background: var(--line); margin: 6px 4px; }
+.barra-sel .conta { font-size: 13px; color: var(--muted); padding: 0 6px; }
+.barra-sel .conta:empty { display: none; }
+.titolo-fisso { font-size: 22px; font-weight: 650; }
+.toast { bottom: 80px; }
 .schede { flex: none; }
 .schede button { padding: 0 16px; }
 .impost { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }

@@ -47,8 +47,8 @@ export function cerniere(p) {
     ...c, n, avvisi,
     punti: pos.map(b => punto(s.asse, a, s.lungo, b, 0)),
     fori: pos.map(b => ({ c: punto(s.asse, a, s.lungo, b, 0), r: SCODELLA.r, z0: 0, z1: SCODELLA.profondita, nome: 'scodella Ø 35' })),
-    // braccio della cerniera, disegnato dalla scodella verso il bordo e oltre (dove va la base sul fianco)
-    bracci: pos.map(b => ({ da: punto(s.asse, a, s.lungo, b, -2), a: punto(s.asse, s.val - s.verso * 14, s.lungo, b, -2), largo: 16, alto: 10 })),
+    // braccio della cerniera: dalla scodella verso l'interno del mobile, dove va la base sul fianco
+    bracci: pos.map(b => ({ da: punto(s.asse, a, s.lungo, b, -1), a: punto(s.asse, a, s.lungo, b, -45), largo: 8, alto: 10 })),
   };
 }
 
@@ -80,6 +80,14 @@ export function maniglia(p) {
 // Tutti i fori della ferramenta del pezzo, per toglierli dal solido.
 export function foriPezzo(p) {
   return [...(cerniere(p)?.fori || []), ...(maniglia(p)?.fori || [])];
+}
+
+// Guide del cassetto, montate sul fianco del cassetto (lungo la lunghezza, a metà altezza, sulla faccia esterna).
+export function guide(p) {
+  const g = (p.ferramenta || []).find(f => f.tipo === 'guida');
+  if (!g) return null;
+  const { W, T } = dimensioni(p), z = g.faccia === 'z0' ? -6.5 : T + 6.5;
+  return [{ da: [0, W / 2, z], a: [g.lunghezza, W / 2, z], alto: 12 }];
 }
 
 export function haCerniere(p) {

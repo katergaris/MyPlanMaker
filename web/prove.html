@@ -187,6 +187,30 @@ function controllaLastre(gruppi, lama) {
   prova('gambe strette al centro: si ribalta appoggiandosi', c2.avvisi.some(a => /ribalta/.test(a)), c2.avvisi.join(' '));
 }
 
+// 12. Gizmo, calamita, copia specchiata
+{
+  const T = await import('./vendor/three.module.js');
+  const pr = mod.nuovoProgetto(), a = mod.nuovoPezzo(pr, 'pannello'); a.pos = [0, 0, 0];
+  mod.trasforma(a, new T.Matrix4().makeTranslation(100, 50, -20));
+  prova('sposta col gizmo: +100, +50, -20', a.pos.join() === '100,50,-20', a.pos.join());
+  const b = mod.nuovoPezzo(pr, 'pannello'); b.pos = [0, 0, 0]; b.rot = [-90, 0, 0];
+  mod.trasforma(b, new T.Matrix4().makeRotationY(Math.PI / 2));
+  const asseL = new T.Vector3(1, 0, 0).applyMatrix4(new T.Matrix4().extractRotation(mod.matrice(b)));
+  prova('ruota di 90° in pianta: la lunghezza va verso -Z', Math.abs(asseL.z + 1) < 1e-6, `${asseL.toArray().map(v => v.toFixed(3))} rot ${b.rot}`);
+  const pr2 = mod.nuovoProgetto(), x = mod.nuovoPezzo(pr2, 'pannello'), y = mod.nuovoPezzo(pr2, 'pannello');
+  x.pos = [0, 0, 0]; y.pos = [0, 26, 0];
+  const s = mod.calamita(pr2, new Set([y.id]), p => mod.ingombro(p));
+  prova('calamita: a 8 mm si appoggia sopra', Math.abs(y.pos[1] - 18) < 0.01, `${s} → ${y.pos}`);
+  const pr3 = mobilettoLeggio(), fs = pr3.pezzi.find(p => p.nome === 'Fianco sinistro'), an = pr3.pezzi.find(p => p.nome === 'Anta');
+  const [c1, c2] = mod.copiaSpecchiata(pr3, [fs, an], 800);
+  const g1 = geometriaPezzo(c1), b1 = mod.ingombro(c1, g1.vertici.map(v => new T.Vector3(...v).applyMatrix4(mod.matrice(c1))));
+  prova('copia specchiata del fianco: da x 1582 a 1600, stessa misura finita', Math.abs(b1.min.x - 1582) < 0.01 && Math.abs(b1.max.x - 1600) < 0.01 && Math.abs(g1.max[0] - g1.min[0] - 900) < 0.6, `${b1.min.x.toFixed(1)}..${b1.max.x.toFixed(1)} L ${(g1.max[0] - g1.min[0]).toFixed(1)}`);
+  const piano = pr3.pezzi.find(p => p.nome === 'Piano inclinato'), gp = geometriaPezzo(piano);
+  const topFianco = Math.max(...g1.vertici.map(v => new T.Vector3(...v).applyMatrix4(mod.matrice(c1)).y));
+  prova('copia specchiata: il taglio obliquo resta in cima (900 dietro)', Math.abs(topFianco - 900) < 0.6, `${topFianco.toFixed(1)}`);
+  prova('copia specchiata dell\'anta: cerniere sul lato B', cerniere(c2).lato === 'B', cerniere(c2).lato);
+}
+
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');
 const ko = esiti.filter(e => !e.ok).length;
 document.getElementById('riassunto').textContent = ko ? `FALLITE ${ko} su ${esiti.length}` : `TUTTE OK (${esiti.length})`;

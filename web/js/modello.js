@@ -198,6 +198,63 @@ export function dividi(progetto, a, spazio, n) {
   return nuovi;
 }
 
+// Applica una trasformazione del mondo (spostamento/rotazione dal gizmo) a un pezzo.
+export function trasforma(p, delta) {
+  const m = delta.clone().multiply(matrice(p));
+  const pos = new Vector3().setFromMatrixPosition(m);
+  const e = new Euler().setFromRotationMatrix(new Matrix4().extractRotation(m), 'ZYX');
+  p.pos = [pos.x, pos.y, pos.z].map(pulisci);
+  p.rot = [e.x, e.y, e.z].map(v => pulisci(v / RAD));
+}
+
+export function sposta(p, d) { p.pos = p.pos.map((c, i) => pulisci(c + d[i])); }
+
+// Calamita: dopo uno spostamento, avvicina la selezione alle facce degli altri pezzi se sono entro `soglia` mm
+// (per ogni asse separatamente). `box` = funzione che dà l'ingombro { min, max } di un pezzo.
+export function calamita(progetto, ids, box, soglia = 12) {
+  const sel = progetto.pezzi.filter(p => ids.has(p.id)), altri = progetto.pezzi.filter(p => !ids.has(p.id));
+  if (!sel.length || !altri.length) return [0, 0, 0];
+  const S = sel.map(box).reduce((a, b) => ({ min: a.min.clone().min(b.min), max: a.max.clone().max(b.max) }));
+  const spinta = [0, 0, 0], assi = ['x', 'y', 'z'];
+  assi.forEach((k, i) => {
+    let migliore = null;
+    for (const o of altri) {
+      const O = box(o);
+      // deve stare vicino anche sugli altri due assi
+      if (!assi.every(j => j === k || (S.min[j] < O.max[j] + soglia && S.max[j] > O.min[j] - soglia))) continue;
+      for (const d of [O.max[k] - S.min[k], O.min[k] - S.max[k], O.min[k] - S.min[k], O.max[k] - S.max[k]]) {
+        if (Math.abs(d) <= soglia && Math.abs(d) > 0.01 && (!migliore || Math.abs(d) < Math.abs(migliore))) migliore = d;
+      }
+    }
+    if (migliore !== null) spinta[i] = migliore;
+  });
+  if (spinta.some(v => v)) for (const p of sel) sposta(p, spinta);
+  return spinta;
+}
+
+// Copia specchiata della selezione rispetto al piano verticale x = asse (di solito il bordo destro).
+// Il pezzo specchiato resta un pezzo vero: si capovolge la sua lunghezza (x locale → L - x).
+export function copiaSpecchiata(progetto, pezzi, asse) {
+  const S = new Matrix4().makeTranslation(2 * asse, 0, 0).multiply(new Matrix4().makeScale(-1, 1, 1));
+  const ids = new Map(pezzi.map(p => [p.id, nuovoId()]));
+  return pezzi.map(p => {
+    const c = structuredClone(p), { L } = dimensioni(p);
+    c.id = ids.get(p.id);
+    c.n = progetto.prossimoN++;
+    c.nome = `${p.nome.replace(/\s\d+$/, '')} ${c.n}`;
+    const F = new Matrix4().makeTranslation(L, 0, 0).multiply(new Matrix4().makeScale(-1, 1, 1));
+    const m = S.clone().multiply(matrice(p)).multiply(F);
+    const pos = new Vector3().setFromMatrixPosition(m), e = new Euler().setFromRotationMatrix(new Matrix4().extractRotation(m), 'ZYX');
+    c.pos = [pos.x, pos.y, pos.z].map(pulisci);
+    c.rot = [e.x, e.y, e.z].map(v => pulisci(v / RAD));
+    c.tagli = p.tagli.map(t => ({ n: [-t.n[0], t.n[1], t.n[2]], d: t.d - t.n[0] * L, da: ids.get(t.da) || null }));
+    const scambia = { A: 'B', B: 'A' };
+    c.ferramenta = (p.ferramenta || []).map(f => ({ ...f, ...(f.lato && scambia[f.lato] ? { lato: scambia[f.lato] } : {}) }));
+    progetto.pezzi.push(c);
+    return c;
+  });
+}
+
 export const fmt = (v, dec = 0) => Number(v).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: dec });
 
 // Descrizione del taglio come la serve in laboratorio.
