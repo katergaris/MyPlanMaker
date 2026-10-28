@@ -36,6 +36,13 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   - `prove.html` — prove automatiche di modello e geometria (aprirla col server avviato: "TUTTE OK").
   - `vendor/` — three.js 0.186.1 e manifold-3d 3.5.4 copiati dal registro npm (`VERSIONI.txt`).
 - `tests/test_server.py` — `python3 -m unittest discover -s tests`.
+- `windows/` — **versione portable per Windows** (2026-10-28): `crea-portable.sh` (da Linux) scarica Python
+  3.13.17 embeddable da python.org (cache in `dist/cache`) e crea `dist/MyPlanMaker-portable-<VERSIONE>.zip`
+  con `python/`, `app/` (server + web + `avvia.pyw`), `MyPlanMaker.bat`, `LEGGIMI.txt`. `avvia.pyw` usa la
+  prima porta libera da 8099 (o riapre l'istanza già avviata, riconosciuta da `/api/ping`), ascolta solo su
+  127.0.0.1, apre Edge/Chrome con `--app` e profilo in `dati/browser`, e si chiude quando la finestra viene
+  chiusa o dopo 3 minuti senza richieste (la pagina fa un ping ogni minuto). Dati in `dati/` accanto al `.bat`.
+  `dist/` è esclusa da git. Provato solo su Linux: **non ancora provato su un Windows vero**.
 
 ## Verifiche
 - Sul code-server non ci sono Node né Docker; c'è `chromium`. WebGL in headless funziona con

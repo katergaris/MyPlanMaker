@@ -1,0 +1,22 @@
+MyPlanMaker {VERSIONE} - versione portable per Windows
+======================================================
+
+Non serve installare niente. La cartella si può tenere ovunque, anche su una chiavetta USB.
+
+AVVIO
+  Doppio clic su "MyPlanMaker.bat". Si apre una finestra con l'app (usa Microsoft Edge,
+  oppure Chrome se c'è). Per chiudere, chiudi la finestra: il programma si ferma da solo.
+
+  Se Windows mostra "Windows ha protetto il PC", scegli "Ulteriori informazioni" e poi
+  "Esegui comunque": succede con i file scaricati da Internet.
+
+DOVE SONO I PROGETTI
+  Nella cartella "dati" qui accanto (file myplanmaker.sqlite). Per fare una copia di sicurezza
+  basta copiare la cartella "dati". Per spostare tutto su un altro PC, copia l'intera cartella.
+
+PROBLEMI
+  Il file "dati\registro.txt" riporta avvii, chiusure ed eventuali errori.
+
+CONTENUTO
+  python\   Python 3.13 embeddable ufficiale (python.org)
+  app\      l'app (server, pagine, three.js, Manifold)

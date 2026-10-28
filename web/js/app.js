@@ -378,6 +378,8 @@ async function avvio() {
   if (p) apri(p);
   else { crea(ESEMPI[0].crea()); avvisa('Ti ho aperto un esempio: tocca un pezzo per vedere come è fatto. Nuovi progetti dal menu Progetto.', false, 9000); }
   archivio.sincronizza();
+  // Segnale di vita: la versione portable per Windows si chiude da sola quando nessuna pagina è aperta.
+  setInterval(() => fetch('/api/ping', { cache: 'no-store' }).catch(() => {}), 60000);
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
   window.mpm = { stato, comando, tocco, apri, mod, righeDistinta }; // per le prove automatiche
 }

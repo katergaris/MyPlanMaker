@@ -116,9 +116,12 @@ def make_handler(store, password):
             return None
 
         def do_GET(self):
+            self.server.ultima_richiesta = time.time()
             if not self._guard():
                 return
             path = self.path.split("?")[0]
+            if path == "/api/ping":
+                return self._send(200, b"MyPlanMaker", "text/plain", {"Cache-Control": "no-store"})
             if path == "/api/projects":
                 return self._json(200, store.list())
             if path.startswith("/api/"):
@@ -130,6 +133,7 @@ def make_handler(store, password):
         do_HEAD = do_GET
 
         def do_PUT(self):
+            self.server.ultima_richiesta = time.time()
             if not self._guard():
                 return
             pid = self._project_id()
@@ -170,11 +174,15 @@ def make_handler(store, password):
     return Handler
 
 
+def crea_server(port, data, password="", host="0.0.0.0"):
+    store = Store(Path(data) / "myplanmaker.sqlite")
+    return ThreadingHTTPServer((host, port), make_handler(store, password))
+
+
 def main():
     port = int(os.environ.get("MPM_PORT", "8099"))
     data = Path(os.environ.get("MPM_DATA", str(ROOT / "data")))
-    store = Store(data / "myplanmaker.sqlite")
-    srv = ThreadingHTTPServer(("0.0.0.0", port), make_handler(store, os.environ.get("MPM_PASSWORD", "")))
+    srv = crea_server(port, data, os.environ.get("MPM_PASSWORD", ""))
     print(f"MyPlanMaker su http://0.0.0.0:{port}  (dati in {data})", flush=True)
     srv.serve_forever()
 
