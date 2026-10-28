@@ -82,3 +82,5 @@ pezzi, istruzioni di montaggio con vista esplosa, dime di foratura stampabili 1:
 - 2026-10-28, 0.3: cerniere e maniglie con fori, viti automatiche (tipo, misura, numero, posizione,
   preforo) con controlli e collisioni, lista della spesa. Mancano: guide, angolari disegnati, piedini,
   reggipiani, sistema 32, viti nascoste a scelta.
+- 2026-10-28, 0.4: Dividi come "n pezzi alla stessa distanza tra due pezzi paralleli" (al posto della
+  divisione dei vani pensata all'inizio: più semplice e funziona anche per divisori verticali).

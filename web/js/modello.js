@@ -156,6 +156,48 @@ export function adatta(a, b) {
   return { ok: true, msg: descriviTaglio(a.tagli.at(-1)) };
 }
 
+// Dividi: n copie di A distribuite alla stessa distanza nello spazio tra A e B (che devono essere paralleli).
+// vertA/vertB = vertici reali nel mondo. Restituisce { ok, msg, asse, luce, passo }.
+export function spazioTra(a, b, vertA, vertB, n) {
+  const ra = new Matrix4().extractRotation(matrice(a)), rb = new Matrix4().extractRotation(matrice(b));
+  const assiA = [0, 1, 2].map(i => new Vector3(...[0, 1, 2].map(j => (j === i ? 1 : 0))).applyMatrix4(ra));
+  const assiB = [0, 1, 2].map(i => new Vector3(...[0, 1, 2].map(j => (j === i ? 1 : 0))).applyMatrix4(rb));
+  const centro = pts => pts.reduce((c, v) => c.add(v), new Vector3()).multiplyScalar(1 / pts.length);
+  const verso = centro(vertB).sub(centro(vertA));
+  // l'asse di A più allineato alla direzione verso B, che deve essere parallelo a un asse di B
+  let asse = null;
+  for (const x of assiA) {
+    if (!assiB.some(y => Math.abs(Math.abs(x.dot(y)) - 1) < 1e-4)) continue;
+    if (!asse || Math.abs(x.dot(verso)) > Math.abs(asse.dot(verso))) asse = x.clone();
+  }
+  if (!asse) return { ok: false, msg: 'I due pezzi devono essere paralleli (per esempio fondo e piano, o i due fianchi).' };
+  if (asse.dot(verso) < 0) asse.negate();
+  const proj = pts => { let lo = Infinity, hi = -Infinity; for (const v of pts) { const t = v.dot(asse); lo = Math.min(lo, t); hi = Math.max(hi, t); } return [lo, hi]; };
+  const [a0, a1] = proj(vertA), [b0] = proj(vertB);
+  const spessore = a1 - a0, luce = b0 - a1;
+  if (luce <= 0.5) return { ok: false, msg: 'Tra i due pezzi non c\'è spazio libero.' };
+  const passo = (luce - n * spessore) / (n + 1);
+  if (passo < 5) return { ok: false, msg: `Non ci stanno ${n} pezzi da ${fmt(spessore, 1)} mm in ${fmt(luce, 1)} mm.` };
+  return { ok: true, asse, spessore, luce, passo };
+}
+
+export function dividi(progetto, a, spazio, n) {
+  const nuovi = [];
+  const base = a.nome.replace(/\s\d+$/, '');
+  for (let i = 1; i <= n; i++) {
+    const c = structuredClone(a);
+    c.id = nuovoId();
+    c.n = progetto.prossimoN++;
+    c.nome = `${base} ${c.n}`;
+    const s = i * (spazio.passo + spazio.spessore);
+    c.pos = a.pos.map((v, k) => pulisci(v + spazio.asse.getComponent(k) * s));
+    c.tagli = c.tagli.map(t => ({ ...t, da: null }));
+    progetto.pezzi.push(c);
+    nuovi.push(c);
+  }
+  return nuovi;
+}
+
 export const fmt = (v, dec = 0) => Number(v).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: dec });
 
 // Descrizione del taglio come la serve in laboratorio.

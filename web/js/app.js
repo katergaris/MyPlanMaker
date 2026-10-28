@@ -86,12 +86,13 @@ function comando(cmd) {
     modifica(() => { stato.sel = mod.nuovoPezzo(pr, cmd, vicino).id; });
     vista.vista(vista.nomeVista);
     avvisa(`Aggiunto: scrivi le misure a destra, poi usa Accosta per metterlo contro un altro pezzo.`);
-  } else if (cmd === 'accosta' || cmd === 'adatta') {
+  } else if (cmd === 'accosta' || cmd === 'adatta' || cmd === 'dividi') {
     if (stato.modo === cmd) return esciModo();
     stato.modo = cmd;
     aggiornaAttrezzi();
     avvisa(cmd === 'accosta'
       ? `Tocca la faccia dove appoggiare «${p.nome}». Esc per annullare.`
+      : cmd === 'dividi' ? `Tocca il pezzo opposto a «${p.nome}» (per esempio il piano, o l'altro fianco): ti chiedo quanti pezzi mettere in mezzo.`
       : `Tocca il pezzo contro cui adattare «${p.nome}»: lo allungo o accorcio e lo taglio con l'angolo giusto.`, false, 0);
   } else if (cmd === 'duplica') {
     modifica(() => { stato.sel = mod.duplica(pr, p).id; });
@@ -107,6 +108,12 @@ function tocco(id, faccia) {
   if (stato.modo && p) {
     if (!id || id === p.id) return avvisa('Tocca un altro pezzo, oppure premi di nuovo il comando per uscire.', true, 4000);
     const b = stato.progetto.pezzi.find(x => x.id === id);
+    if (stato.modo === 'dividi') {
+      stato.modo = null;
+      aggiornaAttrezzi();
+      $('#toast').hidden = true;
+      return apriDividi(p, b);
+    }
     if (stato.modo === 'accosta') {
       modifica(() => mod.accosta(p, faccia, verticiMondo(p)));
       avvisa(`«${p.nome}» accostato a «${b.nome}».`);
@@ -125,6 +132,25 @@ function tocco(id, faccia) {
   }
   stato.sel = id;
   aggiorna();
+}
+
+// ---------- Dividi ----------
+let dividiDa = null;
+function apriDividi(a, b) {
+  dividiDa = { a, b };
+  $('#dividi-testo').innerHTML = `Quanti pezzi come «${esc(a.nome)}» vuoi mettere tra «${esc(a.nome)}» e «${esc(b.nome)}»? Saranno alla stessa distanza.`;
+  $('#dividi-n').value = '1';
+  anteprimaDividi();
+  $('#dlg-dividi').showModal();
+}
+function anteprimaDividi() {
+  const n = Math.max(1, Math.min(50, Math.round(numero($('#dividi-n').value) || 1)));
+  const s = mod.spazioTra(dividiDa.a, dividiDa.b, verticiMondo(dividiDa.a), verticiMondo(dividiDa.b), n);
+  const e = $('#dividi-esito');
+  e.className = s.ok ? 'ok' : 'avviso';
+  e.textContent = s.ok ? `Spazio libero ${f1(s.luce)} mm: ${n} pezz${n === 1 ? 'o' : 'i'} da ${f1(s.spessore)} mm, luce tra un pezzo e l'altro ${f1(s.passo)} mm.` : s.msg;
+  $('#dividi-ok').disabled = !s.ok;
+  return { n, s };
 }
 
 // ---------- pannello delle proprietà ----------
@@ -491,6 +517,17 @@ function eventiDialoghi() {
     } catch (err) { avvisa(err.message, true, 8000); }
   });
   $('#apri-distinta').addEventListener('click', () => { mostraDistinta('pezzi'); $('#dlg-distinta').showModal(); });
+  $('#dividi-n').addEventListener('input', anteprimaDividi);
+  $('#dividi-meno').addEventListener('click', () => { $('#dividi-n').value = Math.max(1, (numero($('#dividi-n').value) || 1) - 1); anteprimaDividi(); });
+  $('#dividi-piu').addEventListener('click', () => { $('#dividi-n').value = Math.min(50, (numero($('#dividi-n').value) || 1) + 1); anteprimaDividi(); });
+  $('#dividi-ok').addEventListener('click', () => {
+    const { n, s } = anteprimaDividi();
+    if (!s.ok) return;
+    const { a } = dividiDa;
+    modifica(() => { const nuovi = mod.dividi(stato.progetto, a, s, n); stato.sel = nuovi[0].id; });
+    $('#dlg-dividi').close();
+    avvisa(`Aggiunt${n === 1 ? 'o 1 pezzo' : `i ${n} pezzi`} alla stessa distanza (luce ${f1(s.passo)} mm). Viti e distinta sono già aggiornate.`);
+  });
   $('#schede-distinta').addEventListener('click', e => { const b = e.target.closest('button'); if (b) mostraDistinta(b.dataset.scheda); });
   $('#distinta').addEventListener('change', e => {
     const k = e.target.dataset.taglio;

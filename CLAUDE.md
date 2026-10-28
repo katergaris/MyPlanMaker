@@ -25,7 +25,8 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   (GET/PUT/DELETE) su SQLite. Al PUT vince il campo `updated` più recente (altrimenti 409 con la versione del
   server). Variabili `MPM_PORT` (8099), `MPM_DATA` (`./data`, esclusa da git), `MPM_PASSWORD` (HTTP Basic).
 - `web/` — web app senza passaggi di compilazione (moduli ES, import map per `three`):
-  - `js/modello.js` — pezzi, orientamenti rapidi, **Accosta**, **Adatta**, descrizione dei tagli, storico.
+  - `js/modello.js` — pezzi, orientamenti rapidi, **Accosta**, **Adatta**, **Dividi** (`spazioTra` + `dividi`:
+    n copie di A alla stessa distanza fino a B, che deve essere parallelo), descrizione dei tagli, storico.
     Sistema locale del pezzo: L lungo x, W lungo y, T lungo z; tagli = semipiani locali `n·x >= d`.
     Rotazioni in gradi, ordine sugli assi del mondo X → Y → Z (Euler three.js `'ZYX'`).
   - `js/geometria.js` — Manifold: profilo (rettangolo, angoli arrotondati, cerchio) estruso + `trimByPlane`.
@@ -76,6 +77,8 @@ solo lungo la lunghezza del pezzo; un progetto eliminato senza rete ricompare da
 comprare (anche nel piede e nella stampa).
 0.3 (2026-10-28): ferramenta (cerniere, maniglie, fori scavati) e viti automatiche con controlli, viti nel 3D
 (pulsante Viti), scheda "Ferramenta e viti" con lista della spesa, avvisi nel piede.
+0.4 (2026-10-28): Dividi (scegli un pezzo, tocca quello opposto, quanti in mezzo); finestre centrate.
 Per preparare un progetto per Salvo: costruirlo con le funzioni di `modello.js` (come `esempi.js`), controllarlo
 con `prove-ui.html` e consegnarlo come `.mpm.json` in `MyPlanMaker/progetti/`.
-Prossimi passi (vedi `docs/PIANO.md`): guide e cassetti, Dividi, sagome libere e dime 1:1, magazzino avanzi.
+Prossimi passi (vedi `docs/PIANO.md`): guide e cassetti, sagome libere e dime 1:1, magazzino avanzi, freccia dei
+ripiani e ribaltamento.

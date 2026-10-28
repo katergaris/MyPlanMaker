@@ -84,7 +84,7 @@ footer { grid-column: 1 / -1; background: var(--panel); border-top: 1px solid va
 footer b { color: var(--text); font-weight: 600; }
 footer .costo b { font-size: 17px; }
 
-.dlg { border: 1px solid var(--line); border-radius: 16px; padding: 0; width: min(560px, 94vw); max-height: 88vh; background: var(--panel); color: var(--text); box-shadow: 0 20px 60px rgba(40, 25, 10, .25); }
+.dlg { margin: auto; border: 1px solid var(--line); border-radius: 16px; padding: 0; width: min(560px, 94vw); max-height: 88vh; background: var(--panel); color: var(--text); box-shadow: 0 20px 60px rgba(40, 25, 10, .25); }
 .dlg.larga { width: min(1100px, 96vw); }
 .dlg::backdrop { background: rgba(43, 39, 34, .35); }
 .dlg-testa { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }

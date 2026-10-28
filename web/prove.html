@@ -152,6 +152,21 @@ function controllaLastre(gruppi, lama) {
   prova('tavolo: fascia contro gamba trovata', !!f, f && `${f.tipo} · ${f.note.join(' ')}`);
 }
 
+// 10. Dividi
+{
+  const pr = mobilettoLeggio(), { Vector3 } = await import('./vendor/three.module.js');
+  const vm = p => { const g = geometriaPezzo(p), m = mod.matrice(p); return g.vertici.map(v => new Vector3(...v).applyMatrix4(m)); };
+  const fondo = pr.pezzi.find(p => p.nome === 'Fondo'), rip = pr.pezzi.find(p => p.nome === 'Ripiano');
+  const s = mod.spazioTra(fondo, rip, vm(fondo), vm(rip), 2);
+  prova('dividi fondo-ripiano: spazio 318, 2 pezzi, luce 94', s.ok && Math.abs(s.luce - 318) < 0.01 && Math.abs(s.passo - 94) < 0.01, s.msg || `${s.luce} ${s.passo}`);
+  const nuovi = mod.dividi(pr, fondo, s, 2);
+  prova('dividi: ripiani a 68+94 e 68+94+18+94', Math.abs(nuovi[0].pos[1] - 162) < 0.01 && Math.abs(nuovi[1].pos[1] - 274) < 0.01, nuovi.map(p => p.pos[1]).join(', '));
+  const u = unioni(pr), g = u.giunti.filter(g => nuovi.includes(g.a) || nuovi.includes(g.b));
+  prova('dividi: i nuovi pezzi prendono le viti dai fianchi', g.filter(x => x.viti.length === 3).length === 4, `${g.length}`);
+  const fs = pr.pezzi.find(p => p.nome === 'Fianco sinistro'), piano = pr.pezzi.find(p => p.nome === 'Piano inclinato');
+  prova('dividi tra pezzi non paralleli: rifiuta', !mod.spazioTra(fs, piano, vm(fs), vm(piano), 1).ok);
+}
+
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');
 const ko = esiti.filter(e => !e.ok).length;
 document.getElementById('riassunto').textContent = ko ? `FALLITE ${ko} su ${esiti.length}` : `TUTTE OK (${esiti.length})`;
