@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MyPlanMaker — Direzione B: Disegno tecnico</title>
+<style>
+  :root { --paper:#fbfbf7; --grid:#dfe5ee; --ink:#1c2740; --muted:#66708a; --line:#c9d0dc; --red:#d0412b; --mono:ui-monospace,"Cascadia Mono","Consolas",monospace; }
+  * { box-sizing:border-box; margin:0; }
+  body { font:15px/1.4 system-ui,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--paper); height:100vh; overflow:hidden; }
+  .app { display:grid; grid-template-columns:1fr 360px; grid-template-rows:56px 60px 1fr; height:100vh; }
+  header { grid-column:1/-1; display:flex; align-items:center; gap:18px; padding:0 22px; border-bottom:2px solid var(--ink); }
+  .logo { font-family:var(--mono); font-weight:700; font-size:16px; letter-spacing:.06em; text-transform:uppercase; }
+  .proj { font-family:var(--mono); color:var(--muted); font-size:14px; }
+  .sp { flex:1; }
+  .btn { height:40px; padding:0 16px; border:1.5px solid var(--ink); background:var(--paper); font:inherit; font-weight:600; color:var(--ink); border-radius:0; }
+  .btn.primary { background:var(--ink); color:var(--paper); }
+  nav.tools { grid-column:1/-1; display:flex; align-items:stretch; border-bottom:1px solid var(--line); padding:0 12px; }
+  .tool { border:0; background:none; font:inherit; font-weight:600; padding:0 22px; color:var(--ink); display:flex; align-items:center; gap:10px; border-bottom:3px solid transparent; }
+  .tool kbd { font-family:var(--mono); font-size:12px; border:1px solid var(--line); padding:1px 6px; color:var(--muted); }
+  .tool.on { border-bottom-color:var(--red); color:var(--red); }
+  .tools .sep { width:1px; background:var(--line); margin:14px 10px; }
+  main { position:relative; background-color:var(--paper);
+    background-image:linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:24px 24px; }
+  main svg#scena { position:absolute; inset:50px 40px 70px; width:calc(100% - 80px); height:calc(100% - 120px); }
+  .views { position:absolute; top:16px; left:20px; display:flex; gap:0; }
+  .views button { height:34px; padding:0 14px; border:1.5px solid var(--ink); margin-right:-1.5px; background:var(--paper); font-family:var(--mono); font-size:13px; color:var(--ink); }
+  .views button.on { background:var(--ink); color:var(--paper); }
+  .stamp { position:absolute; right:20px; bottom:18px; border:1.5px solid var(--ink); background:var(--paper); font-family:var(--mono); font-size:12px; display:grid; grid-template-columns:auto auto; }
+  .stamp div { padding:6px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .stamp div:nth-child(2n) { border-right:0; font-weight:700; }
+  .note { position:absolute; left:20px; bottom:18px; font-family:var(--mono); font-size:13px; background:var(--paper); border-left:3px solid var(--red); padding:8px 12px; max-width:440px; }
+  aside.props { border-left:2px solid var(--ink); overflow:auto; }
+  .ph { padding:18px 20px 14px; border-bottom:1px solid var(--line); }
+  .ph .n { font-family:var(--mono); font-size:12px; color:var(--red); letter-spacing:.08em; }
+  .ph h2 { font-size:20px; font-weight:700; margin-top:2px; }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:12px 20px; border-bottom:1px solid var(--line); }
+  td:first-child { color:var(--muted); width:46%; }
+  td.v { font-family:var(--mono); font-size:16px; font-weight:600; text-align:right; }
+  td.v.edit { background:#fff; outline:1.5px solid var(--ink); outline-offset:-6px; }
+  .sec { padding:16px 20px 6px; font-family:var(--mono); font-size:12px; letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
+  .check { margin:14px 20px; padding:10px 12px; border:1.5px solid #2c7a4b; color:#2c7a4b; font-family:var(--mono); font-size:13px; }
+</style></head>
+<body><div class="app">
+  <header>
+    <div class="logo">MyPlanMaker</div>
+    <div class="proj">/ mobiletto-con-leggio · rev 3</div>
+    <div class="sp"></div>
+    <button class="btn">↶</button><button class="btn">↷</button>
+    <button class="btn">Distinta</button><button class="btn primary">PDF</button>
+  </header>
+  <nav class="tools">
+    <button class="tool">Pannello <kbd>P</kbd></button>
+    <button class="tool">Listello <kbd>L</kbd></button>
+    <button class="tool">Ferramenta <kbd>F</kbd></button>
+    <span class="sep"></span>
+    <button class="tool">Dividi <kbd>D</kbd></button>
+    <button class="tool on">Adatta <kbd>A</kbd></button>
+    <button class="tool">Misura <kbd>M</kbd></button>
+  </nav>
+  <main>
+    <div class="views"><button class="on">ISO</button><button>FRONTE</button><button>LATO</button><button>PIANTA</button><button>ESPLOSO</button></div>
+    <svg id="scena"></svg>
+    <div class="note">Pezzo 8 rifilato contro pezzi 1 e 7 · taglio 16,7° · 6 viti 4×40 posate</div>
+    <div class="stamp"><div>PEZZI</div><div>9</div><div>PANNELLI</div><div>1 × 2800×2070</div><div>VITI</div><div>12 × 4×40</div><div>COSTO</div><div>94,60 €</div></div>
+  </main>
+  <aside class="props">
+    <div class="ph"><div class="n">PEZZO 08</div><h2>Piano inclinato</h2></div>
+    <table>
+      <tr><td>Materiale</td><td class="v">MULTISTR. 18</td></tr>
+      <tr><td>Lunghezza</td><td class="v">800 mm</td></tr>
+      <tr><td>Larghezza</td><td class="v">522 mm</td></tr>
+      <tr><td>Inclinazione</td><td class="v edit">16,7°</td></tr>
+      <tr><td>Venatura</td><td class="v">↔ lungo L</td></tr>
+    </table>
+    <div class="sec">Unioni</div>
+    <table>
+      <tr><td>con pezzo 01</td><td class="v">3 × vite 4×40</td></tr>
+      <tr><td>con pezzo 07</td><td class="v">3 × vite 4×40</td></tr>
+      <tr><td>Preforo</td><td class="v">Ø 2,5</td></tr>
+    </table>
+    <div class="check">OK · nessuna collisione · ripiano 20 kg → freccia 0,6 mm</div>
+  </aside>
+</div>
+<script src="scena.js"></script>
+<script>
+disegnaScena(document.getElementById('scena'), {
+  colors: { legno:'#ffffff', fondo:'#f1f3f7', metallo:'#cfd5df' }, stroke:'#1c2740', strokeWidth:1.6,
+  selected:'piano', selColor:'#d0412b', selFill:'#fff3ef', screw:'#d0412b', labelBg:'#1c2740', labelText:'#fbfbf7',
+  labelRadius:0, labelFont:'ui-monospace,Consolas,monospace'
+});
+</script></body></html>

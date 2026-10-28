@@ -1,0 +1,11 @@
+{
+  "name": "MyPlanMaker",
+  "short_name": "MyPlanMaker",
+  "description": "Progettazione di mobili e costruzioni in legno",
+  "lang": "it",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f1ec",
+  "theme_color": "#fffdfa",
+  "icons": [{ "src": "icona.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

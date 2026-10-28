@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><title>MyPlanMaker — prove</title>
+<style>body{font:14px system-ui;padding:20px} .ok{color:#2f7d4f} .ko{color:#c0392b;font-weight:600}</style></head>
+<body><h1>Prove del modello</h1><ul id="esiti"></ul><pre id="riassunto">in corso…</pre>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<script type="module">
+import { avviaGeometria, geometriaPezzo } from './js/geometria.js';
+import * as mod from './js/modello.js';
+import { mobilettoLeggio, tavoloRotondo } from './js/esempi.js';
+import { righeDistinta } from './js/distinta.js';
+
+const esiti = [];
+const vicino = (a, b, tol = 0.6) => Math.abs(a - b) <= tol;
+function prova(nome, cond, dettaglio = '') { esiti.push({ nome, ok: !!cond, dettaglio }); }
+
+await avviaGeometria();
+
+// 1. Mobiletto: fianchi e schienale adattati al piano inclinato di 16,7°
+{
+  const pr = mobilettoLeggio(), righe = righeDistinta(pr), r = n => righe.find(x => x.nome === n);
+  const f = r('Fianco sinistro'), s = r('Schienale');
+  prova('fianco: misura finita 900 × 500', vicino(f.L, 900, 1) && vicino(f.W, 500, 1), `${f.L} × ${f.W}`);
+  prova('fianco: testa obliqua 16,7°', f.tagli[0] === 'Testa B: obliquo 16,7°', f.tagli.join('; '));
+  prova('schienale: lama inclinata 16,7°', s.tagli[0] === 'Testa B: lama inclinata 16,7°', s.tagli.join('; '));
+  prova('schienale: lunghezza finita ~850', vicino(s.L, 850, 1.5), `${s.L}`);
+  prova('nessun pezzo vuoto', righe.every(x => !x.vuoto));
+}
+
+// 2. Adatta allunga: un listello corto sotto un ripiano arriva fino al ripiano con taglio a squadra
+{
+  const pr = mod.nuovoProgetto();
+  const gamba = mod.nuovoPezzo(pr, 'listello'); gamba.L = 300; gamba.pos = [100, 0, 0];
+  const piano = mod.nuovoPezzo(pr, 'pannello'); piano.pos = [0, 700, 100];
+  const r = mod.adatta(gamba, piano), g = geometriaPezzo(gamba);
+  prova('adatta allunga fino a 700', r.ok && vicino(g.max[0] - g.min[0], 700), `${r.msg} · L=${g.max[0] - g.min[0]}`);
+  prova('taglio a squadra', r.msg === 'Testa B: a squadra', r.msg);
+}
+
+// 3. Adatta su un piano inclinato di 30° di lato (taglio obliquo + direzione corretta)
+{
+  const pr = mod.nuovoProgetto();
+  const gamba = mod.nuovoPezzo(pr, 'listello'); gamba.L = 1200; gamba.pos = [400, 0, 0];
+  const piano = mod.nuovoPezzo(pr, 'pannello'); piano.L = 1200; piano.pos = [0, 600, 200]; piano.rot = [-90, 0, 30];
+  const r = mod.adatta(gamba, piano), g = geometriaPezzo(gamba);
+  prova('taglio obliquo di 30°', r.ok && /30°/.test(r.msg), r.msg);
+  prova('la gamba resta sotto il piano', g && g.max[0] < 1200, g && `${g.max[0]}`);
+}
+
+// 4. Paralleli: Adatta rifiuta
+{
+  const pr = mod.nuovoProgetto();
+  const a = mod.nuovoPezzo(pr, 'pannello'), b = mod.nuovoPezzo(pr, 'pannello'); b.pos = [0, 300, 0];
+  prova('pezzi paralleli: Adatta dice di usare Accosta', !mod.adatta(a, b).ok);
+}
+
+// 5. Accosta: un pannello appoggiato sopra un altro
+{
+  const pr = mod.nuovoProgetto();
+  const a = mod.nuovoPezzo(pr, 'pannello'), b = mod.nuovoPezzo(pr, 'pannello'); b.pos = [0, 300, 0];
+  const { Vector3 } = await import('./vendor/three.module.js');
+  mod.accosta(b, { normale: new Vector3(0, 1, 0), punto: new Vector3(0, 18, 0) });
+  prova('accosta: appoggiato a 18 mm', vicino(b.pos[1], 18, 0.01), `${b.pos[1]}`);
+}
+
+// 6. Tavolo rotondo
+{
+  const pr = tavoloRotondo(), righe = righeDistinta(pr), p = righe.find(x => x.nome === 'Piano rotondo');
+  prova('piano rotondo Ø 1000', vicino(p.L, 1000, 1) && /^rotondo Ø 1\.?000$/.test(p.forma[0]), `${p.L} · ${p.forma}`);
+  prova('tavolo: 9 pezzi', righe.length === 9);
+}
+
+document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');
+const ko = esiti.filter(e => !e.ok).length;
+document.getElementById('riassunto').textContent = ko ? `FALLITE ${ko} su ${esiti.length}` : `TUTTE OK (${esiti.length})`;
+</script></body></html>

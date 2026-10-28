@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MyPlanMaker — Direzione C: Officina scura</title>
+<style>
+  :root { --bg:#17191c; --panel:#212429; --panel2:#2a2e34; --line:#33373e; --text:#ecebe7; --muted:#9a9ea6; --amber:#f2a63b; --amber-ink:#1d1406; --ok:#6fcf8f; }
+  * { box-sizing:border-box; margin:0; }
+  body { font:16px/1.4 system-ui,"Segoe UI",Roboto,sans-serif; color:var(--text); background:radial-gradient(ellipse at 45% 40%, #23262b 0%, var(--bg) 70%); height:100vh; overflow:hidden; }
+  .app { position:relative; height:100vh; }
+  header { position:absolute; top:16px; left:16px; right:16px; display:flex; align-items:center; gap:12px; }
+  .pill { height:48px; padding:0 18px; border-radius:24px; background:var(--panel); border:1px solid var(--line); display:flex; align-items:center; gap:10px; font-weight:500; color:var(--text); font:inherit; }
+  .pill b { font-weight:650; }
+  .pill .m { color:var(--muted); }
+  .sp { flex:1; }
+  .pill.icon { width:48px; justify-content:center; padding:0; font-size:20px; }
+  .pill.primary { background:var(--amber); color:var(--amber-ink); border-color:var(--amber); font-weight:650; }
+  svg#scena { position:absolute; top:90px; left:40px; width:calc(100% - 460px); height:calc(100% - 230px); }
+  .views { position:absolute; top:84px; left:24px; display:flex; flex-direction:column; gap:6px; }
+  .views button { width:84px; height:40px; border-radius:12px; border:1px solid var(--line); background:transparent; color:var(--muted); font:inherit; font-size:14px; }
+  .views button.on { background:var(--panel2); color:var(--text); }
+  .card { position:absolute; top:84px; right:16px; width:380px; background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:22px; display:flex; flex-direction:column; gap:18px; box-shadow:0 20px 50px rgba(0,0,0,.35); }
+  .card .k { color:var(--amber); font-size:13px; font-weight:600; letter-spacing:.04em; }
+  .card h2 { font-size:24px; font-weight:650; }
+  .big { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .num { background:var(--panel2); border-radius:14px; padding:12px 14px; }
+  .num span { display:block; font-size:12px; color:var(--muted); }
+  .num b { font-size:24px; font-weight:650; font-variant-numeric:tabular-nums; }
+  .num b small { font-size:14px; color:var(--muted); font-weight:500; }
+  .num.hl { outline:2px solid var(--amber); }
+  .num.hl b { color:var(--amber); }
+  .stepper { display:flex; gap:8px; }
+  .stepper .num { flex:1; }
+  .stepper button { width:56px; border-radius:14px; border:0; background:var(--panel2); color:var(--text); font-size:24px; }
+  .line { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-top:1px solid var(--line); font-size:15px; }
+  .line a { color:var(--amber); text-decoration:none; font-weight:600; }
+  .ok { color:var(--ok); font-size:15px; }
+  .dock { position:absolute; bottom:20px; left:calc(50% - 200px); transform:translateX(-50%); display:flex; gap:6px; background:var(--panel); border:1px solid var(--line); border-radius:26px; padding:8px; box-shadow:0 14px 40px rgba(0,0,0,.4); }
+  .tool { width:92px; height:72px; border-radius:18px; border:0; background:transparent; color:var(--text); font:inherit; font-size:13px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; }
+  .tool svg { width:28px; height:28px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .tool.on { background:var(--amber); color:var(--amber-ink); font-weight:600; }
+  .dock .sep { width:1px; background:var(--line); margin:10px 4px; }
+  .sum { position:absolute; bottom:28px; right:16px; width:380px; display:flex; justify-content:space-between; color:var(--muted); font-size:14px; }
+  .sum b { color:var(--text); font-size:20px; display:block; font-weight:650; }
+</style></head>
+<body><div class="app">
+  <header>
+    <div class="pill"><b>MyPlanMaker</b><span class="m">· Mobiletto con leggio</span></div>
+    <div class="sp"></div>
+    <button class="pill icon">↶</button><button class="pill icon">↷</button>
+    <button class="pill">Distinta e tagli</button><button class="pill primary">Esporta PDF</button>
+  </header>
+  <div class="views"><button class="on">3D</button><button>Fronte</button><button>Lato</button><button>Esploso</button></div>
+  <svg id="scena"></svg>
+  <div class="card">
+    <div><div class="k">PEZZO 8</div><h2>Piano inclinato</h2></div>
+    <div class="num"><span>Materiale</span><b style="font-size:18px">Multistrato betulla 18</b></div>
+    <div class="big">
+      <div class="num"><span>Lunghezza</span><b>800 <small>mm</small></b></div>
+      <div class="num"><span>Larghezza</span><b>522 <small>mm</small></b></div>
+    </div>
+    <div class="stepper"><button>−</button><div class="num hl"><span>Inclinazione</span><b>16,7 <small>°</small></b></div><button>+</button></div>
+    <div>
+      <div class="line"><span>Viti 4×40 nascoste · 6</span><a href="#">Mostra</a></div>
+      <div class="line"><span>Preforo Ø 2,5 mm</span><a href="#">Cambia</a></div>
+    </div>
+    <div class="ok">● Nessuna collisione · ripiano ok con 20 kg</div>
+  </div>
+  <div class="dock">
+    <button class="tool"><svg viewBox="0 0 32 32"><rect x="5" y="9" width="22" height="14" rx="1.5"/></svg>Pannello</button>
+    <button class="tool"><svg viewBox="0 0 32 32"><rect x="3" y="13" width="26" height="6" rx="1"/></svg>Listello</button>
+    <button class="tool"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="9"/><path d="M12 16h8M16 12v8"/></svg>Ferramenta</button>
+    <span class="sep"></span>
+    <button class="tool"><svg viewBox="0 0 32 32"><rect x="5" y="5" width="22" height="22" rx="1.5"/><path d="M5 16h22"/></svg>Dividi</button>
+    <button class="tool on"><svg viewBox="0 0 32 32"><path d="M5 24 27 10M19 9l8 1-3 7"/></svg>Adatta</button>
+  </div>
+  <div class="sum"><span><b>9</b>pezzi</span><span><b>12</b>viti</span><span><b>94,60 €</b>costo</span></div>
+</div>
+<script src="scena.js"></script>
+<script>
+disegnaScena(document.getElementById('scena'), {
+  colors: { legno:'#d8b07a', fondo:'#c9b796', metallo:'#b8bec6' }, stroke:'#5a4128', strokeWidth:1,
+  selected:'piano', selColor:'#f2a63b', selFill:'#e2bb85', screw:'#f2a63b', labelBg:'#f2a63b', labelText:'#1d1406', labelRadius:20
+});
+</script></body></html>

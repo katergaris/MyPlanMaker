@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fffdfa">
+<title>MyPlanMaker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icona.svg" type="image/svg+xml">
+<link rel="stylesheet" href="stile.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">My<span>Plan</span>Maker</div>
+    <button class="proj" id="apri-progetti" title="Progetti">Progetto <b id="nome-progetto">—</b> <small>▾</small></button>
+    <span class="stato" id="stato-salvataggio"></span>
+    <div class="sp"></div>
+    <button class="btn icon" id="annulla" title="Annulla (Ctrl+Z)">↶</button>
+    <button class="btn icon" id="ripeti" title="Ripeti (Ctrl+Y)">↷</button>
+    <button class="btn" id="apri-distinta">Distinta e tagli</button>
+    <button class="btn primary" id="esporta">Esporta PDF</button>
+  </header>
+
+  <aside class="tools">
+    <button class="tool" data-cmd="pannello"><svg viewBox="0 0 32 32"><rect x="5" y="9" width="22" height="14" rx="1.5"/></svg>Pannello</button>
+    <button class="tool" data-cmd="listello"><svg viewBox="0 0 32 32"><rect x="3" y="13" width="26" height="6" rx="1"/></svg>Listello</button>
+    <hr>
+    <button class="tool" data-cmd="accosta" data-serve-sel><svg viewBox="0 0 32 32"><rect x="4" y="9" width="9" height="14" rx="1"/><path d="M27 9v14M17 16h7M21 13l3 3-3 3"/></svg>Accosta</button>
+    <button class="tool" data-cmd="adatta" data-serve-sel><svg viewBox="0 0 32 32"><path d="M5 24 27 10M19 9l8 1-3 7"/></svg>Adatta</button>
+    <hr>
+    <button class="tool" data-cmd="duplica" data-serve-sel><svg viewBox="0 0 32 32"><rect x="5" y="5" width="15" height="15" rx="1.5"/><rect x="12" y="12" width="15" height="15" rx="1.5"/></svg>Duplica</button>
+    <button class="tool" data-cmd="elimina" data-serve-sel><svg viewBox="0 0 32 32"><path d="M7 9h18M13 9V6h6v3M9 9l1.5 17h11L23 9"/></svg>Elimina</button>
+  </aside>
+
+  <main>
+    <div class="views" id="viste">
+      <button data-vista="3d" class="on">3D</button><button data-vista="fronte">Fronte</button><button data-vista="lato">Lato</button><button data-vista="sopra">Sopra</button><button data-vista="inquadra" title="Inquadra tutti i pezzi">⤢</button>
+    </div>
+    <div id="vista3d"></div>
+    <div class="toast" id="toast" hidden><span class="dot"></span><span id="toast-testo"></span><button id="toast-chiudi" class="link" hidden>Annulla</button></div>
+  </main>
+
+  <aside class="props" id="proprieta"></aside>
+
+  <footer id="piede"></footer>
+</div>
+
+<dialog id="dlg-progetti" class="dlg">
+  <div class="dlg-testa"><h2>Progetti</h2><button class="btn icon" data-chiudi>✕</button></div>
+  <div class="dlg-corpo">
+    <button class="btn primary" id="nuovo-progetto">+ Nuovo progetto vuoto</button>
+    <h3>I tuoi progetti</h3>
+    <ul class="lista" id="lista-progetti"></ul>
+    <h3>Parti da un esempio</h3>
+    <ul class="lista" id="lista-esempi"></ul>
+  </div>
+</dialog>
+
+<dialog id="dlg-distinta" class="dlg larga">
+  <div class="dlg-testa"><h2>Distinta e tagli</h2><span class="sp"></span><button class="btn" id="stampa">Stampa o salva PDF</button><button class="btn icon" data-chiudi>✕</button></div>
+  <div class="dlg-corpo" id="distinta"></div>
+</dialog>
+
+<div id="stampa-area"></div>
+
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
