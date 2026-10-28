@@ -240,6 +240,29 @@ for (const m of MODELLI) {
   prova('due fianchi uno dentro l\'altro: «si compenetrano»', controlli(pr).avvisi.some(x => /compenetrano/.test(x)));
 }
 
+// 14. Fissaggi, bordi, venatura
+{
+  const pr = mobilettoLeggio(), fs = pr.pezzi.find(p => p.nome === 'Fianco sinistro'), fondo = pr.pezzi.find(p => p.nome === 'Fondo');
+  const k = [fs.id, fondo.id].sort().join('|');
+  for (const [tipo, atteso] of [['confirmat', /confirmat 7×50/], ['spinotti', /spinotti Ø 8/], ['eccentrici', /eccentrici Ø 15/], ['colla', /solo colla/]]) {
+    pr.fissaggi = { [k]: tipo };
+    const g = unioni(pr).giunti.find(x => x.chiave === k);
+    prova(`fianco → fondo con ${tipo}`, atteso.test((await import('./js/unioni.js')).descriviGiunto(g)), (await import('./js/unioni.js')).descriviGiunto(g));
+  }
+  pr.fissaggi = { [k]: 'spinotti' };
+  const sp = listaSpesa(pr, unioni(pr));
+  prova('spinotti nella lista della spesa con la colla', sp.righe.some(r => /Spinotto/.test(r.voce)) && sp.righe.some(r => /Colla/.test(r.voce)));
+  const rip = pr.pezzi.find(p => p.nome === 'Ripiano');
+  prova('nomi dei bordi del ripiano: davanti = bordo basso', mod.nomeBordo(rip, 'basso') === 'davanti' && mod.nomeBordo(rip, 'alto') === 'dietro', `${mod.nomeBordo(rip, 'basso')} / ${mod.nomeBordo(rip, 'alto')}`);
+  rip.bordatura = { spessore: 2, lati: ['basso'] };
+  const r = righeDistinta(pr).find(x => x.nome === 'Ripiano');
+  prova('ripiano bordato 2 mm davanti: da tagliare 764 × 488', r.Ltaglio === 764 && r.Wtaglio === 488, `${r.Ltaglio} × ${r.Wtaglio}`);
+  rip.venatura = 'W';
+  const g = schemaDiTaglio(pr).find(x => x.materiale.id === 'mb18'), posto = g.fogli.flatMap(f => f.pezzi).find(p => p.n === rip.n);
+  prova('venatura in larghezza: il ripiano va ruotato sulla lastra', posto.ruotato && Math.abs(posto.w - 488) < 0.01, `${posto.w}×${posto.h} ruotato=${posto.ruotato}`);
+  prova('schema senza sovrapposizioni con bordi e venatura', !controllaLastre(schemaDiTaglio(pr), 3.2));
+}
+
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');
 const ko = esiti.filter(e => !e.ok).length;
 document.getElementById('riassunto').textContent = ko ? `FALLITE ${ko} su ${esiti.length}` : `TUTTE OK (${esiti.length})`;

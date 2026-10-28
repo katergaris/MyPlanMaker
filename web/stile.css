@@ -70,6 +70,7 @@ aside.props { background: var(--panel); border-left: 1px solid var(--line); padd
 .chipline { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 15px; }
 .nota { font-size: 14px; color: var(--muted); }
 .chipline b { white-space: nowrap; }
+select.mini { border: 1px solid var(--line); border-radius: 8px; background: #fff; font: inherit; font-size: 13px; padding: 4px 6px; max-width: 160px; }
 .giunto { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
 .giunto:last-of-type { border-bottom: 0; }
 .avviso-mini { color: var(--warn); }

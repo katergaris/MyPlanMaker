@@ -255,6 +255,20 @@ export function copiaSpecchiata(progetto, pezzi, asse) {
   });
 }
 
+// Bordi di un pannello (nel sistema locale) e come si chiamano visti nel mobile.
+export const LATI_BORDO = { A: [-1, 0, 0], B: [1, 0, 0], basso: [0, -1, 0], alto: [0, 1, 0] };
+export function nomeBordo(p, lato) {
+  const n = new Vector3(...LATI_BORDO[lato]).applyMatrix4(new Matrix4().extractRotation(matrice(p)));
+  const c = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)], k = c.indexOf(Math.max(...c));
+  return [['a sinistra', 'a destra'], ['sotto', 'sopra'], ['dietro', 'davanti']][k][n.getComponent(k) > 0 ? 1 : 0];
+}
+// Misura da tagliare: la misura finita meno lo spessore dei bordi applicati.
+export function bordatura(p) {
+  const b = p.bordatura || {}, s = b.spessore || 0, lati = new Set(b.lati || []);
+  const meno = l => (lati.has(l) ? s : 0);
+  return { s, lati, menoL: meno('A') + meno('B'), menoW: meno('basso') + meno('alto') };
+}
+
 export const fmt = (v, dec = 0) => Number(v).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: dec });
 
 // Descrizione del taglio come la serve in laboratorio.

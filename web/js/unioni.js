@@ -112,10 +112,14 @@ function scegliVite(attraversa, profondita, bordo, mat, inFaccia = false) {
   };
 }
 
-function posizioni(l1) {
+// Fissaggi possibili per un'unione "faccia su testa/bordo".
+export const FISSAGGI = { viti: 'Viti', confirmat: 'Confirmat 7×50', spinotti: 'Spinotti e colla', eccentrici: 'Eccentrici (minifix)', colla: 'Solo colla', nessuno: 'Niente' };
+const PASSO = { viti: 200, confirmat: 200, spinotti: 128, eccentrici: 400 };
+
+function posizioni(l1, tipo = 'viti') {
   if (l1 < 40) return [0];
   if (l1 < 120) return [-l1 / 4, l1 / 4];
-  const margine = Math.min(50, l1 / 4), n = Math.max(2, Math.ceil((l1 - 2 * margine) / 200) + 1);
+  const margine = Math.min(tipo === 'spinotti' ? 32 : 50, l1 / 4), n = Math.max(2, Math.ceil((l1 - 2 * margine) / PASSO[tipo]) + 1);
   return Array.from({ length: n }, (_, i) => -l1 / 2 + margine + (i * (l1 - 2 * margine)) / (n - 1));
 }
 
@@ -135,7 +139,7 @@ let ultimo = { k: null, r: null };
 // Restituisce { giunti, viti, avvisi }. Ogni giunto: { a, b, tipo, passa, riceve, vite, viti: [...], note, escluso }.
 export function unioni(progetto) {
   // Il risultato contiene i pezzi stessi: si riusa solo se è proprio lo stesso progetto con gli stessi dati.
-  const k = JSON.stringify([progetto.pezzi, progetto.unioniEscluse]);
+  const k = JSON.stringify([progetto.pezzi, progetto.unioniEscluse, progetto.fissaggi, progetto.fissaggioPredefinito]);
   if (ultimo.k === k && ultimo.progetto === progetto && ultimo.pezzi.every((p, i) => p === progetto.pezzi[i])) return ultimo.r;
   const pezzi = progetto.pezzi.filter(p => geometriaPezzo(p));
   const facce = new Map(pezzi.map(p => [p.id, facceMondo(p)]));
@@ -188,15 +192,33 @@ export function unioni(progetto) {
     if (n.y < -0.7) {
       g.note.push(`Le teste delle viti restano in vista sopra «${passa.nome}»: meglio fissare da sotto con angolari${materiale(passa.mat).massello ? ' o fissaggi a 8 (lasciano muovere il legno)' : ''}.`);
     }
-    if (g.escluso) continue;
+    g.fissaggio = g.escluso ? 'nessuno' : (progetto.fissaggi || {})[g.chiave] || progetto.fissaggioPredefinito || 'viti';
+    const tipo = g.fissaggio;
+    if (tipo === 'confirmat' && (cp.profondita < 15 || bordo < 15)) { g.note.push('Confirmat solo con pannelli da 15 mm in su: qui uso le viti.'); g.fissaggio = 'viti'; }
+    if (tipo === 'eccentrici' && (cr.tipo === 'faccia' || cr.tipo === 'fianco' || bordo < 15)) { g.note.push('Eccentrici solo nella testa o nel bordo di pannelli da 15 mm in su: qui uso le viti.'); g.fissaggio = 'viti'; }
+    if (g.fissaggio === 'nessuno' || g.fissaggio === 'colla') { g.escluso = g.fissaggio === 'nessuno'; continue; }
+    if (g.fissaggio !== 'viti') g.note = g.note.filter(x => !/in vista/.test(x) || g.fissaggio === 'confirmat');
     const origine = c.n.clone().multiplyScalar(c.d);
-    for (const t of posizioni(r.l1)) {
+    const assiR = new Matrix4().extractRotation(matrice(riceve)), spessoreR = new Vector3(0, 0, 1).applyMatrix4(assiR);
+    for (const t of posizioni(r.l1, g.fissaggio)) {
       const s1 = r.c1 + t, s2 = r.c2;
       const x = r.lungo[0] * s1 + r.corto[0] * s2, y = r.lungo[1] * s1 + r.corto[1] * s2;
       const p = origine.clone().add(c.u.clone().multiplyScalar(x)).add(c.v.clone().multiplyScalar(y));
       const testa = p.clone().sub(n.clone().multiplyScalar(cp.profondita));
       const asse = c.u.clone().multiplyScalar(r.lungo[0]).add(c.v.clone().multiplyScalar(r.lungo[1]));
-      g.viti.push({ testa, punta: testa.clone().add(n.clone().multiplyScalar(vite.l)), d: vite.d, giunto: g, asse, t, limite: r.l1 / 2 - Math.min(20, r.l1 / 4) });
+      const el = { tipo: g.fissaggio, d: vite.d, giunto: g, asse, t, limite: r.l1 / 2 - Math.min(20, r.l1 / 4) };
+      if (g.fissaggio === 'viti') Object.assign(el, { testa, punta: testa.clone().add(n.clone().multiplyScalar(vite.l)) });
+      else if (g.fissaggio === 'confirmat') Object.assign(el, { d: 7, testa, punta: testa.clone().add(n.clone().multiplyScalar(50)) });
+      else if (g.fissaggio === 'spinotti') {
+        const d = cp.profondita >= 16 && bordo >= 16 ? 8 : 6;
+        Object.assign(el, { d, testa: p.clone().sub(n.clone().multiplyScalar(Math.min(12, cp.profondita * 0.65))), punta: p.clone().add(n.clone().multiplyScalar(Math.min(d === 8 ? 23 : 18, cr.profondita - 5))) });
+      } else if (g.fissaggio === 'eccentrici') {
+        // perno avvitato nel pezzo "di faccia", eccentrico Ø 15 nella faccia del pezzo che riceve, a 34 mm dal bordo
+        const c34 = p.clone().add(n.clone().multiplyScalar(34)), mezzo = dimensioni(riceve).T / 2;
+        const sopra = spessoreR.clone().multiplyScalar(mezzo);
+        Object.assign(el, { d: 6, testa: p.clone().sub(n.clone().multiplyScalar(11)), punta: c34, camma: { da: c34.clone().add(sopra), a: c34.clone().add(sopra).sub(spessoreR.clone().multiplyScalar(12.5)) } });
+      }
+      g.viti.push(el);
     }
   }
 
@@ -208,7 +230,7 @@ export function unioni(progetto) {
       for (const passo of [0, 12, 24, 36, 48]) {
         const verso = v.t > 0 ? -1 : 1, nuovo = v.t + verso * passo;
         if (passo && Math.abs(nuovo) > v.limite + 1e-6 && passo > Math.abs(v.t)) break;
-        if (passo) { const d = v.asse.clone().multiplyScalar(verso * (passo - (v.spostata || 0))); v.testa.add(d); v.punta.add(d); v.spostata = passo; }
+        if (passo) { const d = v.asse.clone().multiplyScalar(verso * (passo - (v.spostata || 0))); v.testa.add(d); v.punta.add(d); if (v.camma) { v.camma.da.add(d); v.camma.a.add(d); } v.spostata = passo; }
         if (!urta(v)) { messe.push(v); return true; }
       }
       // non c'è posto: si toglie, se ne restano altre nell'unione
@@ -249,6 +271,11 @@ export function descriviGiunto(g) {
   if (g.angolari) return `${g.angolari} angolari`;
   if (g.chiodini) return 'chiodini o graffe';
   if (!g.vite) return 'nessuna vite adatta';
-  const v = g.vite;
-  return `${g.escluso ? 'escluse:' : `${g.viti.length} viti`} ${f1(v.d)}×${v.l} da «${g.passa.nome}» · preforo Ø ${f1(v.preforo)} ${v.preforoQuando}`;
+  const v = g.vite, n = g.viti.length;
+  if (g.escluso) return 'nessun fissaggio';
+  if (g.fissaggio === 'colla') return 'solo colla (e morsetti)';
+  if (g.fissaggio === 'confirmat') return `${n} confirmat 7×50 da «${g.passa.nome}» · foro a gradino Ø 7 / Ø 5`;
+  if (g.fissaggio === 'spinotti') return `${n} spinotti Ø ${g.viti[0]?.d || 8} e colla · fori ciechi, interasse ≤ 128`;
+  if (g.fissaggio === 'eccentrici') return `${n} eccentrici Ø 15 con perno · eccentrico in «${g.riceve.nome}» a 34 mm dal bordo`;
+  return `${n} viti ${f1(v.d)}×${v.l} da «${g.passa.nome}» · preforo Ø ${f1(v.preforo)} ${v.preforoQuando}`;
 }

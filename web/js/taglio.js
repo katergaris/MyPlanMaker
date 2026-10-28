@@ -46,11 +46,14 @@ function lastre(pezzi, m, { lama, rifilo }) {
   const ordinati = pezzi.slice().sort((a, b) => Math.max(b.L, b.W) - Math.max(a.L, a.W) || b.L * b.W - a.L * a.W);
   const fogli = [], fuori = [];
   for (const p of ordinati) {
-    const w = p.L + lama, h = p.W + lama;
+    // venatura lungo la larghezza: il pezzo va messo già ruotato; "libera": si può ruotare
+    const forzaRuota = m.venatura && p.vena === 'W', ruota = !m.venatura || p.vena === 'libera';
+    const w = (forzaRuota ? p.W : p.L) + lama, h = (forzaRuota ? p.L : p.W) + lama;
+    const cerca = f => { const c = f.cerca(w, h, ruota); if (c && forzaRuota) c.ruotato = !c.ruotato; return c; };
     let posto = null, foglio = null;
-    for (const f of fogli) { const c = f.cerca(w, h, !m.venatura); if (c) { posto = c; foglio = f; break; } }
+    for (const f of fogli) { const c = cerca(f); if (c) { posto = c; foglio = f; break; } }
     if (!posto) {
-      const f = new Lastra(utileL, utileH), c = f.cerca(w, h, !m.venatura);
+      const f = new Lastra(utileL, utileH), c = cerca(f);
       if (!c) { fuori.push(p); continue; }
       fogli.push(f); posto = c; foglio = f;
     }
@@ -90,7 +93,7 @@ export function schemaDiTaglio(progetto) {
     if (r.vuoto) continue;
     const id = mats.get(r.n);
     if (!perMat.has(id)) perMat.set(id, []);
-    perMat.get(id).push(r);
+    perMat.get(id).push({ ...r, L: r.Ltaglio, W: r.Wtaglio });
   }
   return [...perMat].map(([id, pezzi]) => {
     const m = materiale(id);

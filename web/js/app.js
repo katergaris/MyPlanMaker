@@ -8,7 +8,7 @@ import { euro, riepilogo, righeDistinta } from './distinta.js';
 import * as archivio from './archivio.js';
 import { ESEMPI } from './esempi.js';
 import { IMPOSTAZIONI_TAGLIO, schemaDiTaglio } from './taglio.js';
-import { descriviGiunto, unioni } from './unioni.js';
+import { FISSAGGI, descriviGiunto, unioni } from './unioni.js';
 import { INTERASSI, LATI, MODELLI_CERNIERA, cerniere, maniglia } from './ferramenta.js';
 import { listaSpesa } from './spesa.js';
 import { MODELLI, modello, valoriDefault } from './modelli.js';
@@ -442,6 +442,7 @@ function htmlPezzo(p) {
       <button class="btn" data-azione="terra">Appoggia a terra</button>
     </div>
     <div class="group"><h3>Tagli</h3>${tagli}</div>
+    ${p.tipo === 'pannello' ? htmlBordi(p) : ''}
     ${p.tipo === 'pannello' ? htmlFerramenta(p) : ''}
     <div class="group" data-unioni></div>
     <div class="azioni"><button class="btn" data-azione="duplica">Duplica</button><button class="btn danger" data-azione="elimina">Elimina</button></div>`;
@@ -471,12 +472,23 @@ function htmlFerramenta(p) {
   return h + '</div>';
 }
 
+function htmlBordi(p) {
+  const m = materiale(p.mat), bo = mod.bordatura(p), rotondo = p.forma === 'cerchio';
+  const lati = rotondo ? '' : `<div class="seg">${Object.keys(mod.LATI_BORDO).map(l => `<button data-bordo="${l}" class="${bo.lati.has(l) ? 'on' : ''}">${mod.nomeBordo(p, l)}</button>`).join('')}</div>
+    <div class="chipline"><button class="link" data-bordi-tutti="si">Tutti</button><button class="link" data-bordi-tutti="no">Nessuno</button>
+    <span class="input" style="height:40px;width:130px"><select data-bordo-spessore>${[0.4, 1, 2].map(x => `<option value="${x}" ${x === (bo.s || 1) ? 'selected' : ''}>${f1(x)} mm</option>`).join('')}</select><small>▾</small></span></div>
+    ${bo.lati.size ? `<p class="nota">Da tagliare: ${f1((geometriaPezzo(p)?.max[0] - geometriaPezzo(p)?.min[0]) - bo.menoL)} × ${f1((geometriaPezzo(p)?.max[1] - geometriaPezzo(p)?.min[1]) - bo.menoW)} mm (misura finita meno il bordo).</p>` : ''}`;
+  const vena = m.venatura ? `<div class="field"><label>Venatura</label><div class="seg">${[['L', 'Lungo la lunghezza'], ['W', 'Lungo la larghezza'], ['libera', 'Non importa']].map(([k, t]) => `<button data-vena="${k}" class="${(p.venatura || 'L') === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>` : '';
+  return `<div class="group"><h3>Bordi e venatura</h3>${rotondo ? '<p class="nota">Bordo rotondo: si borda a mano dopo il taglio.</p>' : `<p class="nota">Bordi da rivestire (tocca per scegliere):</p>${lati}`}${vena}</div>`;
+}
+
 function htmlUnioni(p) {
   const u = unioni(stato.progetto), miei = u.giunti.filter(g => g.a.id === p.id || g.b.id === p.id);
   const righe = miei.map(g => {
     const altro = g.a.id === p.id ? g.b : g.a;
-    const puo = g.vite && g.tipo !== 'cerniere';
-    return `<div class="giunto"><div class="chipline"><span>con «${esc(altro.nome)}»</span>${puo ? `<button class="link" data-escludi="${g.chiave}">${g.escluso ? 'Rimetti le viti' : 'Niente viti'}</button>` : ''}</div>
+    const puo = g.vite && g.passa;
+    const scelta = puo ? `<select class="mini" data-fissaggio="${g.chiave}">${Object.entries(FISSAGGI).map(([k, t]) => `<option value="${k}" ${k === (g.escluso ? 'nessuno' : g.fissaggio) ? 'selected' : ''}>${t}</option>`).join('')}</select>` : '';
+    return `<div class="giunto"><div class="chipline"><span>con «${esc(altro.nome)}»</span>${scelta}</div>
       <div class="nota">${esc(descriviGiunto(g))}</div>${g.note.map(n => `<div class="nota avviso-mini">${esc(n)}</div>`).join('')}</div>`;
   }).join('');
   const avvisi = u.avvisi.filter(a => a.includes(`«${p.nome}»`)).map(a => `<div class="avviso">${esc(a)}</div>`).join('');
@@ -521,6 +533,8 @@ function htmlProgetto() {
       <p class="nota"><b>Accosta</b>: scegli un pezzo, poi tocca la faccia di un altro: ci si appoggia sopra.</p>
       <p class="nota"><b>Adatta</b>: scegli un pezzo, poi tocca quello contro cui deve finire: si allunga o accorcia e prende il taglio con l'angolo giusto.</p></div>
     <div class="group"><h3>Materiali</h3>${mats || '<p class="nota">Ancora nessun pezzo.</p>'}</div>
+    <div class="group"><h3>Fissaggio predefinito</h3><div class="input"><select data-fissaggio-def>${Object.entries(FISSAGGI).filter(([k]) => k !== 'nessuno').map(([k, t]) => `<option value="${k}" ${k === (stato.progetto.fissaggioPredefinito || 'viti') ? 'selected' : ''}>${t}</option>`).join('')}</select><small>▾</small></div>
+      <p class="nota">Vale per tutte le unioni; ogni unione si può cambiare dal pannello del pezzo.</p></div>
     <div class="group" data-controlli></div>`;
 }
 
@@ -548,6 +562,13 @@ function eventiProprieta() {
     const c = e.target.dataset.campo, p = pezzoSel();
     if (c) applicaCampo(c, e.target.value);
     else if (e.target.hasAttribute('data-man-interasse') && p) modifica(() => { ferr(p, 'maniglia').interasse = +e.target.value; });
+    else if (e.target.dataset.fissaggio) modifica(() => {
+      const k = e.target.dataset.fissaggio, v = e.target.value, pr = stato.progetto;
+      pr.fissaggi = { ...(pr.fissaggi || {}), [k]: v };
+      pr.unioniEscluse = (pr.unioniEscluse || []).filter(x => x !== k);
+    });
+    else if (e.target.hasAttribute('data-fissaggio-def')) modifica(() => { stato.progetto.fissaggioPredefinito = e.target.value; });
+    else if (e.target.hasAttribute('data-bordo-spessore') && p) modifica(() => { p.bordatura = { ...(p.bordatura || { lati: [] }), spessore: numero(e.target.value) || 0 }; });
     else if (e.target.dataset.sposta !== undefined) {
       const v = numero(e.target.value);
       if (!v) return;
@@ -578,6 +599,13 @@ function eventiProprieta() {
       p.ferramenta = (p.ferramenta || []).filter(f => f.tipo !== b.dataset.aggiungiFerr);
       p.ferramenta.push(b.dataset.aggiungiFerr === 'cerniere' ? { tipo: 'cerniere', lato: 'A', modello: 'sovrapposta' } : { tipo: 'maniglia', interasse: 128, posizione: 'fine', direzione: 'parallela' });
     });
+    else if (b.dataset.bordo && p) modifica(() => {
+      const bo = p.bordatura || { spessore: 1, lati: [] }, l = new Set(bo.lati);
+      l.has(b.dataset.bordo) ? l.delete(b.dataset.bordo) : l.add(b.dataset.bordo);
+      p.bordatura = { spessore: bo.spessore || 1, lati: [...l] };
+    });
+    else if (b.dataset.bordiTutti && p) modifica(() => { p.bordatura = { spessore: (p.bordatura || {}).spessore || 1, lati: b.dataset.bordiTutti === 'si' ? ['A', 'B', 'basso', 'alto'] : [] }; });
+    else if (b.dataset.vena && p) modifica(() => { p.venatura = b.dataset.vena; });
     else if (b.dataset.togliFerr && p) modifica(() => { p.ferramenta = p.ferramenta.filter(f => f.tipo !== b.dataset.togliFerr); });
     else if (b.dataset.cernLato && p) modifica(() => { ferr(p, 'cerniere').lato = b.dataset.cernLato; });
     else if (b.dataset.cernModello && p) modifica(() => { ferr(p, 'cerniere').modello = b.dataset.cernModello; });
@@ -613,11 +641,12 @@ function htmlDistinta() {
   const righe = righeDistinta(stato.progetto), r = riepilogo(stato.progetto);
   const tr = righe.map(x => `<tr><td class="n">${x.n}</td><td>${esc(x.nome)}</td><td>${esc(x.materiale)}</td>
     <td class="num">${x.vuoto ? '—' : `${x.L} × ${x.W} × ${x.T}`}</td>
+    <td class="num">${x.vuoto ? '—' : x.Ltaglio !== x.L || x.Wtaglio !== x.W ? `<b>${f1(x.Ltaglio)} × ${f1(x.Wtaglio)}</b>` : '='}${x.vena === 'W' ? '<br><small class="nota">venatura in larghezza</small>' : ''}</td>
     <td>${x.forma.length || x.tagli.length ? `<ul>${[...x.forma, ...x.tagli].map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : 'a squadra'}</td>
     <td class="num">${euro(x.costo)}</td></tr>`).join('');
   return `<div class="distinta-totali"><span><b>${r.pezzi}</b> pezzi</span>${r.materiali.map(m => `<span>${esc(m.nome)}: <b>${f1(m.qta)} ${m.tipo === 'listello' ? 'm' : 'm²'}</b></span>`).join('')}<span>Costo stimato: <b>${euro(r.costo)}</b></span></div>
-    <table class="distinta"><thead><tr><th>N°</th><th>Pezzo</th><th>Materiale</th><th style="text-align:right">Misura finita (mm)</th><th>Forma e tagli</th><th style="text-align:right">Costo</th></tr></thead><tbody>${tr}</tbody></table>
-    <p class="nota">Misure finite dopo i tagli (L × larghezza × spessore). Testa A = inizio del pezzo, Testa B = fine. Costi indicativi, senza sfrido.</p>`;
+    <table class="distinta"><thead><tr><th>N°</th><th>Pezzo</th><th>Materiale</th><th style="text-align:right">Misura finita (mm)</th><th style="text-align:right">Da tagliare</th><th>Forma e tagli</th><th style="text-align:right">Costo</th></tr></thead><tbody>${tr}</tbody></table>
+    <p class="nota">Misure finite dopo i tagli (L × larghezza × spessore). Testa A = inizio del pezzo, Testa B = fine. «Da tagliare» = misura finita meno i bordi applicati (= se uguale). Costi indicativi, senza sfrido.</p>`;
 }
 
 function svgLastra(f, larghezza) {
@@ -663,7 +692,7 @@ function htmlFerramentaProgetto() {
   const ctr = controlli(stato.progetto);
   const avvisi = [...ctr.avvisi, ...u.avvisi].map(a => `<div class="avviso">⚠ ${esc(a)}</div>`).join('') + ctr.note.map(n => `<div class="ok">✓ ${esc(n)}</div>`).join('')
     + `<p class="nota">Peso stimato: <b>${f1(ctr.peso)} kg</b>.${ctr.frecce.length ? ` Ripiani: ${ctr.frecce.map(f => `${esc(f.p.nome)} ${f1(f.nelTempo)} mm`).join(', ')} (carico ${f1(stato.progetto.caricoRipiani ?? CARICO_RIPIANI)} kg/m, nel tempo).` : ''}</p>`;
-  const spesa = sp.righe.map(r => `<tr><td>${esc(r.voce)}${r.nota ? `<br><small class="nota">${esc(r.nota)}</small>` : ''}</td><td class="num">${r.qta}</td><td class="num">${euro(r.qta * r.prezzo)}</td></tr>`).join('');
+  const spesa = sp.righe.map(r => `<tr><td>${esc(r.voce)}${r.nota ? `<br><small class="nota">${esc(r.nota)}</small>` : ''}</td><td class="num">${f1(r.qta)}</td><td class="num">${euro(r.qta * r.prezzo)}</td></tr>`).join('');
   const giunti = u.giunti.map(g => `<tr><td>${esc(g.a.nome)} + ${esc(g.b.nome)}</td><td>${esc(g.tipo || '')}</td><td>${esc(descriviGiunto(g))}${g.note.map(n => `<br><small class="nota">${esc(n)}</small>`).join('')}</td></tr>`).join('');
   return `${avvisi}
     <h3>Lista della spesa</h3>

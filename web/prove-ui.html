@@ -20,6 +20,7 @@ f.onload = async () => {
     if (p === 'ferramenta') { d.getElementById('apri-distinta').click(); d.querySelector('[data-scheda="ferramenta"]').click(); }
     if (p.startsWith('modello:')) { comando('modelli'); await attendi(200); d.querySelector(`[data-modello="${p.slice(8)}"]`).click(); }
     if (p === 'crea') d.querySelector('[data-crea="nuovo"]').click();
+    if (p.startsWith('fissaggio:')) { stato.progetto.fissaggioPredefinito = p.slice(10); w.mpm.apri(stato.progetto); }
     if (p === 'progetti') d.getElementById('apri-progetti').click();
     await attendi(400);
   }
