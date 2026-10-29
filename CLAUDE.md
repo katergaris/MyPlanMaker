@@ -58,7 +58,9 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   embeddable (cache in `dist/cache`) e crea `dist/MyPlanMaker-portable-<VERSIONE>.zip`; `avvia.pyw` usa la prima
   porta libera da 8099 (o riapre l'istanza già avviata), solo 127.0.0.1, Edge/Chrome `--app` con profilo in
   `dati/browser`, si chiude con la finestra o dopo 3 minuti senza richieste. **Mai provato su un Windows vero.**
-- `Dockerfile`, `docker-compose.yml` (porta 8099, volume `./data`) — **non provati** (niente Docker sul code-server).
+- `Dockerfile`, `docker-compose.yml` (porta 8099, volume `./data`). Il Dockerfile è quello usato su ZimaOS.
+- `deploy/pubblica-zimaos.sh` — installa/aggiorna su ZimaOS: `ZIMA_SSH="ssh -i ~/.ssh/zimaos salvo@10.77.0.201" deploy/pubblica-zimaos.sh`
+  (build da `/DATA/shared-dev/MyPlanMaker`, container `myplanmaker`, porta **8098**, dati in `/DATA/AppData/myplanmaker`).
 - `.github/workflows/prove.yml` — prove del server e `prove.html` in Chrome headless a ogni push.
 - `README.md` (pubblico, con screenshot), `CHANGELOG.md`, `LICENSE` (MIT, scelta per la pubblicazione: da
   confermare con Salvo).
@@ -72,7 +74,9 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
 ## Stato
 **0.9.0** (2026-10-29): vedi `CHANGELOG.md`. Repository privato `katergaris/MyPlanMaker`, branch `main`, pronto per
 la pubblicazione (README, screenshot, licenza, CI) ma **ancora privato**: renderlo pubblico solo se Salvo lo chiede.
-Non ancora installato su ZimaOS.
+**Installato su ZimaOS il 2026-10-29**: `http://192.168.0.20:8098` (LAN), `http://10.77.0.201:8098` (rete interna). HTTPS
+Tailscale (`https://pve.van-pike.ts.net:8098`) da attivare su pve: vedi `Homelab/diario-modifiche.md`. Dopo ogni modifica
+al codice: rilanciare `deploy/pubblica-zimaos.sh` (i dati restano).
 Per preparare un progetto per Salvo: costruirlo con le funzioni di `modello.js`/`modelli.js` (come `esempi.js`),
 controllarlo con `prove-ui.html` e consegnarlo come `.mpm.json` in `MyPlanMaker/progetti/`.
 Limiti noti: i tagli restano fissi se poi si cambia la lunghezza; Adatta lavora solo lungo la lunghezza; i cassetti
