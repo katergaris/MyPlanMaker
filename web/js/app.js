@@ -452,6 +452,7 @@ function htmlPezzo(p) {
     ${p.tipo === 'pannello' ? htmlBordi(p) : ''}
     ${p.tipo === 'pannello' ? htmlFerramenta(p) : ''}
     <div class="group" data-unioni></div>
+    ${p.gruppo ? `<button class="btn" data-azione="gruppo">Seleziona tutto «${esc(nomeGruppo(p))}»</button>` : ''}
     <div class="azioni"><button class="btn" data-azione="duplica">Duplica</button><button class="btn danger" data-azione="elimina">Elimina</button></div>`;
 }
 
@@ -527,6 +528,7 @@ function htmlMulti(pezzi) {
       <p class="nota">Oppure trascina le frecce del gizmo nel 3D (passo 5 mm, poi si aggancia ai pezzi vicini).</p></div>
     <div class="group"><h3>Materiale per tutti</h3><div class="input"><select data-mat-multi><option value="">— scegli —</option>${['pannello', 'listello'].filter(t => pezzi.some(p => p.tipo === t)).map(t => materialiPer(t).map(m => `<option value="${m.id}">${esc(m.nome)}</option>`).join('')).join('')}</select><small>▾</small></div></div>
     <div class="azioni"><button class="btn" data-azione="duplica">Duplica</button><button class="btn" data-azione="specchia">Copia specchiata</button></div>
+    <div class="azioni"><button class="btn" data-azione="raggruppa">Raggruppa</button>${pezzi.some(p => p.gruppo) ? '<button class="btn" data-azione="separa">Separa il gruppo</button>' : ''}</div>
     <div class="azioni"><button class="btn danger" data-azione="elimina">Elimina tutti</button></div>`;
 }
 
@@ -560,6 +562,8 @@ function applicaCampo(campo, valore) {
   modifica(() => { p[campo] = v; if (campo === 'D') { p.L = v; p.W = v; } });
   if (p.tagli.length && ['L', 'W', 'D'].includes(campo)) avvisa('Il pezzo ha dei tagli: restano dove sono. Se serve, toglili e rifai Adatta.');
 }
+
+const nomeGruppo = p => p.nomeGruppo || (p.mobile ? p.nome.split(' · ')[0] : 'gruppo');
 
 function apriSagoma(p) {
   const g = geometriaPezzo(p), dim = { L: g ? g.max[0] - g.min[0] : p.L, W: g ? g.max[1] - g.min[1] : p.W };
@@ -636,7 +640,15 @@ function eventiProprieta() {
     else if (b.dataset.azione === 'terra' && p) {
       const min = Math.min(...verticiMondo(p).map(v => v.y));
       modifica(() => { p.pos[1] = Math.round((p.pos[1] - min) * 1000) / 1000; });
-    } else if (b.dataset.azione === 'sagoma' && p) apriSagoma(p);
+    } else if (b.dataset.azione === 'gruppo' && p) { stato.multi = new Set(stato.progetto.pezzi.filter(x => x.gruppo === p.gruppo).map(x => x.id)); aggiorna(); }
+    else if (b.dataset.azione === 'raggruppa') {
+      const nome = prompt('Nome del gruppo (es. «Cassetto in alto», «Modulo sinistro»):', 'Gruppo');
+      if (nome === null) return;
+      const g = 'gruppo-' + mod.nuovoId();
+      modifica(() => pezziSel().forEach(x => { x.gruppo = g; x.nomeGruppo = nome.trim() || 'Gruppo'; }));
+      avvisa('Raggruppati: tocca un pezzo e poi «Seleziona tutto» per muoverli insieme.');
+    } else if (b.dataset.azione === 'separa') modifica(() => pezziSel().forEach(x => { if (!x.mobile) { delete x.gruppo; delete x.nomeGruppo; } }));
+    else if (b.dataset.azione === 'sagoma' && p) apriSagoma(p);
     else if (b.dataset.azione === 'dima' && p) stampaHtml(htmlDima(stato.progetto, p), 'dima');
     else if (b.dataset.azione) comando(b.dataset.azione);
   });

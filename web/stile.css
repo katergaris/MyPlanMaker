@@ -37,7 +37,7 @@ aside.tools { background: var(--panel); border-right: 1px solid var(--line); pad
 main { position: relative; overflow: hidden; }
 #vista3d { position: absolute; inset: 0; }
 #vista3d canvas { display: block; touch-action: none; }
-.views { position: absolute; z-index: 2; top: 16px; left: 50%; transform: translateX(-50%); display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.views { position: absolute; z-index: 2; top: 16px; left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 24px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
 .views button { height: 38px; padding: 0 16px; border: 0; border-radius: 9px; background: none; font-size: 15px; color: var(--muted); }
 .views button.on { background: var(--bg); color: var(--text); font-weight: 600; }
 .toast { position: absolute; z-index: 2; left: 20px; bottom: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; display: flex; gap: 10px; align-items: center; box-shadow: 0 4px 16px rgba(60, 40, 20, .08); max-width: min(480px, calc(100% - 40px)); }
@@ -118,7 +118,7 @@ table.distinta { width: 100%; border-collapse: collapse; font-size: 15px; }
 .quota.misura { background: #c0392b; text-align: center; }
 .quota.misura small { display: block; font-weight: 400; font-size: 11px; opacity: .9; }
 .quota.movimento { background: var(--text); }
-.barra-sel { position: absolute; z-index: 3; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 5px; box-shadow: 0 6px 20px rgba(60,40,20,.12); }
+.barra-sel { position: absolute; z-index: 3; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; max-width: calc(100% - 24px); overflow-x: auto; align-items: center; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 5px; box-shadow: 0 6px 20px rgba(60,40,20,.12); }
 .barra-sel button { height: 40px; border: 0; border-radius: 10px; background: none; padding: 0 12px; font-size: 14px; font-weight: 500; white-space: nowrap; }
 .barra-sel button:hover { background: var(--bg); }
 .barra-sel button.on { background: var(--accent-soft); color: var(--accent); }
@@ -155,13 +155,17 @@ table.distinta { width: 100%; border-collapse: collapse; font-size: 15px; }
 @media (max-width: 1100px) {
   .app { grid-template-columns: 88px 1fr 300px; }
   .tool { height: 68px; font-size: 12px; }
-  header .btn:not(.icon):not(.primary) { display: none; }
+  .stato { display: none; }
+  #apri-distinta { padding: 0 12px; }
   footer { gap: 18px; font-size: 14px; }
 }
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .app { grid-template-columns: 76px 1fr; grid-template-rows: 60px 1fr auto 48px; }
   aside.props { grid-column: 1 / -1; max-height: 42vh; border-left: 0; border-top: 1px solid var(--line); }
   .logo, .stato { display: none; }
+  .views button { padding: 0 10px; font-size: 14px; }
+  footer { gap: 12px; font-size: 13px; }
+  footer > span:nth-child(3) { display: none; }
 }
 
 .sagoma { flex-direction: row; gap: 18px; align-items: stretch; }

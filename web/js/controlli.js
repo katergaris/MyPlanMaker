@@ -35,7 +35,16 @@ function fuori(a, b, q) {
   return -((dx * (q[1] - a[1]) - dy * (q[0] - a[0])) / l);
 }
 
+let ultimo = { k: null, r: null };
 export function controlli(progetto) {
+  const k = JSON.stringify([progetto.pezzi, progetto.caricoRipiani, progetto.fissaggi, progetto.unioniEscluse]);
+  if (ultimo.k === k && ultimo.progetto === progetto && ultimo.pezzi.every((p, i) => p === progetto.pezzi[i])) return ultimo.r;
+  const r = calcola(progetto);
+  ultimo = { k, progetto, pezzi: progetto.pezzi.slice(), r };
+  return r;
+}
+
+function calcola(progetto) {
   const pezzi = progetto.pezzi.filter(p => geometriaPezzo(p));
   const esito = { peso: 0, avvisi: [], note: [], frecce: [] };
   if (!pezzi.length) return esito;
