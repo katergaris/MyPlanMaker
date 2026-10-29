@@ -13,6 +13,8 @@ import { INTERASSI, LATI, MODELLI_CERNIERA, cerniere, maniglia } from './ferrame
 import { listaSpesa } from './spesa.js';
 import { MODELLI, modello, valoriDefault } from './modelli.js';
 import { creaCassetti, lunghezzaGuida } from './cassetti.js';
+import { apriEditorSagoma } from './sagome.js';
+import { htmlDima, htmlDisegno, htmlEtichette } from './disegni.js';
 import { CARICO_RIPIANI, controlli } from './controlli.js';
 
 const $ = s => document.querySelector(s);
@@ -410,9 +412,10 @@ function htmlPezzo(p) {
   const misure = p.tipo === 'listello'
     ? `${campoNum('L', 'Lunghezza', p.L)}<p class="nota">Sezione ${materiale(p.mat).W} × ${materiale(p.mat).T} mm: dipende dal materiale.</p>`
     : rotondo ? campoNum('D', 'Diametro', p.D)
+    : p.forma === 'sagoma' ? `<div class="chipline"><span>Ingombro della sagoma</span><b>${f1(p.L)} × ${f1(p.W)}</b></div><div class="azioni"><button class="btn" data-azione="sagoma">Modifica la sagoma…</button><button class="btn" data-azione="dima">Dima 1:1</button></div>`
     : `<div class="row">${campoNum('L', 'Lunghezza', p.L)}${campoNum('W', 'Larghezza', p.W)}</div>${campoNum('r', 'Raggio degli angoli (0 = spigolo vivo)', p.r || 0)}`;
   const forma = p.tipo === 'pannello'
-    ? `<div class="field"><label>Forma</label><div class="seg"><button data-forma="rett" class="${rotondo ? '' : 'on'}">Rettangolo</button><button data-forma="cerchio" class="${rotondo ? 'on' : ''}">Rotondo</button></div></div>` : '';
+    ? `<div class="field"><label>Forma</label><div class="seg"><button data-forma="rett" class="${rotondo || p.forma === 'sagoma' ? '' : 'on'}">Rettangolo</button><button data-forma="cerchio" class="${rotondo ? 'on' : ''}">Rotondo</button><button data-forma="sagoma" class="${p.forma === 'sagoma' ? 'on' : ''}">Sagoma</button></div></div>` : '';
   const orient = Object.entries(mod.NOMI_ORIENTAMENTI).map(([k, v]) => `<button data-orient="${k}">${v}</button>`).join('');
   const tagli = p.tagli.length
     ? p.tagli.map((t, i) => {
@@ -554,6 +557,14 @@ function applicaCampo(campo, valore) {
   if (p.tagli.length && ['L', 'W', 'D'].includes(campo)) avvisa('Il pezzo ha dei tagli: restano dove sono. Se serve, toglili e rifai Adatta.');
 }
 
+function apriSagoma(p) {
+  const g = geometriaPezzo(p), dim = { L: g ? g.max[0] - g.min[0] : p.L, W: g ? g.max[1] - g.min[1] : p.W };
+  apriEditorSagoma(p, dim, n => {
+    modifica(() => { p.forma = 'sagoma'; p.sagoma = n.punti; p.L = n.L; p.W = n.W; });
+    avvisa(`Sagoma salvata: ${f1(n.L)} × ${f1(n.W)} mm. Dalla distinta (scheda Disegni) o dal pulsante «Dima 1:1» stampi la dima in scala reale.`);
+  });
+}
+
 const ferr = (p, tipo) => p.ferramenta.find(f => f.tipo === tipo);
 
 function eventiProprieta() {
@@ -591,7 +602,8 @@ function eventiProprieta() {
     const b = e.target.closest('button');
     if (!b) return;
     const p = pezzoSel();
-    if (b.dataset.forma && p) modifica(() => { p.forma = b.dataset.forma; if (p.forma === 'cerchio') { p.D = p.D || Math.max(p.L, p.W); } });
+    if (b.dataset.forma === 'sagoma' && p) apriSagoma(p);
+    else if (b.dataset.forma && p) modifica(() => { p.forma = b.dataset.forma; if (p.forma === 'cerchio') { p.D = p.D || Math.max(p.L, p.W); } });
     else if (b.dataset.orient && p) modifica(() => { p.rot = mod.rotazioneDa(b.dataset.orient); });
     else if (b.dataset.inclina && p) modifica(() => { p.rot[0] = Math.round((p.rot[0] + +b.dataset.inclina) * 1000) / 1000; });
     else if (b.dataset.togli && p) modifica(() => { p.tagli.splice(+b.dataset.togli, 1); });
@@ -620,7 +632,9 @@ function eventiProprieta() {
     else if (b.dataset.azione === 'terra' && p) {
       const min = Math.min(...verticiMondo(p).map(v => v.y));
       modifica(() => { p.pos[1] = Math.round((p.pos[1] - min) * 1000) / 1000; });
-    } else if (b.dataset.azione) comando(b.dataset.azione);
+    } else if (b.dataset.azione === 'sagoma' && p) apriSagoma(p);
+    else if (b.dataset.azione === 'dima' && p) stampaHtml(htmlDima(stato.progetto, p), 'dima');
+    else if (b.dataset.azione) comando(b.dataset.azione);
   });
 }
 
@@ -705,13 +719,28 @@ function htmlFerramentaProgetto() {
 
 function mostraDistinta(scheda) {
   document.querySelectorAll('#schede-distinta button').forEach(b => b.classList.toggle('on', b.dataset.scheda === scheda));
-  $('#distinta').innerHTML = scheda === 'schema' ? htmlSchema() : scheda === 'ferramenta' ? htmlFerramentaProgetto() : htmlDistinta();
+  $('#distinta').innerHTML = scheda === 'schema' ? htmlSchema() : scheda === 'ferramenta' ? htmlFerramentaProgetto() : scheda === 'disegni' ? htmlDisegni() : htmlDistinta();
   $('#distinta').dataset.scheda = scheda;
 }
 
-function stampa() {
-  $('#stampa-area').innerHTML = `<h1>${esc(stato.progetto.nome)}</h1><p class="nota">MyPlanMaker · ${new Date().toLocaleDateString('it-IT')}</p>${htmlDistinta()}<div class="stampa-schema"><h1>Schema di taglio</h1>${htmlSchema(true)}</div><div class="stampa-schema"><h1>Ferramenta e viti</h1>${htmlFerramentaProgetto()}</div>`;
+function stampaHtml(html, tipo = 'documento') {
+  $('#stampa-area').innerHTML = html;
+  document.body.dataset.stampa = tipo;
   window.print();
+}
+
+function htmlDisegni() {
+  const pezzi = stato.progetto.pezzi.slice().sort((a, b) => a.n - b.n);
+  return `<p class="nota">Ogni pezzo visto di faccia, con i fori di ferramenta e fissaggi. Per i pezzi sagomati, rotondi o tagliati in obliquo stampa la dima 1:1.</p>
+    <div class="disegni">${pezzi.map(p => `<div>${htmlDisegno(stato.progetto, p)}<button class="btn" data-dima="${p.id}">Dima 1:1</button></div>`).join('')}</div>`;
+}
+
+function stampa() {
+  const pr = stato.progetto;
+  stampaHtml(`<h1>${esc(pr.nome)}</h1><p class="nota">MyPlanMaker · ${new Date().toLocaleDateString('it-IT')}</p><img class="stampa-vista" src="${vista.immagine()}">${htmlDistinta()}
+    <div class="stampa-schema"><h1>Schema di taglio</h1>${htmlSchema(true)}</div>
+    <div class="stampa-schema"><h1>Ferramenta, viti e controlli</h1>${htmlFerramentaProgetto()}</div>
+    <div class="stampa-schema"><h1>Disegni dei pezzi</h1><div class="disegni">${pr.pezzi.slice().sort((a, b) => a.n - b.n).map(p => htmlDisegno(pr, p)).join('')}</div></div>`);
 }
 
 // ---------- progetti e salvataggio ----------
@@ -822,6 +851,11 @@ function eventiDialoghi() {
     avvisa(`Aggiunt${n === 1 ? 'o 1 pezzo' : `i ${n} pezzi`} alla stessa distanza (luce ${f1(s.passo)} mm). Viti e distinta sono già aggiornate.`);
   });
   $('#schede-distinta').addEventListener('click', e => { const b = e.target.closest('button'); if (b) mostraDistinta(b.dataset.scheda); });
+  $('#distinta').addEventListener('click', e => {
+    const b = e.target.closest('[data-dima]');
+    if (b) stampaHtml(htmlDima(stato.progetto, stato.progetto.pezzi.find(p => p.id === b.dataset.dima)), 'dima');
+  });
+  $('#etichette').addEventListener('click', () => stampaHtml(htmlEtichette(stato.progetto, righeDistinta(stato.progetto)), 'etichette'));
   $('#distinta').addEventListener('change', e => {
     const k = e.target.dataset.taglio;
     if (!k) return;

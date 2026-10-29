@@ -21,6 +21,7 @@ export function dimensioni(p) {
   const m = materiale(p.mat);
   if (p.tipo === 'listello') return { L: p.L, W: m.W, T: m.T };
   if (p.forma === 'cerchio') return { L: p.D, W: p.D, T: m.T };
+  if (p.forma === 'sagoma' && p.sagoma?.length) return { L: p.L, W: p.W, T: m.T }; // L e W = ingombro della sagoma (archi compresi)
   return { L: p.L, W: p.W, T: m.T };
 }
 

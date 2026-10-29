@@ -15,6 +15,9 @@ import { cerniere, maniglia } from './js/ferramenta.js';
 import { controlli, freccia } from './js/controlli.js';
 import { MODELLI, valoriDefault } from './js/modelli.js';
 import { listaSpesa } from './js/spesa.js';
+import { normalizza, FORME } from './js/sagome.js';
+import { foriDelPezzo, htmlDima, htmlDisegno, htmlEtichette } from './js/disegni.js';
+import { contornoSagoma, puntiArco } from './js/geometria.js';
 
 const esiti = [];
 const vicino = (a, b, tol = 0.6) => Math.abs(a - b) <= tol;
@@ -261,6 +264,31 @@ for (const m of MODELLI) {
   const g = schemaDiTaglio(pr).find(x => x.materiale.id === 'mb18'), posto = g.fogli.flatMap(f => f.pezzi).find(p => p.n === rip.n);
   prova('venatura in larghezza: il ripiano va ruotato sulla lastra', posto.ruotato && Math.abs(posto.w - 488) < 0.01, `${posto.w}×${posto.h} ruotato=${posto.ruotato}`);
   prova('schema senza sovrapposizioni con bordi e venatura', !controllaLastre(schemaDiTaglio(pr), 3.2));
+}
+
+// 15. Sagome, disegni, dime, etichette
+{
+  const arco = puntiArco([0, 0], [100, 0], 20), ymin = Math.min(...arco.map(q => q[1]));
+  prova('arco di freccia 20 su corda 100: sporge di 20 verso l\'esterno (a destra)', Math.abs(ymin + 20) < 0.3, ymin.toFixed(2));
+  const orario = [{ x: 0, y: 0 }, { x: 0, y: 300 }, { x: 500, y: 300 }, { x: 500, y: 0 }];
+  const n = normalizza(orario);
+  const area = n.punti.reduce((t, q, i) => { const r = n.punti[(i + 1) % n.punti.length]; return t + q.x * r.y - r.x * q.y; }, 0);
+  prova('sagoma disegnata in senso orario: girata in antiorario', area > 0 && n.L === 500 && n.W === 300, `${area} ${n.L}×${n.W}`);
+  const ar = normalizza(FORME.arco(800, 400));
+  prova('forma «arco sopra» 800×400: ingombro 800 × 400', Math.abs(ar.L - 800) < 0.2 && Math.abs(ar.W - 400) < 0.5, `${ar.L}×${ar.W}`);
+  const pr = mobilettoLeggio(), fs = pr.pezzi.find(p => p.nome === 'Fianco sinistro');
+  Object.assign(fs, { forma: 'sagoma', sagoma: ar.punti, L: ar.L, W: ar.W, tagli: [] });
+  const g = geometriaPezzo(fs);
+  prova('pezzo sagomato: solido valido con l\'area giusta', g && Math.abs(g.volume / 18 - (800 * 300 + (2 / 3) * 800 * 100)) / g.volume * 18 < 0.02, g && `${Math.round(g.volume / 18)} mm²`);
+  const anta = pr.pezzi.find(p => p.nome === 'Anta'), fori = foriDelPezzo(pr, anta);
+  prova('fori dell\'anta: 2 scodelle Ø 35 e 2 fori maniglia', fori.filter(f => f.d === 35).length === 2 && fori.filter(f => f.d === 5).length === 2, fori.map(f => `${f.nome} Ø${f.d}`).join(', '));
+  const fondo = pr.pezzi.find(p => p.nome === 'Fondo'), ff = foriDelPezzo(pr, fondo);
+  prova('fori del fondo: 6 fori nel bordo per le viti dai fianchi', ff.filter(f => f.faccia === 'bordo').length === 6, `${ff.length}`);
+  prova('disegno del fondo con tabella fori', /Foro nel bordo/.test(htmlDisegno(pr, fondo)));
+  const tav = tavoloRotondo(), dima = htmlDima(tav, tav.pezzi[0]);
+  prova('dima 1:1 del piano Ø 1000: 24 fogli A4', (dima.match(/class="foglio-dima"/g) || []).length === 24, `${(dima.match(/class="foglio-dima"/g) || []).length}`);
+  const et = htmlEtichette(pr, righeDistinta(pr));
+  prova('etichette: una per pezzo', (et.match(/class="etichetta"/g) || []).length === pr.pezzi.length);
 }
 
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');

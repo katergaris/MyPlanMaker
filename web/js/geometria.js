@@ -17,8 +17,32 @@ export async function avviaGeometria() {
 
 const segmentiArco = (r, angolo) => Math.max(3, Math.min(48, Math.ceil(Math.sqrt(r) * angolo / (Math.PI / 2) * 1.6)));
 
+// Punti intermedi di un arco da a a b con freccia h (h > 0: la curva sporge a destra del verso a → b,
+// cioè verso l'esterno se i punti girano in senso antiorario).
+export function puntiArco(a, b, h) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], c = Math.hypot(dx, dy);
+  if (Math.abs(h) < 0.05 || c < 0.01) return [];
+  const nx = dy / c, ny = -dx / c, R = (c * c / 4 + h * h) / (2 * Math.abs(h));
+  const picco = [(a[0] + b[0]) / 2 + nx * h, (a[1] + b[1]) / 2 + ny * h];
+  const cx = picco[0] - nx * Math.sign(h) * R, cy = picco[1] - ny * Math.sign(h) * R;
+  const ang = q => Math.atan2(q[1] - cy, q[0] - cx);
+  const a0 = ang(a);
+  let meta = ang(picco) - a0;
+  while (meta > Math.PI) meta -= 2 * Math.PI;
+  while (meta <= -Math.PI) meta += 2 * Math.PI;
+  const tot = 2 * meta, n = Math.max(4, Math.min(64, Math.ceil(Math.abs(tot) * R / 6)));
+  return Array.from({ length: n - 1 }, (_, i) => { const t = a0 + tot * (i + 1) / n; return [cx + R * Math.cos(t), cy + R * Math.sin(t)]; });
+}
+
+export function contornoSagoma(punti) {
+  const out = [];
+  punti.forEach((q, i) => { const b = punti[(i + 1) % punti.length]; out.push([q.x, q.y], ...puntiArco([q.x, q.y], [b.x, b.y], q.b || 0)); });
+  return out;
+}
+
 export function profilo(p) {
   const { L, W } = dimensioni(p);
+  if (p.tipo !== 'listello' && p.forma === 'sagoma' && p.sagoma?.length >= 3) return contornoSagoma(p.sagoma);
   if (p.tipo !== 'listello' && p.forma === 'cerchio') {
     // n multiplo di 4: i punti a 0°, 90°, 180°, 270° cadono sul cerchio vero, così le misure restano esatte.
     const r = p.D / 2, n = 4 * Math.max(12, Math.min(40, Math.round(p.D / 48)));
@@ -36,7 +60,7 @@ export function profilo(p) {
 }
 
 const cache = new Map();
-export const chiave = p => JSON.stringify([p.tipo, p.mat, p.forma, p.L, p.W, p.D, p.r, p.tagli.map(t => [t.n, t.d]), foriPezzo(p)]);
+export const chiave = p => JSON.stringify([p.tipo, p.mat, p.forma, p.L, p.W, p.D, p.r, p.forma === 'sagoma' ? p.sagoma : 0, p.tagli.map(t => [t.n, t.d]), foriPezzo(p)]);
 
 // Restituisce { geometria, bordi, min, max, vertici } nel sistema locale del pezzo, o null se i tagli
 // hanno tolto tutto.
@@ -99,4 +123,13 @@ export function volumeComune(ga, ma, gb, mb) {
   const v = c.volume();
   a.delete(); b.delete(); c.delete();
   return v;
+}
+
+// Contorno del pezzo visto di faccia (sezione a metà spessore, quindi con tagli e fori passanti), nel suo sistema locale.
+export function sezionePezzo(p, z) {
+  const g = geometriaPezzo(p);
+  if (!g) return [];
+  const cs = g.solido.slice(z ?? (g.max[2] + g.min[2]) / 2), poli = cs.toPolygons();
+  cs.delete();
+  return poli;
 }

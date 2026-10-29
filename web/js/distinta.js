@@ -9,6 +9,7 @@ export function righeDistinta(progetto) {
     const L = g ? g.max[0] - g.min[0] : 0, W = g ? g.max[1] - g.min[1] : 0;
     const forma = [];
     if (p.tipo === 'pannello' && p.forma === 'cerchio') forma.push(`rotondo Ø ${fmt(p.D)}`);
+    else if (p.tipo === 'pannello' && p.forma === 'sagoma') { const c = (p.sagoma || []).filter(q => Math.abs(q.b || 0) > 0.05).length; forma.push(`sagomato: ${p.sagoma.length} punti${c ? `, ${c} curv${c === 1 ? 'a' : 'e'}` : ''} (dima 1:1)`); }
     else if (p.tipo === 'pannello' && p.r > 0) forma.push(`angoli raggio ${fmt(p.r)}`);
     const tagli = p.tagli.map(descriviTaglio);
     const costo = p.tipo === 'listello' ? (L / 1000) * m.prezzoM : (L * W / 1e6) * m.prezzoM2;

@@ -164,8 +164,55 @@ table.distinta { width: 100%; border-collapse: collapse; font-size: 15px; }
   .logo, .stato { display: none; }
 }
 
+.sagoma { flex-direction: row; gap: 18px; align-items: stretch; }
+.sagoma-disegno { flex: 1.3; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sagoma-disegno svg { width: 100%; height: 52vh; background: #faf7f1; border: 1px solid var(--line); border-radius: 12px; touch-action: none; }
+.sagoma-lato { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 300px; }
+.sg-forma { fill: #e9d3ac; stroke: #8a6b45; stroke-width: var(--tratto, 2px); vector-effect: non-scaling-stroke; }
+.sg-punto { fill: #fff; stroke: var(--accent); stroke-width: 2px; vector-effect: non-scaling-stroke; cursor: grab; }
+.sg-punto.on { fill: var(--accent); }
+.sg-piu circle { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1px; vector-effect: non-scaling-stroke; cursor: pointer; }
+.sg-piu text { fill: var(--accent); font-weight: 700; pointer-events: none; }
+.sg-tabella { max-height: 32vh; overflow: auto; }
+.sg-tabella tr.scelto td { background: var(--accent-soft); }
+.mini-num { width: 70px; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 14px; text-align: right; }
+@media (max-width: 900px) { .sagoma { flex-direction: column; } .sagoma-lato { min-width: 0; } }
+.disegni { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+.disegni > div { display: flex; flex-direction: column; gap: 8px; }
+.foglio-pezzo { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; break-inside: avoid; }
+.foglio-pezzo h3 { font-size: 15px; margin: 0; color: var(--text); }
+.foglio-pezzo h3 .n { color: var(--accent); }
+.disegno-box { background: #fff; border-radius: 8px; }
+svg.disegno { width: 100%; height: 220px; display: block; }
+.pz-contorno { fill: #f3e6cf; stroke: #2b2722; stroke-width: 1.2px; vector-effect: non-scaling-stroke; }
+.foro { fill: #fff; stroke: #c0392b; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.foro.f-viti { stroke: #1f5fbf; } .foro.f-confirmat { stroke: #6a3fb5; } .foro.f-spinotti { stroke: #b07a2a; } .foro.f-eccentrici { stroke: #2f7d4f; }
+.croce, .tacca { stroke: #2b2722; stroke-width: .6px; vector-effect: non-scaling-stroke; fill: none; }
+.tacca { stroke: #1f5fbf; stroke-width: 1.4px; }
+.quota-l { stroke: #5c5247; stroke-width: .8px; vector-effect: non-scaling-stroke; fill: none; }
+.quota-t, .num-foro { fill: #2b2722; font-family: system-ui, sans-serif; }
+table.fori { font-size: 12px; display: block; overflow-x: auto; }
+.foglio-pezzo { min-width: 0; overflow: hidden; }
+table.fori td { padding: 4px 6px; }
+.foglio-dima { break-after: page; display: flex; flex-direction: column; gap: 2mm; }
+.intestazione-dima { font-size: 9pt; color: #444; }
+svg.dima .pz-contorno { fill: none; stroke: #000; stroke-width: .35mm; vector-effect: none; }
+svg.dima .foro, svg.dima .croce, svg.dima .tacca { vector-effect: none; stroke-width: .25mm; }
+svg.dima .quota-l { vector-effect: none; stroke-width: .2mm; }
+.croce-all { stroke: #000; stroke-width: .2mm; fill: none; }
+.bordo-foglio { fill: none; stroke: #999; stroke-width: .2mm; stroke-dasharray: 2 2; }
+.scala path { stroke: #000; stroke-width: .3mm; fill: none; }
+@page etichette { size: A4; margin: 0; }
+.foglio-etichette { page: etichette; padding-top: .5mm; display: grid; grid-template-columns: repeat(3, 70mm); grid-auto-rows: 37mm; break-after: page; }
+.etichetta { box-sizing: border-box; padding: 3mm 4mm; display: flex; gap: 3mm; font-size: 9pt; line-height: 1.25; overflow: hidden; border: .1mm dashed #ccc; }
+.etichetta .n { font-size: 20pt; color: #1f5fbf; min-width: 12mm; }
+.etichetta small { color: #555; }
+.etichetta .prog { color: #999; }
+.stampa-vista { width: 100%; max-height: 110mm; object-fit: contain; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 6mm; }
+
 @media print {
-  @page { margin: 14mm; }
+  @page { size: A4; margin: 10mm; }
+  svg.disegno { height: 70mm; }
   body { overflow: visible; background: #fff; }
   .app, dialog { display: none !important; }
   #stampa-area { display: block; }

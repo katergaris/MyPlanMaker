@@ -206,7 +206,7 @@ export function unioni(progetto) {
       const p = origine.clone().add(c.u.clone().multiplyScalar(x)).add(c.v.clone().multiplyScalar(y));
       const testa = p.clone().sub(n.clone().multiplyScalar(cp.profondita));
       const asse = c.u.clone().multiplyScalar(r.lungo[0]).add(c.v.clone().multiplyScalar(r.lungo[1]));
-      const el = { tipo: g.fissaggio, d: vite.d, giunto: g, asse, t, limite: r.l1 / 2 - Math.min(20, r.l1 / 4) };
+      const el = { tipo: g.fissaggio, d: vite.d, giunto: g, asse, t, limite: r.l1 / 2 - Math.min(20, r.l1 / 4), profPassa: g.fissaggio === 'spinotti' ? Math.min(12, cp.profondita * 0.65) : g.fissaggio === 'eccentrici' ? 11 : cp.profondita };
       if (g.fissaggio === 'viti') Object.assign(el, { testa, punta: testa.clone().add(n.clone().multiplyScalar(vite.l)) });
       else if (g.fissaggio === 'confirmat') Object.assign(el, { d: 7, testa, punta: testa.clone().add(n.clone().multiplyScalar(50)) });
       else if (g.fissaggio === 'spinotti') {
