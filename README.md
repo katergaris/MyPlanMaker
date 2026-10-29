@@ -1,25 +1,96 @@
 # MyPlanMaker
 
-App personale per progettare mobili e costruzioni in legno: pannelli e listelli a qualunque angolo, tagli
-obliqui calcolati da soli, piani rotondi e angoli arrotondati, distinta dei tagli e costi.
-Web app installabile (PC e tablet) con un piccolo server che salva i progetti.
+**Progettare mobili e costruzioni in legno come con un programma professionale, ma con un'interfaccia che si
+capisce al primo sguardo.** Funziona nel browser su PC e tablet, anche senza rete, e gira sul tuo computer o sul
+tuo server di casa: i progetti restano tuoi.
 
-## Avvio
-Serve solo Python 3.10 o più recente, senza altre dipendenze.
+![Il progetto in 3D con il pezzo selezionato, le quote e le viti](docs/screenshot/01-progetto.png)
 
+*Italiano · [English summary below](#english)*
+
+## Cosa fa
+
+**Si costruisce con pezzi veri.** Pannelli e listelli con gli spessori e le sezioni che compri davvero, a
+qualunque angolo, anche curvi. Non è un CAD da imparare: le misure si scrivono a numero e i comandi sono pochi.
+
+- **Modelli pronti** come punto di partenza: libreria, mobile base con ante, pensile, cassettiera, scaffale,
+  tavolo (anche rotondo), panca. Dopo, ogni pezzo si cambia come se l'avessi fatto a mano.
+- **Sposta e ruota trascinando**, con passo di 5 mm e aggancio magnetico ai pezzi vicini; selezione multipla,
+  copia specchiata, gruppi, scorciatoie da tastiera.
+- **Accosta** appoggia un pezzo sulla faccia di un altro. **Adatta** lo allunga o accorcia fino a un altro pezzo
+  e lo taglia con l'angolo giusto (piani inclinati, tagli obliqui, lama inclinata). **Dividi** mette N ripiani o
+  divisori alla stessa distanza. **Cassetto** crea i cassetti tra due fianchi, con guide di misura commerciale.
+- **Forme**: rettangoli con angoli arrotondati, cerchi, **sagome libere** con tratti dritti e ad arco (editor con
+  punti da trascinare e forme di partenza).
+- **Ferramenta**: cerniere a scodella (numero dall'altezza dell'anta, scodelle scavate nel pezzo), maniglie con
+  interasse e posizione, guide per cassetti.
+- **Fissaggi automatici**: dove due pezzi si toccano l'app propone viti (misura, quante, dove, preforo), oppure
+  confirmat, spinotti, eccentrici o solo colla. Le viti negli angoli si spostano per non incontrarsi.
+- **Controlli**: viti che si scontrano, pezzi che si compenetrano, ripiani che si piegano troppo (freccia nel
+  tempo), mobili che si ribaltano se ci si appoggia, mobili alti da fissare al muro, peso.
+- **Per il laboratorio**: distinta con misure finite e da tagliare (al netto dei bordi), **schema di taglio** su
+  lastre e barre (lama, rifilo, venatura, magazzino avanzi), lista della spesa, **disegni quotati** di ogni pezzo
+  con la tabella dei fori, **dime 1:1** su fogli A4, etichette, **istruzioni di montaggio**, **modalità
+  laboratorio** per il tablet con i pezzi da spuntare.
+- **Esportazioni**: PDF (stampa), CSV per i centri di taglio, DXF per CNC e laser, STL, PNG, file di progetto.
+- **I tuoi materiali e prezzi**, bordatura per lato, venatura per pezzo, versioni del progetto.
+
+| | |
+|---|---|
+| ![Modelli pronti](docs/screenshot/02-modelli.png) | ![Cassettiera con guide](docs/screenshot/03-cassettiera.png) |
+| *Modelli pronti: poche misure e hai tutti i pezzi* | *Cassetti su guide, frontali a filo, maniglie* |
+| ![Schema di taglio](docs/screenshot/04-schema-taglio.png) | ![Viti e controlli](docs/screenshot/05-viti-controlli.png) |
+| *Schema di taglio sulle lastre, con la venatura* | *Lista della spesa e unioni trovate da sole* |
+| ![Disegni dei pezzi](docs/screenshot/06-disegni.png) | ![Editor delle sagome](docs/screenshot/07-sagoma.png) |
+| *Disegni con i fori e la tabella delle quote* | *Sagome libere con archi* |
+| ![Modalità laboratorio](docs/screenshot/08-laboratorio.png) | ![Vista esplosa](docs/screenshot/09-esploso.png) |
+| *Modalità laboratorio per il tablet* | *Vista esplosa* |
+
+## Provarlo
+
+### Windows, senza installare niente
+Scarica `MyPlanMaker-portable-<versione>.zip` dalla pagina *Releases*, scompattalo dove vuoi (anche su una
+chiavetta) e fai doppio clic su `MyPlanMaker.bat`. Si apre in una finestra di Edge o Chrome; i progetti restano
+nella cartella `dati`.
+
+### Con Python (Linux, macOS, Windows)
+Serve solo Python 3.10 o più recente, senza altre dipendenze:
 ```
 python3 server/server.py
 ```
-Poi apri `http://<indirizzo>:8099`. Variabili d'ambiente: `MPM_PORT` (porta, predefinita 8099), `MPM_DATA`
-(cartella dei dati, predefinita `./data`), `MPM_PASSWORD` (se impostata, la pagina chiede questa password).
+e apri `http://localhost:8099`.
 
-## Versione portable per Windows
-`sh windows/crea-portable.sh` crea `dist/MyPlanMaker-portable-<versione>.zip` (Python embeddable incluso).
-Si scompatta ovunque e si avvia con `MyPlanMaker.bat`; i progetti restano nella cartella `dati`.
+### Con Docker (server di casa, NAS)
+```
+docker compose up -d
+```
+Porta 8099, dati nel volume `./data`. Variabili: `MPM_PORT`, `MPM_DATA`, `MPM_PASSWORD` (se impostata, la pagina
+chiede la password).
 
-## Prove
-- Server: `python3 -m unittest discover -s tests`
-- Modello e geometria: con il server avviato apri `/prove.html` (deve dire "TUTTE OK").
+Dal tablet: apri l'indirizzo del server e scegli «Aggiungi alla schermata Home» per usarla come un'app.
 
-## Librerie incluse
-`web/vendor/`: three.js 0.186.1 (MIT) e manifold-3d 3.5.4 (Apache-2.0), vedi `VERSIONI.txt`.
+## Come è fatto
+- **Interfaccia**: JavaScript senza passaggi di compilazione (`web/`), 3D con [three.js](https://threejs.org),
+  geometria dei solidi con [Manifold](https://github.com/elalish/manifold) (tagli, sagome, fori, compenetrazioni).
+- **Server**: Python con la sola libreria standard e SQLite (`server/server.py`), salva progetti e impostazioni.
+  Ogni progetto ha anche una copia nel browser, quindi l'app funziona senza rete.
+- **Prove**: `python3 -m unittest discover -s tests` per il server; con il server avviato, `/prove.html` esegue le
+  prove di modello, geometria, viti, schema di taglio, modelli, disegni ed esportazioni (deve dire «TUTTE OK»).
+- **Portable per Windows**: `sh windows/crea-portable.sh` crea lo zip con Python embeddable.
+
+Le regole per viti, frecce e stabilità sono **indicative**: aiutano a non dimenticare niente, ma prima di forare
+controlla sempre con la tua esperienza.
+
+## Licenza
+[MIT](LICENSE). Librerie incluse in `web/vendor/`: three.js (MIT), manifold-3d (Apache-2.0).
+
+---
+
+<a id="english"></a>
+## English summary
+MyPlanMaker is a self-hosted web app (PC and tablet, works offline) for designing furniture and woodwork with
+real boards and battens at any angle, curved and free-form shapes, automatic hardware and fasteners (screws,
+confirmat, dowels, cam locks) with clash detection, structural checks (shelf sag, tipping, interpenetration),
+and workshop output: cut list, sheet/bar cutting layouts with grain and offcuts, shopping list, dimensioned part
+drawings with hole tables, 1:1 templates on A4, labels, assembly steps, CSV/DXF/STL export. The interface is in
+Italian. Run `python3 server/server.py` (stdlib only) or `docker compose up -d`, then open port 8099.

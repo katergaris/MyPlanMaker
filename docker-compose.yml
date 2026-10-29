@@ -1,0 +1,13 @@
+services:
+  myplanmaker:
+    build: .
+    image: myplanmaker:latest
+    container_name: myplanmaker
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    volumes:
+      - ./data:/data
+    environment:
+      MPM_PORT: "8099"
+      # MPM_PASSWORD: "scegli-una-password"

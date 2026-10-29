@@ -1,5 +1,5 @@
 // Funzionamento senza rete: i file dell'app vengono dalla cache, i progetti dalla copia locale (archivio.js).
-const VERSIONE = 'mpm-0.8.0';
+const VERSIONE = 'mpm-0.9.0';
 const FILE = ['./', 'index.html', 'stile.css', 'manifest.webmanifest', 'icona.svg',
   'js/app.js', 'js/archivio.js', 'js/cassetti.js', 'js/modelli.js', 'js/controlli.js', 'js/disegni.js', 'js/esporta.js', 'js/montaggio.js', 'js/sagome.js', 'js/distinta.js', 'js/esempi.js', 'js/ferramenta.js', 'js/spesa.js', 'js/unioni.js', 'js/geometria.js', 'js/materiali.js', 'js/modello.js', 'js/taglio.js', 'js/vista3d.js',
   'vendor/three.module.js', 'vendor/three.core.js', 'vendor/OrbitControls.js', 'vendor/TransformControls.js', 'vendor/manifold.js', 'vendor/manifold.wasm'];

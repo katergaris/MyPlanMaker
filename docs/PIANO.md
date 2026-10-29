@@ -85,3 +85,8 @@ pezzi, istruzioni di montaggio con vista esplosa, dime di foratura stampabili 1:
 - 2026-10-28, 0.4: Dividi come "n pezzi alla stessa distanza tra due pezzi paralleli" (al posto della
   divisione dei vani pensata all'inizio: più semplice e funziona anche per divisori verticali).
 - 2026-10-28, 0.5: peso, stabilità (ribaltamento con 25 kg sul bordo, fissaggio al muro) e freccia dei ripiani.
+- 2026-10-29, 0.9 (notte in autonomia, su richiesta di Salvo "come un software professionale ma intuitivo"):
+  gizmo, calamita, selezione multipla e gruppi, specchia, misura, quote, esploso; modelli pronti; cassetti;
+  fissaggi a scelta; compenetrazioni; bordatura e venatura; sagome; disegni, dime 1:1, etichette; CSV/DXF/STL;
+  montaggio; laboratorio; magazzino avanzi; catalogo materiali; versioni; guida; tablet in verticale; README,
+  screenshot, licenza MIT, Docker, CI. Fatte quasi tutte le voci di fase 1, 1b e parte della fase 2.
