@@ -1,6 +1,7 @@
 <!doctype html><html lang="it"><head><meta charset="utf-8"><title>MyPlanMaker — prova dell'interfaccia</title></head>
 <body style="margin:0"><iframe id="f" src="index.html" style="border:0;width:100vw;height:100vh"></iframe>
 <script>
+localStorage.setItem('mpm:guida-vista', '1');
 // Pilota l'app per le prove con chromium headless. Passi nell'hash, separati da virgole:
 // esempio:N  sel:Nome  cmd:comando  tocca:Nome  vista:nome  distinta  schema  ferramenta  progetti
 const f = document.getElementById('f');
@@ -23,6 +24,7 @@ f.onload = async () => {
     if (p.startsWith('fissaggio:')) { stato.progetto.fissaggioPredefinito = p.slice(10); w.mpm.apri(stato.progetto); }
     if (p.startsWith('clic:')) d.querySelector(decodeURIComponent(p.slice(5)))?.click();
     if (p === 'disegni') { d.getElementById('apri-distinta').click(); d.querySelector('[data-scheda="disegni"]').click(); }
+    if (p.startsWith('menu:')) w.mpm.menuAltro(p.slice(5));
     if (p === 'progetti') d.getElementById('apri-progetti').click();
     await attendi(400);
   }

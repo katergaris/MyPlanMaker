@@ -20,6 +20,24 @@
     <button class="btn icon" id="ripeti" title="Ripeti (Ctrl+Y)">↷</button>
     <button class="btn" id="apri-distinta">Distinta e tagli</button>
     <button class="btn primary" id="esporta">Esporta PDF</button>
+    <div class="menu-altro"><button class="btn icon" id="menu-altro" title="Altro">⋯</button>
+      <div class="tendina" id="tendina" hidden>
+        <button data-menu="laboratorio">🪚 Modalità laboratorio</button>
+        <button data-menu="montaggio">🔩 Istruzioni di montaggio</button>
+        <hr>
+        <button data-menu="magazzino">📦 Magazzino avanzi</button>
+        <button data-menu="materiali">🏷️ Materiali e prezzi</button>
+        <button data-menu="versioni">🕘 Versioni del progetto</button>
+        <hr>
+        <button data-menu="json">Esporta file del progetto (.mpm.json)</button>
+        <button data-menu="csv">Esporta distinta (CSV per Excel o centro di taglio)</button>
+        <button data-menu="dxf">Esporta contorni (DXF per CNC e laser)</button>
+        <button data-menu="stl">Esporta modello 3D (STL)</button>
+        <button data-menu="png">Salva immagine della vista (PNG)</button>
+        <hr>
+        <button data-menu="guida">❓ Guida rapida e scorciatoie</button>
+      </div>
+    </div>
   </header>
 
   <aside class="tools">
@@ -97,6 +115,42 @@
   <div class="dlg-testa"><h2>Cassetti</h2><button class="btn icon" data-chiudi>✕</button></div>
   <div class="dlg-corpo" id="form-cassetto"></div>
 </dialog>
+
+<dialog id="dlg-magazzino" class="dlg larga">
+  <div class="dlg-testa"><h2>Magazzino e materiali</h2><div class="seg schede"><button data-mag="avanzi">Avanzi</button><button data-mag="materiali">Materiali e prezzi</button></div><span class="sp"></span><button class="btn icon" data-chiudi>✕</button></div>
+  <div class="dlg-corpo" id="corpo-magazzino"></div>
+</dialog>
+
+<dialog id="dlg-versioni" class="dlg">
+  <div class="dlg-testa"><h2>Versioni del progetto</h2><button class="btn icon" data-chiudi>✕</button></div>
+  <div class="dlg-corpo" id="corpo-versioni"></div>
+</dialog>
+
+<dialog id="dlg-guida" class="dlg larga">
+  <div class="dlg-testa"><h2>Benvenuto in MyPlanMaker</h2><span class="sp"></span><button class="btn icon" data-chiudi>✕</button></div>
+  <div class="dlg-corpo guida">
+    <div class="guida-colonne">
+      <section><h3>1 · Parti</h3><p>Da un <b>modello pronto</b> (libreria, cassettiera, tavolo…) oppure aggiungi <b>Pannelli</b> e <b>Listelli</b> uno alla volta. Le misure si scrivono nel pannello a destra.</p></section>
+      <section><h3>2 · Componi</h3><p>Trascina le frecce per <b>spostare</b> (si agganciano ai pezzi vicini), <b>Accosta</b> appoggia un pezzo sulla faccia di un altro, <b>Adatta</b> lo allunga e lo taglia con l'angolo giusto, <b>Dividi</b> mette ripiani alla stessa distanza, <b>Cassetto</b> crea i cassetti tra due fianchi.</p></section>
+      <section><h3>3 · Controlla</h3><p>Viti, eccentrici o spinotti si mettono da soli dove i pezzi si toccano. Il piede segnala cosa non va: viti che si scontrano, pezzi che si compenetrano, ripiani che si piegano, mobili che si ribaltano.</p></section>
+      <section><h3>4 · Costruisci</h3><p><b>Distinta e tagli</b>: misure, schema di taglio sulle lastre, lista della spesa, disegni con i fori, dime 1:1, etichette. Dal menu ⋯ la <b>modalità laboratorio</b> per il tablet e le istruzioni di montaggio.</p></section>
+    </div>
+    <h3>Scorciatoie da tastiera</h3>
+    <div class="scorciatoie">
+      <span><kbd>P</kbd> pannello</span><span><kbd>L</kbd> listello</span><span><kbd>T</kbd> modelli</span><span><kbd>K</kbd> cassetto</span>
+      <span><kbd>C</kbd> accosta</span><span><kbd>A</kbd> adatta</span><span><kbd>D</kbd> dividi</span><span><kbd>M</kbd> misura</span>
+      <span><kbd>G</kbd> sposta</span><span><kbd>R</kbd> ruota</span><span><kbd>S</kbd> copia specchiata</span><span><kbd>Ctrl</kbd>+<kbd>D</kbd> duplica</span>
+      <span><kbd>Maiusc</kbd>+clic più pezzi</span><span><kbd>Ctrl</kbd>+<kbd>A</kbd> tutti</span><span><kbd>←↑→↓</kbd> sposta di 1 mm (con <kbd>Maiusc</kbd> 10)</span><span><kbd>PagSu</kbd>/<kbd>PagGiù</kbd> su e giù</span>
+      <span><kbd>Canc</kbd> elimina</span><span><kbd>Esc</kbd> esci / deseleziona</span><span><kbd>Ctrl</kbd>+<kbd>Z</kbd> annulla</span><span><kbd>Ctrl</kbd>+<kbd>Y</kbd> ripeti</span>
+    </div>
+    <div class="azioni"><button class="btn" data-chiudi>Chiudi</button><button class="btn primary" id="guida-modelli">Parti da un modello</button></div>
+  </div>
+</dialog>
+
+<div id="laboratorio" class="laboratorio" hidden>
+  <div class="lab-testa"><b>Laboratorio</b><div class="seg schede"><button data-lab="taglio">Taglio</button><button data-lab="montaggio">Montaggio</button></div><span class="sp"></span><button class="btn" id="lab-chiudi">Torna al progetto</button></div>
+  <div id="lab-corpo" class="lab-corpo"></div>
+</div>
 
 <div id="stampa-area"></div>
 

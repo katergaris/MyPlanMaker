@@ -21,5 +21,15 @@ export const MATERIALI = [
   { id: 'tr100', massello: true, tipo: 'listello', nome: 'Trave abete 100×100', W: 100, T: 100, prezzoM: 12, barra: 4000, E: 10000, densita: 450, viscosita: 1.5, colore: '#e3c592' },
 ];
 
+// Catalogo personale: prezzi e misure modificati, materiali aggiunti (dalle impostazioni condivise).
+const BASE = structuredClone(MATERIALI);
+export function applicaCatalogo(imp = {}) {
+  const modifiche = imp.materiali || {};
+  MATERIALI.length = 0;
+  for (const m of BASE) MATERIALI.push({ ...m, ...(modifiche[m.id] || {}) });
+  for (const m of imp.materialiExtra || []) MATERIALI.push({ E: m.tipo === 'listello' ? 10000 : 5000, densita: 600, viscosita: 1.5, ...m, ...(modifiche[m.id] || {}) });
+}
+export const materialeBase = id => BASE.find(m => m.id === id);
+
 export const materiale = id => MATERIALI.find(m => m.id === id) || MATERIALI[0];
 export const materialiPer = tipo => MATERIALI.filter(m => m.tipo === tipo);

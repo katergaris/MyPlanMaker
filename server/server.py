@@ -38,7 +38,22 @@ class Store:
             "CREATE TABLE IF NOT EXISTS projects ("
             " id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL, updated INTEGER NOT NULL)"
         )
+        self.db.execute("CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT NOT NULL)")
         self.db.commit()
+
+    def get_settings(self):
+        with self.lock:
+            r = self.db.execute("SELECT v FROM settings WHERE k = 'main'").fetchone()
+        return json.loads(r[0]) if r else {}
+
+    def put_settings(self, data):
+        with self.lock:
+            cur = self.db.execute("SELECT v FROM settings WHERE k = 'main'").fetchone()
+            if cur and json.loads(cur[0]).get("aggiornato", 0) > data.get("aggiornato", 0):
+                return False
+            self.db.execute("INSERT INTO settings (k, v) VALUES ('main', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", (json.dumps(data),))
+            self.db.commit()
+        return True
 
     def list(self):
         with self.lock:
@@ -124,6 +139,8 @@ def make_handler(store, password):
                 return self._send(200, b"MyPlanMaker", "text/plain", {"Cache-Control": "no-store"})
             if path == "/api/projects":
                 return self._json(200, store.list())
+            if path == "/api/settings":
+                return self._json(200, store.get_settings())
             if path.startswith("/api/"):
                 pid = self._project_id()
                 p = store.get(pid) if pid else None
@@ -136,6 +153,18 @@ def make_handler(store, password):
             self.server.ultima_richiesta = time.time()
             if not self._guard():
                 return
+            if self.path.split("?")[0] == "/api/settings":
+                length = int(self.headers.get("Content-Length") or 0)
+                if length <= 0 or length > MAX_BODY:
+                    return self._json(400, {"error": "corpo mancante o troppo grande"})
+                try:
+                    data = json.loads(self.rfile.read(length))
+                    assert isinstance(data, dict)
+                except (ValueError, AssertionError):
+                    return self._json(400, {"error": "dati non validi"})
+                if not store.put_settings(data):
+                    return self._json(409, store.get_settings())
+                return self._json(200, {"ok": True})
             pid = self._project_id()
             if not pid:
                 return self._json(404, {"error": "non trovato"})

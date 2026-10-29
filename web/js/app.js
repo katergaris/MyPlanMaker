@@ -3,7 +3,7 @@ import { Box3, Vector3 } from '../vendor/three.module.js';
 import { avviaGeometria, geometriaPezzo } from './geometria.js';
 import { Vista3D } from './vista3d.js';
 import * as mod from './modello.js';
-import { materiale, materialiPer } from './materiali.js';
+import { MATERIALI, applicaCatalogo, materiale, materialeBase, materialiPer } from './materiali.js';
 import { euro, riepilogo, righeDistinta } from './distinta.js';
 import * as archivio from './archivio.js';
 import { ESEMPI } from './esempi.js';
@@ -15,6 +15,8 @@ import { MODELLI, modello, valoriDefault } from './modelli.js';
 import { creaCassetti, lunghezzaGuida } from './cassetti.js';
 import { apriEditorSagoma } from './sagome.js';
 import { htmlDima, htmlDisegno, htmlEtichette } from './disegni.js';
+import { csvDistinta, dxfPezzi, scarica, stlProgetto } from './esporta.js';
+import { htmlIstruzioni, istruzioni } from './montaggio.js';
 import { CARICO_RIPIANI, controlli } from './controlli.js';
 
 const $ = s => document.querySelector(s);
@@ -29,6 +31,8 @@ const stato = {
 const storico = new mod.Storico();
 let vista;
 
+let impostazioni = {};
+const schema = () => schemaDiTaglio(stato.progetto, impostazioni.avanzi || []);
 const pezzoSel = () => stato.progetto.pezzi.find(p => p.id === stato.sel) || null;
 const selezione = () => { const s = new Set([...stato.multi].filter(id => stato.progetto.pezzi.some(p => p.id === id))); if (pezzoSel()) s.add(stato.sel); return s; };
 const pezziSel = () => { const s = selezione(); return stato.progetto.pezzi.filter(p => s.has(p.id)); };
@@ -641,8 +645,8 @@ function eventiProprieta() {
 // ---------- piede e distinta ----------
 function disegnaPiede() {
   const r = riepilogo(stato.progetto);
-  const comprare = schemaDiTaglio(stato.progetto), lastre = comprare.filter(g => g.tipo === 'pannello').reduce((t, g) => t + g.fogli.length, 0);
-  const barre = comprare.filter(g => g.tipo === 'listello').reduce((t, g) => t + g.fogli.length, 0);
+  const comprare = schema(), lastre = comprare.filter(g => g.tipo === 'pannello').reduce((t, g) => t + g.nuovi, 0);
+  const barre = comprare.filter(g => g.tipo === 'listello').reduce((t, g) => t + g.nuovi, 0);
   const totale = comprare.reduce((t, g) => t + g.totale, 0);
   const u = unioni(stato.progetto), spesa = listaSpesa(stato.progetto, u), ctr = controlli(stato.progetto);
   $('#piede').innerHTML = `<span><b>${r.pezzi}</b> pezzi</span><span>Da comprare: <b>${lastre}</b> lastr${lastre === 1 ? 'a' : 'e'} · <b>${barre}</b> barr${barre === 1 ? 'a' : 'e'}</span>
@@ -682,21 +686,22 @@ function svgLastra(f, larghezza) {
 
 function htmlSchema(perStampa = false) {
   const imp = { ...IMPOSTAZIONI_TAGLIO, ...(stato.progetto.taglio || {}) };
-  const gruppi = schemaDiTaglio(stato.progetto);
+  const gruppi = schema();
   const totale = gruppi.reduce((s, g) => s + g.totale, 0);
   const html = gruppi.map(g => {
     const m = g.materiale, lastra = g.tipo === 'pannello';
-    const unita = lastra ? `lastr${g.fogli.length === 1 ? 'a' : 'e'} ${m.lastra[0]}×${m.lastra[1]}` : `barr${g.fogli.length === 1 ? 'a' : 'e'} da ${mod.fmt(m.barra)} mm`;
+    const unita = lastra ? `lastr${g.nuovi === 1 ? 'a' : 'e'} ${m.lastra[0]}×${m.lastra[1]}` : `barr${g.nuovi === 1 ? 'a' : 'e'} da ${mod.fmt(m.barra)} mm`;
     const fuori = g.fuori.length ? `<div class="avviso">Non ${g.fuori.length === 1 ? 'entra' : 'entrano'} in ${lastra ? 'una lastra' : 'una barra'}: ${g.fuori.map(p => `n° ${p.n} ${esc(p.nome)} (${p.L}${lastra ? `×${p.W}` : ''})`).join(', ')}. Va giuntato o comprato a parte.</div>` : '';
-    const disegni = g.fogli.map((f, i) => `<div class="lastra">${svgLastra(f, lastra ? 460 : 640)}<span>${lastra ? 'Lastra' : 'Barra'} ${i + 1} · usata al ${Math.round(f.uso * 100)}%</span></div>`).join('');
+    const disegni = g.fogli.map((f, i) => `<div class="lastra">${svgLastra(f, lastra ? 460 : 640)}<span>${f.avanzo ? `<b class="avanzo">Avanzo del magazzino ${f1(f.L)}${lastra ? `×${f1(f.H)}` : ''}</b>` : `${lastra ? 'Lastra' : 'Barra'} ${i + 1 - g.daAvanzi}`} · usata al ${Math.round(f.uso * 100)}%</span></div>`).join('');
     return `<div class="gruppo-taglio"><h3>${esc(m.nome)}</h3>
-      <div class="riga"><span>Da comprare: <b>${g.fogli.length} ${unita}</b></span><span>Costo: <b>${euro(g.totale)}</b></span>${lastra ? `<span>${m.venatura ? 'Venatura rispettata: pezzi non ruotati' : 'Pezzi ruotabili (↻ = ruotato)'}</span>` : ''}</div>
+      <div class="riga"><span>Da comprare: <b>${g.nuovi} ${unita}</b></span>${g.daAvanzi ? `<span>Dal magazzino: <b>${g.daAvanzi} avanz${g.daAvanzi === 1 ? 'o' : 'i'}</b></span>` : ''}<span>Costo: <b>${euro(g.totale)}</b></span>${lastra ? `<span>${m.venatura ? 'Venatura rispettata: pezzi non ruotati' : 'Pezzi ruotabili (↻ = ruotato)'}</span>` : ''}</div>
       ${fuori}<div class="lastre">${disegni}</div></div>`;
   }).join('');
   if (perStampa) return `<p class="nota">Lama ${f1(imp.lama)} mm · rifilo ${f1(imp.rifilo)} mm · totale da comprare ${euro(totale)}</p>${html}`;
   return `<div class="impost">
       <div class="field"><label>Spessore della lama</label><div class="input"><input data-taglio="lama" inputmode="decimal" value="${f1(imp.lama)}"><small>mm</small></div></div>
       <div class="field"><label>Rifilo dei bordi</label><div class="input"><input data-taglio="rifilo" inputmode="decimal" value="${f1(imp.rifilo)}"><small>mm</small></div></div>
+      <label class="nota"><input type="checkbox" data-usa-avanzi ${stato.progetto.usaAvanzi === false ? '' : 'checked'}> Usa prima gli avanzi del magazzino (${(impostazioni.avanzi || []).length})</label>
       <p class="nota" style="flex:1;min-width:220px">Totale da comprare: <b>${euro(totale)}</b>. I numeri sui disegni sono quelli della distinta.</p></div>
     ${html || '<p class="nota">Ancora nessun pezzo.</p>'}`;
 }
@@ -740,6 +745,7 @@ function stampa() {
   stampaHtml(`<h1>${esc(pr.nome)}</h1><p class="nota">MyPlanMaker · ${new Date().toLocaleDateString('it-IT')}</p><img class="stampa-vista" src="${vista.immagine()}">${htmlDistinta()}
     <div class="stampa-schema"><h1>Schema di taglio</h1>${htmlSchema(true)}</div>
     <div class="stampa-schema"><h1>Ferramenta, viti e controlli</h1>${htmlFerramentaProgetto()}</div>
+    <div class="stampa-schema"><h1>Istruzioni di montaggio</h1>${htmlIstruzioni(pr)}</div>
     <div class="stampa-schema"><h1>Disegni dei pezzi</h1><div class="disegni">${pr.pezzi.slice().sort((a, b) => a.n - b.n).map(p => htmlDisegno(pr, p)).join('')}</div></div>`);
 }
 
@@ -857,6 +863,7 @@ function eventiDialoghi() {
   });
   $('#etichette').addEventListener('click', () => stampaHtml(htmlEtichette(stato.progetto, righeDistinta(stato.progetto)), 'etichette'));
   $('#distinta').addEventListener('change', e => {
+    if (e.target.hasAttribute('data-usa-avanzi')) { modifica(() => { stato.progetto.usaAvanzi = e.target.checked; }); return mostraDistinta('schema'); }
     const k = e.target.dataset.taglio;
     if (!k) return;
     const v = numero(e.target.value);
@@ -868,9 +875,182 @@ function eventiDialoghi() {
   $('#esporta').addEventListener('click', stampa);
 }
 
+// ---------- menu, magazzino, versioni, laboratorio, guida ----------
+function menuAltro(azione) {
+  const pr = stato.progetto, nome = pr.nome;
+  if (azione === 'json') scarica(`${nome}.mpm.json`, archivio.versoFile(pr), 'application/json');
+  if (azione === 'csv') scarica(`${nome} - distinta.csv`, csvDistinta(pr), 'text/csv');
+  if (azione === 'dxf') scarica(`${nome} - pezzi.dxf`, dxfPezzi(pr), 'application/dxf');
+  if (azione === 'stl') scarica(`${nome}.stl`, stlProgetto(pr), 'model/stl');
+  if (azione === 'png') scarica(`${nome}.png`, vista.immagine());
+  if (azione === 'laboratorio') apriLaboratorio('taglio');
+  if (azione === 'montaggio') apriLaboratorio('montaggio');
+  if (azione === 'magazzino') apriMagazzino('avanzi');
+  if (azione === 'materiali') apriMagazzino('materiali');
+  if (azione === 'versioni') apriVersioni();
+  if (azione === 'guida') $('#dlg-guida').showModal();
+}
+
+async function salvaImp() {
+  const r = await archivio.salvaImpostazioni(impostazioni);
+  applicaCatalogo(impostazioni);
+  chiavePannello = '';
+  aggiorna();
+  if (r !== 'salvato') avvisa('Salvato solo su questo dispositivo: il server non risponde.', true);
+}
+
+function apriMagazzino(scheda) {
+  const d = $('#dlg-magazzino'), avanzi = impostazioni.avanzi || [];
+  d.querySelectorAll('[data-mag]').forEach(b => b.classList.toggle('on', b.dataset.mag === scheda));
+  const opzioni = sel => MATERIALI.map(m => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.nome)}</option>`).join('');
+  let h;
+  if (scheda === 'avanzi') {
+    h = `<p class="nota">Gli avanzi che hai in laboratorio. Lo schema di taglio li usa prima di farti comprare lastre o barre nuove.</p>
+      <table class="distinta"><thead><tr><th>Materiale</th><th style="text-align:right">Lunghezza</th><th style="text-align:right">Larghezza</th><th style="text-align:right">Quanti</th><th></th></tr></thead><tbody>
+      ${avanzi.map((a, i) => `<tr><td>${esc(materiale(a.mat).nome)}</td><td class="num">${f1(a.L)}</td><td class="num">${materiale(a.mat).tipo === 'listello' ? '—' : f1(a.W)}</td><td class="num">${a.qta}</td><td><button class="link" data-togli-avanzo="${i}">Togli</button></td></tr>`).join('') || '<tr><td colspan="5" class="nota">Ancora nessun avanzo.</td></tr>'}</tbody></table>
+      <h3>Aggiungi un avanzo</h3>
+      <div class="griglia-form"><div class="field"><label>Materiale</label><div class="input"><select id="av-mat">${opzioni('mb18')}</select><small>▾</small></div></div>
+      <div class="field"><label>Lunghezza</label><div class="input"><input id="av-L" inputmode="decimal"><small>mm</small></div></div>
+      <div class="field"><label>Larghezza (pannelli)</label><div class="input"><input id="av-W" inputmode="decimal"><small>mm</small></div></div>
+      <div class="field"><label>Quanti</label><div class="input"><input id="av-q" inputmode="numeric" value="1"></div></div></div>
+      <button class="btn primary" id="av-aggiungi">Aggiungi al magazzino</button>`;
+  } else {
+    h = `<p class="nota">I tuoi prezzi e le misure che compri davvero. Valgono per tutti i progetti. Prezzi dei pannelli al m², dei listelli al metro.</p>
+      <div class="tabella-scorre"><table class="distinta"><thead><tr><th>Materiale</th><th style="text-align:right">Spessore / sezione</th><th style="text-align:right">Prezzo</th><th style="text-align:right">Lastra / barra</th><th></th></tr></thead><tbody>
+      ${MATERIALI.map(m => `<tr><td>${esc(m.nome)}${m.id.startsWith('u_') ? ' <small class="nota">tuo</small>' : ''}</td><td class="num">${m.tipo === 'listello' ? `${m.W}×${m.T}` : m.T}</td>
+        <td class="num"><input class="mini-num" data-mat-prezzo="${m.id}" value="${f1(m.tipo === 'listello' ? m.prezzoM : m.prezzoM2)}"> €/${m.tipo === 'listello' ? 'm' : 'm²'}</td>
+        <td class="num">${m.tipo === 'listello' ? `<input class="mini-num" data-mat-barra="${m.id}" value="${m.barra}">` : `<input class="mini-num largo" data-mat-lastra="${m.id}" value="${m.lastra.join('×')}">`}</td>
+        <td>${materialeBase(m.id) && (impostazioni.materiali || {})[m.id] ? `<button class="link" data-mat-ripristina="${m.id}">Ripristina</button>` : m.id.startsWith('u_') ? `<button class="link" data-mat-togli="${m.id}">Togli</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
+      <h3>Nuovo materiale</h3>
+      <div class="griglia-form"><div class="field"><label>Nome</label><div class="input"><input id="nm-nome" placeholder="es. Multistrato pioppo 15"></div></div>
+      <div class="field"><label>Tipo</label><div class="input"><select id="nm-tipo"><option value="pannello">Pannello</option><option value="listello">Listello</option></select><small>▾</small></div></div>
+      <div class="field"><label>Spessore</label><div class="input"><input id="nm-T" inputmode="decimal"><small>mm</small></div></div>
+      <div class="field"><label>Larghezza (listello)</label><div class="input"><input id="nm-W" inputmode="decimal"><small>mm</small></div></div>
+      <div class="field"><label>Prezzo</label><div class="input"><input id="nm-prezzo" inputmode="decimal"><small>€</small></div></div>
+      <div class="field"><label>Lastra (L×H) o barra (L)</label><div class="input"><input id="nm-misura" placeholder="2500×1250 o 3000"></div></div>
+      <div class="field"><label>Venatura</label><div class="input"><select id="nm-vena"><option value="1">Sì</option><option value="0">No</option></select><small>▾</small></div></div>
+      <div class="field"><label>Colore</label><div class="input"><input id="nm-colore" type="color" value="#d9b98a"></div></div></div>
+      <button class="btn primary" id="nm-aggiungi">Aggiungi materiale</button>`;
+  }
+  $('#corpo-magazzino').innerHTML = h;
+  d.dataset.scheda = scheda;
+  if (!d.open) d.showModal();
+}
+
+function eventiMagazzino() {
+  const d = $('#dlg-magazzino');
+  d.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.mag) return apriMagazzino(b.dataset.mag);
+    if (b.dataset.togliAvanzo) { impostazioni.avanzi.splice(+b.dataset.togliAvanzo, 1); salvaImp(); return apriMagazzino('avanzi'); }
+    if (b.id === 'av-aggiungi') {
+      const mat = $('#av-mat').value, L = numero($('#av-L').value), W = numero($('#av-W').value), q = Math.round(numero($('#av-q').value) || 1);
+      const listello = materiale(mat).tipo === 'listello';
+      if (!L || L <= 0 || (!listello && (!W || W <= 0))) return avvisa('Scrivi le misure dell\'avanzo.', true);
+      impostazioni.avanzi = [...(impostazioni.avanzi || []), { mat, L, W: listello ? materiale(mat).W : W, qta: q }];
+      salvaImp(); return apriMagazzino('avanzi');
+    }
+    if (b.dataset.matRipristina) { delete impostazioni.materiali[b.dataset.matRipristina]; salvaImp(); return apriMagazzino('materiali'); }
+    if (b.dataset.matTogli) {
+      if (stato.progetto.pezzi.some(p => p.mat === b.dataset.matTogli)) return avvisa('Questo materiale è usato nel progetto aperto: cambialo prima sui pezzi.', true);
+      impostazioni.materialiExtra = (impostazioni.materialiExtra || []).filter(m => m.id !== b.dataset.matTogli); salvaImp(); return apriMagazzino('materiali');
+    }
+    if (b.id === 'nm-aggiungi') {
+      const tipo = $('#nm-tipo').value, T = numero($('#nm-T').value), W = numero($('#nm-W').value), prezzo = numero($('#nm-prezzo').value), nome = $('#nm-nome').value.trim();
+      const mis = $('#nm-misura').value.split(/[x×*]/i).map(numero);
+      if (!nome || !T || !prezzo || !mis[0] || (tipo === 'listello' && !W) || (tipo === 'pannello' && !mis[1])) return avvisa('Compila nome, spessore, prezzo e misura (per i listelli anche la larghezza).', true);
+      const m = { id: 'u_' + mod.nuovoId(), tipo, nome, T, colore: $('#nm-colore').value, venatura: $('#nm-vena').value === '1' };
+      if (tipo === 'listello') Object.assign(m, { W, prezzoM: prezzo, barra: mis[0] }); else Object.assign(m, { prezzoM2: prezzo, lastra: [mis[0], mis[1]] });
+      impostazioni.materialiExtra = [...(impostazioni.materialiExtra || []), m];
+      salvaImp(); avvisa(`Aggiunto «${nome}»: lo trovi nei materiali di ogni pezzo.`); return apriMagazzino('materiali');
+    }
+  });
+  d.addEventListener('change', e => {
+    const t = e.target, id = t.dataset.matPrezzo || t.dataset.matBarra || t.dataset.matLastra;
+    if (!id) return;
+    const m = materiale(id), cambio = {};
+    if (t.dataset.matPrezzo) { const v = numero(t.value); if (v === null || v < 0) return avvisa('Prezzo non valido.', true); cambio[m.tipo === 'listello' ? 'prezzoM' : 'prezzoM2'] = v; }
+    if (t.dataset.matBarra) { const v = numero(t.value); if (!v || v < 100) return avvisa('Lunghezza della barra non valida.', true); cambio.barra = v; }
+    if (t.dataset.matLastra) { const v = t.value.split(/[x×*]/i).map(numero); if (!v[0] || !v[1]) return avvisa('Scrivi la lastra come 2500×1250.', true); cambio.lastra = [v[0], v[1]]; }
+    if (id.startsWith('u_')) impostazioni.materialiExtra = impostazioni.materialiExtra.map(x => (x.id === id ? { ...x, ...cambio } : x));
+    else impostazioni.materiali = { ...(impostazioni.materiali || {}), [id]: { ...((impostazioni.materiali || {})[id] || {}), ...cambio } };
+    salvaImp();
+  });
+}
+
+function apriVersioni() {
+  const pr = stato.progetto, v = pr.versioni || [];
+  $('#corpo-versioni').innerHTML = `<p class="nota">Una versione è una fotografia del progetto: la puoi riaprire quando vuoi (e annullare con ↶).</p>
+    <div class="azioni"><div class="input" style="flex:2"><input id="ver-nome" placeholder="Nome della versione, es. «con 3 ripiani»"></div><button class="btn primary" id="ver-salva">Salva versione</button></div>
+    <ul class="lista">${v.slice().reverse().map(x => `<li><span class="nome"><b>${esc(x.nome)}</b><span>${new Date(x.data).toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })} · ${x.dati.pezzi.length} pezzi</span></span><button class="btn" data-ver-apri="${x.id}">Riapri</button><button class="btn icon danger" data-ver-togli="${x.id}" title="Togli">✕</button></li>`).join('') || '<li><span class="nome nota">Nessuna versione salvata.</span></li>'}</ul>`;
+  if (!$('#dlg-versioni').open) $('#dlg-versioni').showModal();
+}
+const CAMPI_VERSIONE = ['pezzi', 'prossimoN', 'fissaggi', 'fissaggioPredefinito', 'unioniEscluse', 'taglio', 'caricoRipiani', 'usaAvanzi'];
+function eventiVersioni() {
+  $('#dlg-versioni').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const pr = stato.progetto;
+    if (b.id === 'ver-salva') {
+      const nome = $('#ver-nome').value.trim() || `Versione del ${new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}`;
+      const dati = Object.fromEntries(CAMPI_VERSIONE.map(k => [k, structuredClone(pr[k])]));
+      modifica(() => { pr.versioni = [...(pr.versioni || []), { id: mod.nuovoId(), nome, data: Date.now(), dati }].slice(-20); });
+      avvisa(`Versione «${nome}» salvata.`); apriVersioni();
+    }
+    if (b.dataset.verApri) {
+      const v = pr.versioni.find(x => x.id === b.dataset.verApri);
+      modifica(() => { for (const k of CAMPI_VERSIONE) pr[k] = structuredClone(v.dati[k]); seleziona(null); });
+      $('#dlg-versioni').close(); vista.vista(vista.nomeVista);
+      avvisa(`Riaperta la versione «${v.nome}». Con ↶ torni a prima.`);
+    }
+    if (b.dataset.verTogli) { modifica(() => { pr.versioni = pr.versioni.filter(x => x.id !== b.dataset.verTogli); }); apriVersioni(); }
+  });
+}
+
+// Modalità laboratorio: lista grande dei pezzi da tagliare (da spuntare) e passi di montaggio.
+function apriLaboratorio(scheda) {
+  const el = $('#laboratorio'), pr = stato.progetto;
+  el.hidden = false;
+  el.querySelectorAll('[data-lab]').forEach(b => b.classList.toggle('on', b.dataset.lab === scheda));
+  const righe = righeDistinta(pr).filter(r => !r.vuoto);
+  let h;
+  if (scheda === 'taglio') {
+    const fatti = righe.filter(r => pr.pezzi.find(p => p.n === r.n)?.fatto).length;
+    const perMat = new Map();
+    for (const r of righe) { if (!perMat.has(r.materiale)) perMat.set(r.materiale, []); perMat.get(r.materiale).push(r); }
+    h = `<p class="lab-avanzamento">${fatti} di ${righe.length} pezzi tagliati</p>${[...perMat].map(([m, rr]) => `<h2>${esc(m)}</h2><div class="lab-griglia">${rr.map(r => {
+      const p = pr.pezzi.find(x => x.n === r.n);
+      return `<button class="lab-pezzo ${p.fatto ? 'fatto' : ''}" data-lab-fatto="${p.id}"><span class="n">${r.n}</span><span class="mis">${f1(r.Ltaglio)} × ${f1(r.Wtaglio)}</span><span class="nome">${esc(r.nome)}</span>${[...r.forma, ...r.tagli].map(t => `<span class="extra">${esc(t)}</span>`).join('')}<span class="spunta">${p.fatto ? '✓ Tagliato' : 'Tocca quando è tagliato'}</span></button>`;
+    }).join('')}</div>`).join('')}`;
+  } else {
+    const passi = istruzioni(pr), fatti = new Set(pr.passiFatti || []);
+    h = `<p class="lab-avanzamento">${fatti.size} di ${passi.length} passi fatti</p><ol class="lab-passi">${passi.map((x, i) => `<li><button class="lab-passo ${fatti.has(i) ? 'fatto' : ''}" data-lab-passo="${i}"><b>${i + 1}. ${esc(x.titolo)}</b><span>${esc(x.testo)}</span>${(x.note || []).map(n => `<span class="extra">${esc(n)}</span>`).join('')}</button></li>`).join('')}</ol>`;
+  }
+  $('#lab-corpo').innerHTML = h;
+  el.dataset.scheda = scheda;
+}
+function eventiLaboratorio() {
+  const el = $('#laboratorio');
+  el.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.lab) return apriLaboratorio(b.dataset.lab);
+    if (b.id === 'lab-chiudi') { el.hidden = true; return; }
+    if (b.dataset.labFatto) { const p = stato.progetto.pezzi.find(x => x.id === b.dataset.labFatto); modifica(() => { p.fatto = !p.fatto; }); return apriLaboratorio('taglio'); }
+    if (b.dataset.labPasso) {
+      const i = +b.dataset.labPasso, f = new Set(stato.progetto.passiFatti || []);
+      f.has(i) ? f.delete(i) : f.add(i);
+      modifica(() => { stato.progetto.passiFatti = [...f]; }); return apriLaboratorio('montaggio');
+    }
+  });
+}
+
 // ---------- avvio ----------
 async function avvio() {
   await avviaGeometria();
+  impostazioni = await archivio.caricaImpostazioni();
+  applicaCatalogo(impostazioni);
   vista = new Vista3D($('#vista3d'), { onTocco: tocco, onTrasforma: trasformato });
   $('#barra-sel').addEventListener('click', e => { const b = e.target.closest('button'); if (b) comando(b.dataset.cmd); });
   document.querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => comando(b.dataset.cmd)));
@@ -911,6 +1091,14 @@ async function avvio() {
   });
   eventiProprieta();
   eventiDialoghi();
+  eventiMagazzino();
+  eventiVersioni();
+  eventiLaboratorio();
+  $('#guida-modelli').addEventListener('click', () => { $('#dlg-guida').close(); apriModelli(); });
+  $('#menu-altro').addEventListener('click', e => { e.stopPropagation(); $('#tendina').hidden = !$('#tendina').hidden; });
+  $('#tendina').addEventListener('click', e => { const b = e.target.closest('[data-menu]'); if (b) { $('#tendina').hidden = true; menuAltro(b.dataset.menu); } });
+  document.addEventListener('click', () => { $('#tendina').hidden = true; });
+  if (!localStorage.getItem('mpm:guida-vista')) { localStorage.setItem('mpm:guida-vista', '1'); setTimeout(() => $('#dlg-guida').showModal(), 600); }
   window.addEventListener('online', () => archivio.sincronizza());
 
   const ultimo = localStorage.getItem('mpm:ultimo');
@@ -922,7 +1110,7 @@ async function avvio() {
   // Segnale di vita: la versione portable per Windows si chiude da sola quando nessuna pagina è aperta.
   setInterval(() => fetch('/api/ping', { cache: 'no-store' }).catch(() => {}), 60000);
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
-  window.mpm = { stato, comando, tocco, apri, mod, righeDistinta }; // per le prove automatiche
+  window.mpm = { stato, comando, tocco, apri, mod, righeDistinta, menuAltro }; // per le prove automatiche
 }
 
 avvio().catch(err => { console.error(err); avvisa(`Errore all'avvio: ${err.message}`, true, 0); });

@@ -51,6 +51,12 @@ class ProveServer(unittest.TestCase):
         self.assertEqual(s, 409)
         self.assertEqual(json.loads(b)["data"], {"x": 2})
 
+    def test_impostazioni(self):
+        self.assertEqual(json.loads(self.req("GET", "/api/settings")[1]), {})
+        self.assertEqual(self.req("PUT", "/api/settings", {"avanzi": [1], "aggiornato": 5})[0], 200)
+        self.assertEqual(self.req("PUT", "/api/settings", {"avanzi": [], "aggiornato": 3})[0], 409)
+        self.assertEqual(json.loads(self.req("GET", "/api/settings")[1])["avanzi"], [1])
+
     def test_id_e_percorsi_non_validi(self):
         self.assertEqual(self.req("PUT", "/api/projects/..%2Fx", {"name": "a", "data": {}})[0], 404)
         self.assertEqual(self.req("GET", "/../server/server.py")[0], 404)

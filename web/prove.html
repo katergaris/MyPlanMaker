@@ -18,6 +18,8 @@ import { listaSpesa } from './js/spesa.js';
 import { normalizza, FORME } from './js/sagome.js';
 import { foriDelPezzo, htmlDima, htmlDisegno, htmlEtichette } from './js/disegni.js';
 import { contornoSagoma, puntiArco } from './js/geometria.js';
+import { csvDistinta, dxfPezzi, stlProgetto } from './js/esporta.js';
+import { istruzioni } from './js/montaggio.js';
 
 const esiti = [];
 const vicino = (a, b, tol = 0.6) => Math.abs(a - b) <= tol;
@@ -289,6 +291,25 @@ for (const m of MODELLI) {
   prova('dima 1:1 del piano Ø 1000: 24 fogli A4', (dima.match(/class="foglio-dima"/g) || []).length === 24, `${(dima.match(/class="foglio-dima"/g) || []).length}`);
   const et = htmlEtichette(pr, righeDistinta(pr));
   prova('etichette: una per pezzo', (et.match(/class="etichetta"/g) || []).length === pr.pezzi.length);
+}
+
+// 16. Esportazioni, montaggio, avanzi
+{
+  const pr = mobilettoLeggio();
+  const csv = csvDistinta(pr);
+  prova('CSV: intestazione + 7 righe, separatore ;', csv.trim().split('\r\n').length === 8 && /^\ufeffN;Pezzo;/.test(csv), csv.split('\r\n')[1]);
+  const dxf = dxfPezzi(pr);
+  prova('DXF: linee, cerchi dei fori e fine file', /\r\nLINE\r\n/.test(dxf) && /\r\nCIRCLE\r\n/.test(dxf) && dxf.endsWith('EOF'), `${(dxf.match(/\nLINE\r/g) || []).length} linee`);
+  const stl = stlProgetto(pr);
+  prova('STL: triangoli di tutti i pezzi', (stl.match(/facet normal/g) || []).length > 7 * 12 && stl.startsWith('solid'));
+  const passi = istruzioni(pr);
+  prova('montaggio: fori, poi si parte da un pezzo e si montano tutti', passi[0].titolo === 'Prepara i fori' && /Parti da/.test(passi[1].titolo) && passi.some(x => x.titolo === 'Ante'), passi.map(x => x.titolo).join(' → '));
+  const avanzi = [{ mat: 'mb18', L: 950, W: 520, qta: 2 }];
+  const g = schemaDiTaglio(pr, avanzi).find(x => x.materiale.id === 'mb18');
+  prova('avanzi 950×520: i due fianchi ci entrano, si compra comunque 1 lastra', g.daAvanzi === 2 && g.nuovi === 1 && g.fogli.filter(f => f.avanzo).every(f => f.pezzi.length === 1), `avanzi usati ${g.daAvanzi}, lastre ${g.nuovi}`);
+  pr.usaAvanzi = false;
+  prova('avanzi disattivati nel progetto: non si usano', schemaDiTaglio(pr, avanzi).find(x => x.materiale.id === 'mb18').daAvanzi === 0);
+  prova('schema con avanzi senza sovrapposizioni', !controllaLastre(schemaDiTaglio({ ...pr, usaAvanzi: true }, avanzi), 3.2));
 }
 
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');

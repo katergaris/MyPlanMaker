@@ -79,3 +79,21 @@ export function daFile(testo) {
   p.nome = String(p.nome || 'Progetto importato');
   return p;
 }
+
+// Impostazioni condivise (magazzino avanzi, catalogo materiali): copia locale + server, vince la più recente.
+const IMP = 'mpm:impostazioni';
+export async function caricaImpostazioni() {
+  let locale = {};
+  try { locale = JSON.parse(localStorage.getItem(IMP) || '{}'); } catch { /* copia locale rovinata: si riparte */ }
+  try {
+    const s = await api('GET', '/api/settings');
+    if ((s.aggiornato || 0) > (locale.aggiornato || 0)) { localStorage.setItem(IMP, JSON.stringify(s)); return s; }
+    if ((locale.aggiornato || 0) > (s.aggiornato || 0)) api('PUT', '/api/settings', locale).catch(() => {});
+  } catch { /* senza rete */ }
+  return locale;
+}
+export async function salvaImpostazioni(imp) {
+  imp.aggiornato = Date.now();
+  localStorage.setItem(IMP, JSON.stringify(imp));
+  try { await api('PUT', '/api/settings', imp); return 'salvato'; } catch { return 'locale'; }
+}

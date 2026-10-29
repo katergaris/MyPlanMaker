@@ -60,7 +60,7 @@ export function profilo(p) {
 }
 
 const cache = new Map();
-export const chiave = p => JSON.stringify([p.tipo, p.mat, p.forma, p.L, p.W, p.D, p.r, p.forma === 'sagoma' ? p.sagoma : 0, p.tagli.map(t => [t.n, t.d]), foriPezzo(p)]);
+export const chiave = p => JSON.stringify([p.tipo, p.mat, dimensioni(p), p.forma, p.L, p.W, p.D, p.r, p.forma === 'sagoma' ? p.sagoma : 0, p.tagli.map(t => [t.n, t.d]), foriPezzo(p)]);
 
 // Restituisce { geometria, bordi, min, max, vertici } nel sistema locale del pezzo, o null se i tagli
 // hanno tolto tutto.

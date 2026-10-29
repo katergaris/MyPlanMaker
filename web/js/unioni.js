@@ -148,7 +148,7 @@ export function unioni(progetto) {
     for (const f of facce.get(p.id)) for (const t of f.tri) for (const v of t) { min.min(v); max.max(v); }
     return [p.id, { min: min.subScalar(1), max: max.addScalar(1) }];
   }));
-  const esclusi = new Set(progetto.unioniEscluse || []);
+  const esclusi = new Set(progetto.unioniEscluse || []), cima = Math.max(...[...box.values()].map(b => b.max.y - 1));
   const giunti = [];
   for (let i = 0; i < pezzi.length; i++) for (let j = i + 1; j < pezzi.length; j++) {
     const a = pezzi[i], b = pezzi[j], ba = box.get(a.id), bb = box.get(b.id);
@@ -189,7 +189,7 @@ export function unioni(progetto) {
     if (!vite) { g.note.push('Pezzi troppo sottili per una vite: meglio colla e chiodini o spinotti.'); continue; }
     g.vite = vite;
     if (cr.tipo === 'testa' && mr.massello) g.note.push('Vite in testa al legno massello: tiene poco. Meglio spinotti, tenone o viti più lunghe.');
-    if (n.y < -0.7) {
+    if (n.y < -0.7 && box.get(passa.id).max.y >= cima - 30) {
       g.note.push(`Le teste delle viti restano in vista sopra «${passa.nome}»: meglio fissare da sotto con angolari${materiale(passa.mat).massello ? ' o fissaggi a 8 (lasciano muovere il legno)' : ''}.`);
     }
     g.fissaggio = g.escluso ? 'nessuno' : (progetto.fissaggi || {})[g.chiave] || progetto.fissaggioPredefinito || 'viti';
