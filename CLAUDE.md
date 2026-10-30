@@ -78,7 +78,7 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
 **0.9.0** (2026-10-29): vedi `CHANGELOG.md`. Repository privato `katergaris/MyPlanMaker`, branch `main`, pronto per
 la pubblicazione (README, screenshot, licenza, CI) ma **ancora privato**: renderlo pubblico solo se Salvo lo chiede.
 **Installato su ZimaOS il 2026-10-29**: `http://192.168.0.20:8098` (LAN), `http://10.77.0.201:8098` (rete interna). HTTPS
-Tailscale (`https://pve.van-pike.ts.net:8098`) da attivare su pve: vedi `Homelab/diario-modifiche.md`. Dopo ogni modifica
+Tailscale `https://pve.van-pike.ts.net:8098` (dal 2026-10-30, `tailscale serve` su pve). Dopo ogni modifica
 al codice: rilanciare `deploy/pubblica-zimaos.sh` (i dati restano).
 Per preparare un progetto per Salvo: costruirlo con le funzioni di `modello.js`/`modelli.js` (come `esempi.js`),
 controllarlo con `prove-ui.html` e consegnarlo come `.mpm.json` in `MyPlanMaker/progetti/`.
