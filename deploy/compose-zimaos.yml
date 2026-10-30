@@ -1,0 +1,38 @@
+# MyPlanMaker su ZimaOS (dal 2026-10-29), app di ZimaOS installata con
+#   casaos-cli app-management install -f myplanmaker.yml
+# L'immagine myplanmaker:local si ricostruisce con MyPlanMaker/deploy/pubblica-zimaos.sh.
+name: myplanmaker
+services:
+  myplanmaker:
+    container_name: myplanmaker
+    image: myplanmaker:local
+    pull_policy: never
+    network_mode: bridge
+    restart: unless-stopped
+    ports:
+      - target: 8099
+        published: "8098"
+        protocol: tcp
+    volumes:
+      - type: bind
+        source: /DATA/AppData/myplanmaker
+        target: /data
+    environment:
+      MPM_PORT: "8099"
+      MPM_DATA: /data
+x-casaos:
+  architectures:
+    - amd64
+  author: katergaris
+  category: Utilities
+  main: myplanmaker
+  index: /
+  port_map: "8098"
+  scheme: http
+  icon: http://192.168.0.20:8098/icona.svg
+  description:
+    en_us: Progettazione di mobili e costruzioni in legno
+  tagline:
+    en_us: Mobili in legno, tagli, viti e dime
+  title:
+    custom: MyPlanMaker

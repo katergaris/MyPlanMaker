@@ -60,7 +60,10 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   `dati/browser`, si chiude con la finestra o dopo 3 minuti senza richieste. **Mai provato su un Windows vero.**
 - `Dockerfile`, `docker-compose.yml` (porta 8099, volume `./data`). Il Dockerfile è quello usato su ZimaOS.
 - `deploy/pubblica-zimaos.sh` — installa/aggiorna su ZimaOS: `ZIMA_SSH="ssh -i ~/.ssh/zimaos salvo@10.77.0.201" deploy/pubblica-zimaos.sh`
-  (build da `/DATA/shared-dev/MyPlanMaker`, container `myplanmaker`, porta **8098**, dati in `/DATA/AppData/myplanmaker`).
+  (build da `/DATA/shared-dev/MyPlanMaker`, poi `docker compose -p myplanmaker` con `deploy/compose-zimaos.yml`: container
+  `myplanmaker`, porta **8098**, dati in `/DATA/AppData/myplanmaker`). Lo stesso compose è registrato tra le app di ZimaOS
+  (`casaos-cli app-management install`, 2026-10-30), copia in `Homelab/zimaos/compose/myplanmaker.yml`. Voce `myplanmaker`
+  in The Hook (`Homelab/the-hook/services.json`, guida `the-hook/docs/myplanmaker.md`).
 - `.github/workflows/prove.yml` — prove del server e `prove.html` in Chrome headless a ogni push.
 - `README.md` (pubblico, con screenshot), `CHANGELOG.md`, `LICENSE` (MIT, scelta per la pubblicazione: da
   confermare con Salvo).
