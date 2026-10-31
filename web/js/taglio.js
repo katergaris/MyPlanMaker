@@ -2,7 +2,7 @@
 // listelli sulle barre (prima la barra dove entra, pezzi dal più lungo). Tiene conto di spessore della lama,
 // rifilo dei bordi e venatura. Le misure sono quelle finite di ogni pezzo (per i pezzi tagliati o rotondi,
 // il rettangolo che li contiene).
-import { materiale } from './materiali.js';
+import { materialePezzo } from './materiali.js';
 import { righeDistinta } from './distinta.js';
 
 export const IMPOSTAZIONI_TAGLIO = { lama: 3.2, rifilo: 10 };
@@ -96,15 +96,16 @@ function barre(pezzi, m, { lama, rifilo }, avanzi = []) {
 export function schemaDiTaglio(progetto, avanzi = []) {
   const imp = { ...IMPOSTAZIONI_TAGLIO, ...(progetto.taglio || {}) };
   const perMat = new Map();
-  const mats = new Map(progetto.pezzi.map(p => [p.n, p.mat]));
+  const mats = new Map(progetto.pezzi.map(p => [p.n, materialePezzo(p)])), perId = new Map();
   for (const r of righeDistinta(progetto)) {
     if (r.vuoto) continue;
-    const id = mats.get(r.n);
+    const m = mats.get(r.n), id = m.id;
+    perId.set(id, m);
     if (!perMat.has(id)) perMat.set(id, []);
     perMat.get(id).push({ ...r, L: r.Ltaglio, W: r.Wtaglio });
   }
   return [...perMat].map(([id, pezzi]) => {
-    const m = materiale(id);
+    const m = perId.get(id);
     const miei = progetto.usaAvanzi === false ? [] : avanzi.filter(a => a.mat === id);
     const g = m.tipo === 'listello' ? barre(pezzi, m, imp, miei) : lastre(pezzi, m, imp, miei);
     const nuovi = g.fogli.filter(f => !f.avanzo).length;

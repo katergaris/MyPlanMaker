@@ -1,96 +1,99 @@
 # MyPlanMaker
 
-**Progettare mobili e costruzioni in legno come con un programma professionale, ma con un'interfaccia che si
-capisce al primo sguardo.** Funziona nel browser su PC e tablet, anche senza rete, e gira sul tuo computer o sul
-tuo server di casa: i progetti restano tuoi.
+**Design furniture and woodwork like with professional software, with an interface you understand at first
+glance.** It runs in the browser on PC and tablet, also offline, on your computer or your home server: your
+projects stay yours.
 
-![Il progetto in 3D con il pezzo selezionato, le quote e le viti](docs/screenshot/01-progetto.png)
+![The project in 3D with the selected piece, its sizes and the screws](docs/screenshot/en/01-project.png)
 
-*Italiano · [English summary below](#english)*
+*English · [Italiano](README.it.md)* — the interface is available in English, Italian, French, German and Spanish.
 
-## Cosa fa
+## What it does
 
-**Si costruisce con pezzi veri.** Pannelli e listelli con gli spessori e le sezioni che compri davvero, a
-qualunque angolo, anche curvi. Non è un CAD da imparare: le misure si scrivono a numero e i comandi sono pochi.
+**You build with real pieces.** Panels and battens with the thicknesses and sections you actually buy (or any
+custom thickness), at any angle, also curved. It is not a CAD to learn: sizes are typed as numbers, in mm or cm,
+and there are few commands.
 
-- **Modelli pronti** come punto di partenza: libreria, mobile base con ante, pensile, cassettiera, scaffale,
-  tavolo (anche rotondo), panca. Dopo, ogni pezzo si cambia come se l'avessi fatto a mano.
-- **Sposta e ruota trascinando**, con passo di 5 mm e aggancio magnetico ai pezzi vicini; selezione multipla,
-  copia specchiata, gruppi, scorciatoie da tastiera.
-- **Accosta** appoggia un pezzo sulla faccia di un altro. **Adatta** lo allunga o accorcia fino a un altro pezzo
-  e lo taglia con l'angolo giusto (piani inclinati, tagli obliqui, lama inclinata). **Dividi** mette N ripiani o
-  divisori alla stessa distanza. **Cassetto** crea i cassetti tra due fianchi, con guide di misura commerciale.
-- **Forme**: rettangoli con angoli arrotondati, cerchi, **sagome libere** con tratti dritti e ad arco (editor con
-  punti da trascinare e forme di partenza).
-- **Ferramenta**: cerniere a scodella (numero dall'altezza dell'anta, scodelle scavate nel pezzo), maniglie con
-  interasse e posizione, guide per cassetti.
-- **Fissaggi automatici**: dove due pezzi si toccano l'app propone viti (misura, quante, dove, preforo), oppure
-  confirmat, spinotti, eccentrici o solo colla. Le viti negli angoli si spostano per non incontrarsi.
-- **Controlli**: viti che si scontrano, pezzi che si compenetrano, ripiani che si piegano troppo (freccia nel
-  tempo), mobili che si ribaltano se ci si appoggia, mobili alti da fissare al muro, peso.
-- **Per il laboratorio**: distinta con misure finite e da tagliare (al netto dei bordi), **schema di taglio** su
-  lastre e barre (lama, rifilo, venatura, magazzino avanzi), lista della spesa, **disegni quotati** di ogni pezzo
-  con la tabella dei fori, **dime 1:1** su fogli A4, etichette, **istruzioni di montaggio**, **modalità
-  laboratorio** per il tablet con i pezzi da spuntare.
-- **Esportazioni**: PDF (stampa), CSV per i centri di taglio, DXF per CNC e laser, STL, PNG, file di progetto.
-- **I tuoi materiali e prezzi**, bordatura per lato, venatura per pezzo, versioni del progetto.
+- **Ready-made templates** as a starting point: bookcase, base cabinet with doors, wall cabinet, chest of drawers,
+  open shelving, table (also round), bench. Every size, material and thickness can be changed, and afterwards each
+  piece can be edited as if you had made it by hand.
+- **Drag pieces directly in 3D**, like in Tinkercad: 5 mm steps, magnetic snapping to nearby pieces, an arrow to
+  raise or lower them. Multiple selection, mirrored copy, groups, keyboard shortcuts.
+- **Place**: tap the face of a piece, then the point on another piece where it goes; then type the distance from
+  the edges, align it (left, centre, right…) or copy it to the other corners — four table legs in a few taps.
+- **Fit** extends or shortens a piece (in length or width, even when rotated) up to the face you tap and cuts it
+  at the right angle: sloping tops, angled cuts, tilted blade. **Divide** spaces N shelves or dividers evenly.
+  **Drawer** builds drawers between two sides with standard-length runners.
+- **2D drawing** of a panel, as in LightBurn: rectangles, ellipses, polygons and point-to-point lines, each one
+  solid, through hole or pocket with its depth. The piece is the union of the solids minus the holes, with snapping
+  to the grid and to other shapes, typed positions, series of holes, 1:1 template and DXF (pockets on their own layer).
+- **Shapes**: rectangles with rounded corners, circles, free **profiles** with straight and arc segments.
+- **Hardware**: concealed cup hinges (number from the door height, cups cut into the piece), handles with centre
+  distance and position, drawer runners.
+- **Automatic fasteners**: where two pieces touch, the app proposes screws (size, how many, where, pilot hole), or
+  confirmat, dowels, cam locks or glue only. Screws in corners are moved so they don't collide.
+- **Checks**: colliding screws, overlapping pieces, shelves that sag too much over time, furniture that tips over
+  when someone leans on it, tall units to fix to the wall, weight.
+- **For the workshop**: cut list with finished and cutting sizes (net of edge banding), **cutting layout** on
+  sheets and lengths (blade, trim, grain, offcut stock), shopping list, **dimensioned drawings** of every piece
+  with the hole table, **1:1 templates** on A4 sheets, labels, **assembly instructions**, **workshop mode** for
+  the tablet with pieces to tick off.
+- **Exports**: PDF (print), CSV for cutting services, DXF for CNC and laser, STL, PNG, project file.
+- **Your materials** with sheet and length sizes, edge banding per side, grain per piece, project versions.
+  **Prices and costs are optional**: turn them on from the ⋯ menu if you want them.
 
 | | |
 |---|---|
-| ![Modelli pronti](docs/screenshot/02-modelli.png) | ![Cassettiera con guide](docs/screenshot/03-cassettiera.png) |
-| *Modelli pronti: poche misure e hai tutti i pezzi* | *Cassetti su guide, frontali a filo, maniglie* |
-| ![Schema di taglio](docs/screenshot/04-schema-taglio.png) | ![Viti e controlli](docs/screenshot/05-viti-controlli.png) |
-| *Schema di taglio sulle lastre, con la venatura* | *Lista della spesa e unioni trovate da sole* |
-| ![Disegni dei pezzi](docs/screenshot/06-disegni.png) | ![Editor delle sagome](docs/screenshot/07-sagoma.png) |
-| *Disegni con i fori e la tabella delle quote* | *Sagome libere con archi* |
-| ![Modalità laboratorio](docs/screenshot/08-laboratorio.png) | ![Vista esplosa](docs/screenshot/09-esploso.png) |
-| *Modalità laboratorio per il tablet* | *Vista esplosa* |
+| ![Templates](docs/screenshot/en/02-templates.png) | ![Chest of drawers](docs/screenshot/en/03-drawers.png) |
+| *Templates: a few sizes, materials and thicknesses and you have all the pieces* | *Drawers on runners, flush fronts, handles* |
+| ![Place](docs/screenshot/en/08-place.png) | ![2D drawing](docs/screenshot/en/07-2d-drawing.png) |
+| *Place a leg under the top and type the distance from the edges* | *2D drawing with solid shapes, holes and pockets* |
+| ![Cutting layout](docs/screenshot/en/04-cutting-layout.png) | ![Screws and checks](docs/screenshot/en/05-screws-checks.png) |
+| *Cutting layout on the sheets, respecting the grain* | *Shopping list and joints found automatically* |
+| ![Drawings](docs/screenshot/en/06-drawings.png) | ![Workshop mode](docs/screenshot/en/09-workshop.png) |
+| *Drawings with holes and the table of positions* | *Workshop mode for the tablet* |
 
-## Provarlo
+## Try it
 
-### Windows, senza installare niente
-Scarica `MyPlanMaker-portable-<versione>.zip` dalla pagina *Releases*, scompattalo dove vuoi (anche su una
-chiavetta) e fai doppio clic su `MyPlanMaker.bat`. Si apre in una finestra di Edge o Chrome; i progetti restano
-nella cartella `dati`.
+### Windows, without installing anything
+Download `MyPlanMaker-portable-<version>.zip` from the *Releases* page, unzip it anywhere (even on a USB stick)
+and double-click `MyPlanMaker.bat`. It opens in an Edge or Chrome window; projects stay in the `dati` folder.
 
-### Con Python (Linux, macOS, Windows)
-Serve solo Python 3.10 o più recente, senza altre dipendenze:
+### With Python (Linux, macOS, Windows)
+Only Python 3.10 or newer is needed, with no other dependencies:
 ```
 python3 server/server.py
 ```
-e apri `http://localhost:8099`.
+then open `http://localhost:8099`.
 
-### Con Docker (server di casa, NAS)
+### With Docker (home server, NAS)
 ```
 docker compose up -d
 ```
-Porta 8099, dati nel volume `./data`. Variabili: `MPM_PORT`, `MPM_DATA`, `MPM_PASSWORD` (se impostata, la pagina
-chiede la password).
+Port 8099, data in the `./data` volume. Variables: `MPM_PORT`, `MPM_DATA`, `MPM_PASSWORD` (if set, the page asks
+for the password).
 
-Dal tablet: apri l'indirizzo del server e scegli «Aggiungi alla schermata Home» per usarla come un'app.
+On a tablet: open the server address and choose «Add to Home Screen» to use it like an app.
 
-## Come è fatto
-- **Interfaccia**: JavaScript senza passaggi di compilazione (`web/`), 3D con [three.js](https://threejs.org),
-  geometria dei solidi con [Manifold](https://github.com/elalish/manifold) (tagli, sagome, fori, compenetrazioni).
-- **Server**: Python con la sola libreria standard e SQLite (`server/server.py`), salva progetti e impostazioni.
-  Ogni progetto ha anche una copia nel browser, quindi l'app funziona senza rete.
-- **Prove**: `python3 -m unittest discover -s tests` per il server; con il server avviato, `/prove.html` esegue le
-  prove di modello, geometria, viti, schema di taglio, modelli, disegni ed esportazioni (deve dire «TUTTE OK»).
-- **Portable per Windows**: `sh windows/crea-portable.sh` crea lo zip con Python embeddable.
+The language follows the browser the first time; you can change it from the ⋯ menu (IT, EN, FR, DE, ES).
 
-Le regole per viti, frecce e stabilità sono **indicative**: aiutano a non dimenticare niente, ma prima di forare
-controlla sempre con la tua esperienza.
+## How it is made
+- **Interface**: JavaScript with no build step (`web/`), 3D with [three.js](https://threejs.org), solid geometry
+  with [Manifold](https://github.com/elalish/manifold) (cuts, profiles, 2D drawings, holes, interpenetration).
+- **Languages**: `web/js/lingua.js` and one dictionary per language in `web/js/lingue/`. The source texts are in
+  Italian and are the dictionary keys; `tests/test_lingue.py` checks that every language has every text, with the
+  same placeholders.
+- **Server**: Python with the standard library only and SQLite (`server/server.py`), stores projects and settings.
+  Every project also has a copy in the browser, so the app works offline.
+- **Tests**: `python3 -m unittest discover -s tests` for the server and the dictionaries; with the server running,
+  `/prove.html` runs the model, geometry, screws, cutting layout, templates, drawings and export tests (it must
+  say «TUTTE OK»). They run on GitHub at every push.
+- **Portable for Windows**: `sh windows/crea-portable.sh` builds the zip with embeddable Python.
 
-## Licenza
-[MIT](LICENSE). Librerie incluse in `web/vendor/`: three.js (MIT), manifold-3d (Apache-2.0).
+The source code (names and comments) and the design notes in `docs/PIANO.md` are in Italian.
 
----
+The rules for screws, sag and stability are **indicative**: they help you not to forget anything, but always check
+with your own experience before drilling.
 
-<a id="english"></a>
-## English summary
-MyPlanMaker is a self-hosted web app (PC and tablet, works offline) for designing furniture and woodwork with
-real boards and battens at any angle, curved and free-form shapes, automatic hardware and fasteners (screws,
-confirmat, dowels, cam locks) with clash detection, structural checks (shelf sag, tipping, interpenetration),
-and workshop output: cut list, sheet/bar cutting layouts with grain and offcuts, shopping list, dimensioned part
-drawings with hole tables, 1:1 templates on A4, labels, assembly steps, CSV/DXF/STL export. The interface is in
-Italian. Run `python3 server/server.py` (stdlib only) or `docker compose up -d`, then open port 8099.
+## License
+[MIT](LICENSE). Libraries included in `web/vendor/`: three.js (MIT), manifold-3d (Apache-2.0).

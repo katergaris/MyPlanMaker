@@ -1,5 +1,6 @@
 // Salvataggio: copia locale nel browser (funziona senza rete) + server su ZimaOS per PC e tablet.
 // Regola: vince la versione con `aggiornato` più recente.
+import { t } from './lingua.js';
 const PREF = 'mpm:progetto:';
 
 const locali = () => Object.keys(localStorage).filter(k => k.startsWith(PREF)).map(k => JSON.parse(localStorage.getItem(k)));
@@ -68,15 +69,16 @@ export function versoFile(progetto) {
 
 export function daFile(testo) {
   let j;
-  try { j = JSON.parse(testo); } catch { throw new Error('Il file non è un progetto MyPlanMaker (JSON non valido).'); }
+  try { j = JSON.parse(testo); } catch { throw new Error(t('Il file non è un progetto MyPlanMaker (JSON non valido).')); }
   const p = j && j.formato === 'myplanmaker' ? j.progetto : j;
-  if (!p || !Array.isArray(p.pezzi)) throw new Error('Il file non contiene un progetto MyPlanMaker.');
+  if (!p || !Array.isArray(p.pezzi)) throw new Error(t('Il file non contiene un progetto MyPlanMaker.'));
   for (const x of p.pezzi) {
-    if (!x || typeof x.id !== 'string' || !Array.isArray(x.pos) || !Array.isArray(x.rot)) throw new Error('Un pezzo del file è incompleto.');
+    if (!x || typeof x.id !== 'string' || !Array.isArray(x.pos) || !Array.isArray(x.rot)) throw new Error(t('Un pezzo del file è incompleto.'));
     x.tagli = Array.isArray(x.tagli) ? x.tagli : [];
   }
   p.prossimoN = Math.max(p.prossimoN || 1, ...p.pezzi.map(x => (x.n || 0) + 1));
-  p.nome = String(p.nome || 'Progetto importato');
+  p.nome = String(p.nome || t('Progetto importato'));
+
   return p;
 }
 

@@ -1,20 +1,22 @@
 // Esportazioni: CSV della distinta (per i centri di taglio e i fogli di calcolo), DXF dei contorni (CNC, laser,
 // pantografo), STL del modello 3D (stampa 3D, altri programmi).
 import { Vector3 } from '../vendor/three.module.js';
-import { matrice, nomeBordo } from './modello.js';
-import { geometriaPezzo, sezionePezzo } from './geometria.js';
+import { fmt, matrice, nomeBordo } from './modello.js';
+
+import { geometriaPezzo, poligoniDisegno, sezionePezzo } from './geometria.js';
 import { righeDistinta } from './distinta.js';
 import { foriDelPezzo } from './disegni.js';
+import { t, tr } from './lingua.js';
 
-const n1 = v => String(Math.round(v * 10) / 10).replace('.', ',');
+const n1 = v => fmt(v, 1);
 const cella = v => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 
 export function csvDistinta(progetto) {
   const righe = righeDistinta(progetto);
-  const testa = ['N', 'Pezzo', 'Materiale', 'Lunghezza taglio', 'Larghezza taglio', 'Spessore', 'Quantità', 'Venatura', 'Bordo davanti/sopra/…', 'Spessore bordo', 'Misura finita', 'Tagli e forma'];
+  const testa = [t('N'), t('Pezzo'), t('Materiale'), t('Lunghezza taglio'), t('Larghezza taglio'), t('Spessore'), t('Quantità'), t('Venatura'), t('Bordo davanti/sopra/…'), t('Spessore bordo'), t('Misura finita'), t('Tagli e forma')];
   const corpo = righe.filter(r => !r.vuoto).map(r => {
     const p = progetto.pezzi.find(x => x.n === r.n), lati = p.bordatura?.lati || [];
-    return [r.n, r.nome, r.materiale, n1(r.Ltaglio), n1(r.Wtaglio), n1(r.T), 1, { L: 'lungo L', W: 'lungo W', libera: 'libera' }[r.vena],
+    return [r.n, r.nome, r.materiale, n1(r.Ltaglio), n1(r.Wtaglio), n1(r.T), 1, t({ L: tr('lungo L'), W: tr('lungo W'), libera: tr('libera') }[r.vena]),
       lati.map(l => nomeBordo(p, l)).join(', '), r.spessoreBordo ? n1(r.spessoreBordo) : '', `${r.L} × ${r.W}`, [...r.forma, ...r.tagli].join(' · ')].map(cella).join(';');
   });
   return '﻿' + [testa.join(';'), ...corpo].join('\r\n') + '\r\n';
@@ -32,6 +34,11 @@ export function dxfPezzi(progetto) {
     const x0 = Math.min(...xs), y0 = Math.min(...ys), x1 = Math.max(...xs);
     const layer = `P${String(p.n).padStart(2, '0')}_${p.nome.replace(/[^A-Za-z0-9]+/g, '_').slice(0, 24)}`;
     for (const pl of poli) pl.forEach((q, i) => { const r = pl[(i + 1) % pl.length]; linea(layer, [q[0] - x0 + x, q[1] - y0], [r[0] - x0 + x, r[1] - y0]); });
+    // scassi del disegno 2D su un layer per profondità (es. P03_Piano_SCASSO_8mm), da leggere come tasche
+    if (p.forma === 'disegno') for (const sc of poligoniDisegno(p.disegno).scassi) {
+      const ls = `${layer}_SCASSO_${String(sc.prof).replace('.', '_')}mm${sc.lato === 'sotto' ? '_SOTTO' : ''}`;
+      for (const pl of sc.poli) pl.forEach((q, i) => { const r = pl[(i + 1) % pl.length]; linea(ls, [q[0] - x0 + x, q[1] - y0], [r[0] - x0 + x, r[1] - y0]); });
+    }
     for (const f of foriDelPezzo(progetto, p).filter(f => f.faccia !== 'bordo')) out.push('0', 'CIRCLE', '8', `${layer}_FORI`, '10', (f.x - x0 + x).toFixed(3), '20', (f.y - y0).toFixed(3), '30', '0', '40', (f.d / 2).toFixed(3));
     out.push('0', 'TEXT', '8', `${layer}_TESTI`, '10', x.toFixed(3), '20', '-30', '30', '0', '40', '12', '1', `${p.n} ${p.nome}`.replace(/[^\x20-\x7e]/g, '?'));
     x += x1 - x0 + 50;

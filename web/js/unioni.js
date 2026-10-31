@@ -13,6 +13,7 @@ import { materiale } from './materiali.js';
 import { dimensioni, fmt, matrice } from './modello.js';
 import { geometriaPezzo, moduloManifold } from './geometria.js';
 import { cerniere, haCerniere, maniglia } from './ferramenta.js';
+import { t, tr } from './lingua.js';
 
 const LUNGHEZZE = [16, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 120, 140, 160];
 const f1 = v => fmt(v, 1);
@@ -108,12 +109,12 @@ function scegliVite(attraversa, profondita, bordo, mat, inFaccia = false) {
   return {
     d, l, misura: `${f1(d)}×${l}`,
     preforo: Math.round(d * fattore * 2) / 2,
-    preforoQuando: mat.duro ? 'obbligatorio' : mat.massello ? 'facoltativo' : 'consigliato',
+    preforoQuando: mat.duro ? tr('obbligatorio') : mat.massello ? tr('facoltativo') : tr('consigliato'),
   };
 }
 
 // Fissaggi possibili per un'unione "faccia su testa/bordo".
-export const FISSAGGI = { viti: 'Viti', confirmat: 'Confirmat 7×50', spinotti: 'Spinotti e colla', eccentrici: 'Eccentrici (minifix)', colla: 'Solo colla', nessuno: 'Niente' };
+export const FISSAGGI = { viti: tr('Viti'), confirmat: tr('Confirmat 7×50'), spinotti: tr('Spinotti e colla'), eccentrici: tr('Eccentrici (minifix)'), colla: tr('Solo colla'), nessuno: tr('Niente') };
 const PASSO = { viti: 200, confirmat: 200, spinotti: 128, eccentrici: 400 };
 
 function posizioni(l1, tipo = 'viti') {
@@ -155,10 +156,10 @@ export function unioni(progetto) {
     if (ba.max.x < bb.min.x || bb.max.x < ba.min.x || ba.max.y < bb.min.y || bb.max.y < ba.min.y || ba.max.z < bb.min.z || bb.max.z < ba.min.z) continue;
     const c = contatto(a, b, facce.get(a.id), facce.get(b.id));
     if (!c) continue;
-    const g = { a, b, chiave: chiaveUnione(a, b), area: c.area, normale: c.n.clone(), viti: [], note: [], escluso: esclusi.has(chiaveUnione(a, b)) };
+    const g = { a, b, chiave: chiaveUnione(a, b), area: c.area, normale: c.n.clone(), viti: [], note: [], importanti: [], escluso: esclusi.has(chiaveUnione(a, b)) };
     giunti.push(g);
-    if (haCerniere(a) || haCerniere(b)) { g.tipo = 'cerniere'; g.note.push('Anta con cerniere: niente viti.'); continue; }
-    if ((a.mobile || b.mobile) && (a.gruppo || a.id) !== (b.gruppo || b.id)) { g.tipo = 'parte mobile'; g.note.push('Parte mobile (cassetto): niente viti verso il mobile.'); continue; }
+    if (haCerniere(a) || haCerniere(b)) { g.tipo = 'cerniere'; g.note.push(t('Anta con cerniere: niente viti.')); continue; }
+    if ((a.mobile || b.mobile) && (a.gruppo || a.id) !== (b.gruppo || b.id)) { g.tipo = 'parte mobile'; g.note.push(t('Parte mobile (cassetto): niente viti verso il mobile.')); continue; }
     const ca = classifica(a, c.n), cb = classifica(b, c.n.clone().negate());
     let passa, riceve, cp, cr, n;
     if (ca.passa && !cb.passa) [passa, riceve, cp, cr, n] = [a, b, ca, cb, c.n];
@@ -171,11 +172,11 @@ export function unioni(progetto) {
       g.tipo = 'testa contro testa';
       const r = rettangolo(c.punti);
       g.angolari = r.l1 > 300 ? 3 : 2;
-      g.note.push(`Testa contro testa: le viti non tengono. Proposti ${g.angolari} angolari (o spinotti).`);
+      g.note.push(t('Testa contro testa: le viti non tengono. Proposti {n} angolari (o spinotti).', { n: g.angolari }));
       continue;
     }
     if ((a.ruolo === 'frontale' && cb.tipo !== 'faccia' && cb.tipo !== 'fianco') || (b.ruolo === 'frontale' && ca.tipo !== 'faccia' && ca.tipo !== 'fianco')) {
-      g.tipo = 'appoggio'; g.note.push('Il frontale si avvita dall\'interno del cassone, non qui.'); continue;
+      g.tipo = 'appoggio'; g.note.push(t("Il frontale si avvita dall'interno del cassone, non qui.")); continue;
     }
     g.tipo = `${cp.tipo} su ${cr.tipo}`;
     g.comePassa = cp.tipo; g.comeRiceve = cr.tipo;
@@ -183,21 +184,25 @@ export function unioni(progetto) {
     const mr = materiale(riceve.mat), dr = dimensioni(riceve);
     const r = rettangolo(c.punti);
     const bordo = Math.min(r.l2, cr.tipo === 'testa' ? Math.min(dr.W, dr.T) : dr.T);
-    if (cp.profondita <= 6) { g.note.push(`Pezzo di ${f1(cp.profondita)} mm: chiodini o graffe ogni 15 cm (e colla).`); g.chiodini = true; continue; }
-    if (bordo < 8) { g.note.push(`Bordo di ${f1(bordo)} mm troppo sottile per le viti: chiodini o graffe (e colla).`); g.chiodini = true; continue; }
+    if (cp.profondita <= 6) { g.note.push(t('Pezzo di {s} mm: chiodini o graffe ogni 15 cm (e colla).', { s: f1(cp.profondita) })); g.chiodini = true; continue; }
+    if (bordo < 8) { g.note.push(t('Bordo di {s} mm troppo sottile per le viti: chiodini o graffe (e colla).', { s: f1(bordo) })); g.chiodini = true; continue; }
     const vite = scegliVite(cp.profondita, cr.profondita, bordo, mr, cr.tipo === 'faccia' || cr.tipo === 'fianco');
-    if (!vite) { g.note.push('Pezzi troppo sottili per una vite: meglio colla e chiodini o spinotti.'); continue; }
+    if (!vite) { g.note.push(t('Pezzi troppo sottili per una vite: meglio colla e chiodini o spinotti.')); continue; }
     g.vite = vite;
-    if (cr.tipo === 'testa' && mr.massello) g.note.push('Vite in testa al legno massello: tiene poco. Meglio spinotti, tenone o viti più lunghe.');
+    if (cr.tipo === 'testa' && mr.massello) g.importanti.push(t('Vite in testa al legno massello: tiene poco. Meglio spinotti, tenone o viti più lunghe.'));
     if (n.y < -0.7 && box.get(passa.id).max.y >= cima - 30) {
-      g.note.push(`Le teste delle viti restano in vista sopra «${passa.nome}»: meglio fissare da sotto con angolari${materiale(passa.mat).massello ? ' o fissaggi a 8 (lasciano muovere il legno)' : ''}.`);
+      g.notaVista = t(materiale(passa.mat).massello ? 'Le teste delle viti restano in vista sopra «{nome}»: meglio fissare da sotto con angolari o fissaggi a 8 (lasciano muovere il legno).' : 'Le teste delle viti restano in vista sopra «{nome}»: meglio fissare da sotto con angolari.', { nome: passa.nome });
+      g.importanti.push(g.notaVista);
     }
     g.fissaggio = g.escluso ? 'nessuno' : (progetto.fissaggi || {})[g.chiave] || progetto.fissaggioPredefinito || 'viti';
     const tipo = g.fissaggio;
-    if (tipo === 'confirmat' && (cp.profondita < 15 || bordo < 15)) { g.note.push('Confirmat solo con pannelli da 15 mm in su: qui uso le viti.'); g.fissaggio = 'viti'; }
-    if (tipo === 'eccentrici' && (cr.tipo === 'faccia' || cr.tipo === 'fianco' || bordo < 15)) { g.note.push('Eccentrici solo nella testa o nel bordo di pannelli da 15 mm in su: qui uso le viti.'); g.fissaggio = 'viti'; }
+    if (tipo === 'confirmat' && (cp.profondita < 15 || bordo < 15)) { g.note.push(t('Confirmat solo con pannelli da 15 mm in su: qui uso le viti.')); g.fissaggio = 'viti'; }
+    if (tipo === 'eccentrici' && (cr.tipo === 'faccia' || cr.tipo === 'fianco' || bordo < 15)) { g.note.push(t('Eccentrici solo nella testa o nel bordo di pannelli da 15 mm in su: qui uso le viti.')); g.fissaggio = 'viti'; }
     if (g.fissaggio === 'nessuno' || g.fissaggio === 'colla') { g.escluso = g.fissaggio === 'nessuno'; continue; }
-    if (g.fissaggio !== 'viti') g.note = g.note.filter(x => !/in vista/.test(x) || g.fissaggio === 'confirmat');
+    // spinotti ed eccentrici non si vedono da sopra: la nota sulle teste in vista resta solo per viti e confirmat
+    if (g.fissaggio !== 'viti' && g.fissaggio !== 'confirmat') g.importanti = g.importanti.filter(x => x !== g.notaVista);
+    g.note.push(...g.importanti);
+
     const origine = c.n.clone().multiplyScalar(c.d);
     const assiR = new Matrix4().extractRotation(matrice(riceve)), spessoreR = new Vector3(0, 0, 1).applyMatrix4(assiR);
     for (const t of posizioni(r.l1, g.fissaggio)) {
@@ -236,7 +241,8 @@ export function unioni(progetto) {
       // non c'è posto: si toglie, se ne restano altre nell'unione
       return g.viti.length <= 1 ? (messe.push(v), true) : false;
     });
-    if (g.viti.some(v => v.spostata)) g.note.push('Alcune viti sono spostate per non incontrare quelle dell\'unione vicina.');
+    if (g.viti.some(v => v.spostata)) { const n = t("Alcune viti sono spostate per non incontrare quelle dell'unione vicina."); g.importanti.push(n); g.note.push(n); }
+
   }
 
   // Collisioni rimaste: viti tra loro, viti contro scodelle e fori delle maniglie.
@@ -246,7 +252,7 @@ export function unioni(progetto) {
     if (x.giunto === y.giunto) continue;
     if (distSegmenti(x.testa, x.punta, y.testa, y.punta) < (x.d + y.d) / 2 + 3) {
       errate.add(x); errate.add(y);
-      const msg = `Due viti si incontrano: «${x.giunto.passa.nome}» → «${x.giunto.riceve.nome}» e «${y.giunto.passa.nome}» → «${y.giunto.riceve.nome}».`;
+      const msg = t('Due viti si incontrano: «{a}» → «{b}» e «{c}» → «{d}».', { a: x.giunto.passa.nome, b: x.giunto.riceve.nome, c: y.giunto.passa.nome, d: y.giunto.riceve.nome });
       if (!avvisi.includes(msg)) avvisi.push(msg);
     }
   }
@@ -256,7 +262,7 @@ export function unioni(progetto) {
       const c = new Vector3(f.c[0], f.c[1], (f.z0 + f.z1) / 2).applyMatrix4(m);
       for (const v of viti) if (distSegmenti(v.testa, v.punta, c, c) < f.r + v.d / 2 + 2) {
         errate.add(v);
-        const msg = `Una vite di «${v.giunto.passa.nome}» finisce contro ${f.nome} di «${p.nome}».`;
+        const msg = t('Una vite di «{a}» finisce contro {foro} di «{b}».', { a: v.giunto.passa.nome, foro: t(f.nome), b: p.nome });
         if (!avvisi.includes(msg)) avvisi.push(msg);
       }
     }
@@ -265,17 +271,27 @@ export function unioni(progetto) {
   return ultimo.r;
 }
 
+// Come si toccano due pezzi, nella lingua scelta (g.tipo resta in italiano: lo usa il programma).
+const PAROLE_TIPO = [tr('testa'), tr('bordo'), tr('faccia'), tr('fianco'), tr('cerniere'), tr('parte mobile'), tr('testa contro testa'), tr('appoggio'), tr('{a} su {b}')];
+export function descriviTipo(g) {
+  if (!g.tipo) return '';
+  const [a, b] = g.tipo.split(' su ');
+  return b ? t(PAROLE_TIPO[8], { a: t(a), b: t(b) }) : t(a);
+}
+
 export function descriviGiunto(g) {
-  if (g.tipo === 'cerniere') return 'anta con cerniere';
-  if (g.tipo === 'parte mobile') return 'parte mobile, niente viti';
-  if (g.angolari) return `${g.angolari} angolari`;
-  if (g.chiodini) return 'chiodini o graffe';
-  if (!g.vite) return 'nessuna vite adatta';
+
+  if (g.tipo === 'cerniere') return t('anta con cerniere');
+  if (g.tipo === 'parte mobile') return t('parte mobile, niente viti');
+  if (g.angolari) return t('{n} angolari', { n: g.angolari });
+  if (g.chiodini) return t('chiodini o graffe');
+  if (!g.vite) return t('nessuna vite adatta');
   const v = g.vite, n = g.viti.length;
-  if (g.escluso) return 'nessun fissaggio';
-  if (g.fissaggio === 'colla') return 'solo colla (e morsetti)';
-  if (g.fissaggio === 'confirmat') return `${n} confirmat 7×50 da «${g.passa.nome}» · foro a gradino Ø 7 / Ø 5`;
-  if (g.fissaggio === 'spinotti') return `${n} spinotti Ø ${g.viti[0]?.d || 8} e colla · fori ciechi, interasse ≤ 128`;
-  if (g.fissaggio === 'eccentrici') return `${n} eccentrici Ø 15 con perno · eccentrico in «${g.riceve.nome}» a 34 mm dal bordo`;
-  return `${n} viti ${f1(v.d)}×${v.l} da «${g.passa.nome}» · preforo Ø ${f1(v.preforo)} ${v.preforoQuando}`;
+  if (g.escluso) return t('nessun fissaggio');
+  if (g.fissaggio === 'colla') return t('solo colla (e morsetti)');
+  if (g.fissaggio === 'confirmat') return t('{n} confirmat 7×50 da «{nome}» · foro a gradino Ø 7 / Ø 5', { n, nome: g.passa.nome });
+  if (g.fissaggio === 'spinotti') return t('{n} spinotti Ø {d} e colla · fori ciechi, interasse ≤ 128', { n, d: g.viti[0]?.d || 8 });
+  if (g.fissaggio === 'eccentrici') return t('{n} eccentrici Ø 15 con perno · eccentrico in «{nome}» a 34 mm dal bordo', { n, nome: g.riceve.nome });
+  return t('{n} viti {d}×{l} da «{nome}» · preforo Ø {p} {quando}', { n, d: f1(v.d), l: v.l, nome: g.passa.nome, p: f1(v.preforo), quando: t(v.preforoQuando) });
+
 }

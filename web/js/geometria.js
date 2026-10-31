@@ -48,7 +48,12 @@ export function profilo(p) {
     const r = p.D / 2, n = 4 * Math.max(12, Math.min(40, Math.round(p.D / 48)));
     return Array.from({ length: n }, (_, i) => { const a = (i / n) * 2 * Math.PI; return [r + r * Math.cos(a), r + r * Math.sin(a)]; });
   }
-  const r = Math.max(0, Math.min(p.tipo === 'listello' ? 0 : (p.r || 0), Math.min(L, W) / 2 - 0.01));
+  return rettangoloArrotondato(L, W, p.tipo === 'listello' ? 0 : (p.r || 0));
+}
+
+// Rettangolo da (0, 0) a (L, W) con gli angoli di raggio r, in senso antiorario.
+function rettangoloArrotondato(L, W, r0) {
+  const r = Math.max(0, Math.min(r0, Math.min(L, W) / 2 - 0.01));
   if (r < 0.5) return [[0, 0], [L, 0], [L, W], [0, W]];
   const pts = [], k = segmentiArco(r, Math.PI / 2);
   const angolo = (cx, cy, a0) => { for (let i = 0; i <= k; i++) { const a = a0 + (i / k) * Math.PI / 2; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); } };
@@ -59,8 +64,72 @@ export function profilo(p) {
   return pts;
 }
 
+// ---------- Disegno 2D (forma 'disegno') ----------
+// p.disegno.forme: forme con centro (cx, cy), misure w × h, rotazione rot (gradi, antioraria) e tipo:
+// 'rett' (raggio degli angoli r), 'ellisse', 'poligono' (lati, inscritto nell'ellisse w × h, un vertice in alto),
+// 'linea' (punti { x, y, b } rispetto al centro, chiusa, b = freccia dell'arco come nelle sagome).
+// modo 'pieno' o 'vuoto'; un vuoto con prof > 0 è uno scasso profondo prof (da sopra, o da sotto se lato 'sotto').
+// Il pezzo = unione dei pieni meno i vuoti passanti, estruso nello spessore, meno gli scassi.
+export function contornoForma(f) {
+  const w = Math.max(0.1, f.w), h = Math.max(0.1, f.h);
+  let pts;
+  if (f.tipo === 'ellisse') {
+    const n = 4 * Math.max(8, Math.min(32, Math.round((w + h) / 40)));
+    pts = Array.from({ length: n }, (_, i) => { const a = (i / n) * 2 * Math.PI; return [w / 2 * Math.cos(a), h / 2 * Math.sin(a)]; });
+  } else if (f.tipo === 'poligono') {
+    const n = Math.max(3, Math.min(64, Math.round(f.lati || 6)));
+    pts = Array.from({ length: n }, (_, i) => { const a = Math.PI / 2 + (i / n) * 2 * Math.PI; return [w / 2 * Math.cos(a), h / 2 * Math.sin(a)]; });
+  } else if (f.tipo === 'linea' && f.punti?.length >= 3) pts = contornoSagoma(f.punti);
+  else pts = rettangoloArrotondato(w, h, f.r || 0).map(([x, y]) => [x - w / 2, y - h / 2]);
+  const a = (f.rot || 0) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  return pts.map(([x, y]) => [f.cx + x * c - y * s, f.cy + x * s + y * c]);
+}
+
+const unione = lista => {
+  if (!lista.length) return null;
+  const u = M.CrossSection.union(lista);
+  lista.forEach(x => x.delete());
+  return u;
+};
+
+// { base: CrossSection (pieni meno vuoti passanti, o null), scassi: [{ cs, prof, lato }] }. Da liberare con delete().
+export function sezioniDisegno(dis) {
+  const forme = dis?.forme || [], cs = f => new M.CrossSection([contornoForma(f)], 'NonZero');
+  let base = unione(forme.filter(f => f.modo !== 'vuoto').map(cs));
+  const passanti = unione(forme.filter(f => f.modo === 'vuoto' && !(f.prof > 0)).map(cs));
+  if (base && passanti) { const b = base.subtract(passanti); base.delete(); base = b; }
+  passanti?.delete();
+  const gruppi = new Map();
+  for (const f of forme.filter(x => x.modo === 'vuoto' && x.prof > 0)) {
+    const k = `${f.prof}|${f.lato === 'sotto' ? 'sotto' : 'sopra'}`;
+    if (!gruppi.has(k)) gruppi.set(k, []);
+    gruppi.get(k).push(cs(f));
+  }
+  const scassi = [...gruppi].map(([k, l]) => { const [prof, lato] = k.split('|'); return { cs: unione(l), prof: +prof, lato }; });
+  return { base, scassi };
+}
+
+// Ingombro dei pieni (meno i vuoti passanti) di un disegno: { min: [x, y], max: [x, y] } o null se vuoto.
+export function ingombroDisegno(dis) {
+  const { base, scassi } = sezioniDisegno(dis);
+  scassi.forEach(s => s.cs.delete());
+  if (!base) return null;
+  const vuoto = !base.toPolygons().length, b = base.bounds();
+  base.delete();
+  return vuoto ? null : b;
+}
+
+// Contorni del risultato (esterni e fori) per il disegno 2D: { pieno: [[x, y]...][], scassi: [{ prof, lato, poli }] }.
+export function poligoniDisegno(dis) {
+  const { base, scassi } = sezioniDisegno(dis);
+  const r = { pieno: base ? base.toPolygons() : [], scassi: scassi.map(s => ({ prof: s.prof, lato: s.lato, poli: s.cs.toPolygons() })) };
+  base?.delete();
+  scassi.forEach(s => s.cs.delete());
+  return r;
+}
+
 const cache = new Map();
-export const chiave = p => JSON.stringify([p.tipo, p.mat, dimensioni(p), p.forma, p.L, p.W, p.D, p.r, p.forma === 'sagoma' ? p.sagoma : 0, p.tagli.map(t => [t.n, t.d]), foriPezzo(p)]);
+export const chiave = p => JSON.stringify([p.tipo, p.mat, dimensioni(p), p.forma, p.L, p.W, p.D, p.r, p.forma === 'sagoma' ? p.sagoma : p.forma === 'disegno' ? p.disegno : 0, p.tagli.map(t => [t.n, t.d]), foriPezzo(p)]);
 
 // Restituisce { geometria, bordi, min, max, vertici } nel sistema locale del pezzo, o null se i tagli
 // hanno tolto tutto.
@@ -68,9 +137,17 @@ export function geometriaPezzo(p) {
   const k = chiave(p);
   if (cache.has(k)) return cache.get(k);
   const { T } = dimensioni(p);
-  const sezione = new M.CrossSection([profilo(p)]);
+  const disegno = p.tipo === 'pannello' && p.forma === 'disegno' && p.disegno?.forme?.length;
+  const { base: sezione, scassi } = disegno ? sezioniDisegno(p.disegno) : { base: new M.CrossSection([profilo(p)]), scassi: [] };
+  if (!sezione) { scassi.forEach(x => x.cs.delete()); cache.set(k, null); return null; }
   let solido = sezione.extrude(T);
   sezione.delete();
+  for (const s of scassi) {
+    const prof = Math.min(s.prof, T), cavo = s.cs.extrude(prof + 1).translate([0, 0, s.lato === 'sotto' ? -1 : T - prof]);
+    const r = solido.subtract(cavo);
+    cavo.delete(); s.cs.delete(); solido.delete();
+    solido = r;
+  }
   for (const t of p.tagli) {
     const s = solido.trimByPlane(t.n, t.d);
     solido.delete();

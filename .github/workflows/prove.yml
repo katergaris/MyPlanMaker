@@ -1,16 +1,16 @@
-name: Prove
+name: Tests
 on: [push, pull_request]
 jobs:
-  prove:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Prove del server
+      - name: Server and dictionary tests
         run: python3 -m unittest discover -s tests
-      - name: Prove di modello e geometria (browser headless)
+      - name: Model and geometry tests (headless browser)
         run: |
           MPM_PORT=8099 MPM_DATA=/tmp/mpm python3 server/server.py &
           sleep 2

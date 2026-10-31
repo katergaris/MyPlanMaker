@@ -1,16 +1,17 @@
 // Controlli del progetto: peso, stabilità (si ribalta?) e freccia dei ripiani. Valori indicativi.
 import { Matrix4, Vector3 } from '../vendor/three.module.js';
-import { materiale } from './materiali.js';
+import { materiale, materialePezzo } from './materiali.js';
 import { dimensioni, fmt, ingombro, matrice } from './modello.js';
 import { geometriaPezzo, volumeComune } from './geometria.js';
 import { unioni } from './unioni.js';
+import { t } from './lingua.js';
 
 export const CARICO_RIPIANI = 30;   // kg per metro di ripiano (libri)
 export const CARICO_BORDO = 25;     // kg di chi si appoggia sul bordo
 
 // Freccia di un ripiano appoggiato alle due teste, con carico uniforme (trave appoggiata).
 export function freccia(p, caricoKgM = CARICO_RIPIANI) {
-  const g = geometriaPezzo(p), m = materiale(p.mat), { T } = dimensioni(p);
+  const g = geometriaPezzo(p), m = materialePezzo(p), { T } = dimensioni(p);
   if (!g || !m.E) return null;
   const L = g.max[0] - g.min[0], b = g.max[1] - g.min[1];
   const w = caricoKgM * 9.81 / 1000, I = b * T ** 3 / 12;
@@ -69,7 +70,7 @@ function calcola(progetto) {
   if (base.length >= 3) {
     const dentro = q => base.every((a, i) => fuori(a, base[(i + 1) % base.length], q) <= 0.5);
     const cgq = [cg.x, -cg.z];
-    if (!dentro(cgq)) esito.avvisi.push('Il baricentro cade fuori dalla base: così si ribalta da solo.');
+    if (!dentro(cgq)) esito.avvisi.push(t('Il baricentro cade fuori dalla base: così si ribalta da solo.'));
     else {
       // Carico sul bordo: per ogni vertice in alto fuori dalla base, confronta i momenti attorno al lato più vicino.
       let peggiore = null;
@@ -84,11 +85,11 @@ function calcola(progetto) {
         }
       }
       if (peggiore && peggiore.rapporto > 1) {
-        esito.avvisi.push(`Se ci si appoggia con ${CARICO_BORDO} kg sul bordo di «${peggiore.p.nome}» (${fmt(peggiore.d)} mm oltre gli appoggi), si ribalta: allarga la base o avvicina il bordo agli appoggi.`);
+        esito.avvisi.push(t('Se ci si appoggia con {kg} kg sul bordo di «{nome}» ({d} mm oltre gli appoggi), si ribalta: allarga la base o avvicina il bordo agli appoggi.', { kg: CARICO_BORDO, nome: peggiore.p.nome, d: fmt(peggiore.d) }));
       } else if (peggiore) {
         const margine = 1 / peggiore.rapporto;
-        esito.note.push(`Stabile anche con ${CARICO_BORDO} kg sul bordo (${margine > 5 ? 'con ampio margine' : `margine ×${fmt(margine, 1)}`}).`);
-      } else esito.note.push('Stabile: nessun bordo sporge oltre gli appoggi.');
+        esito.note.push(margine > 5 ? t('Stabile anche con {kg} kg sul bordo (con ampio margine).', { kg: CARICO_BORDO }) : t('Stabile anche con {kg} kg sul bordo (margine ×{m}).', { kg: CARICO_BORDO, m: fmt(margine, 1) }));
+      } else esito.note.push(t('Stabile: nessun bordo sporge oltre gli appoggi.'));
     }
     // Mobili alti e stretti: da fissare al muro
     let profondita = Infinity;
@@ -97,7 +98,7 @@ function calcola(progetto) {
       profondita = Math.min(profondita, Math.max(...base.map(q => -fuori(a, b, q))));
     }
     const altezza = yMax - yMin;
-    if (altezza > 1000 && altezza > 3 * profondita) esito.avvisi.push(`Alto ${fmt(altezza)} mm su una base profonda ${fmt(profondita)} mm: va fissato al muro.`);
+    if (altezza > 1000 && altezza > 3 * profondita) esito.avvisi.push(t('Alto {h} mm su una base profonda {p} mm: va fissato al muro.', { h: fmt(altezza), p: fmt(profondita) }));
   }
 
   // Pezzi che si compenetrano (più di 1 cm³ in comune)
@@ -106,7 +107,7 @@ function calcola(progetto) {
     const A = scatole[i], B = scatole[j];
     if (A.b.max.x <= B.b.min.x + 0.5 || B.b.max.x <= A.b.min.x + 0.5 || A.b.max.y <= B.b.min.y + 0.5 || B.b.max.y <= A.b.min.y + 0.5 || A.b.max.z <= B.b.min.z + 0.5 || B.b.max.z <= A.b.min.z + 0.5) continue;
     const v = volumeComune(geometriaPezzo(A.p), matrice(A.p), geometriaPezzo(B.p), matrice(B.p));
-    if (v > 1000) esito.avvisi.push(`«${A.p.nome}» e «${B.p.nome}» si compenetrano (${fmt(v / 1000, 1)} cm³): spostane uno o usa Adatta.`);
+    if (v > 1000) esito.avvisi.push(t('«{a}» e «{b}» si compenetrano ({v} cm³): spostane uno o usa Adatta.', { a: A.p.nome, b: B.p.nome, v: fmt(v / 1000, 1) }));
   }
 
   // Freccia dei ripiani: pannelli orizzontali che ricevono viti in entrambe le teste
@@ -122,7 +123,8 @@ function calcola(progetto) {
     const f = freccia(p, progetto.caricoRipiani ?? CARICO_RIPIANI);
     if (!f) continue;
     esito.frecce.push({ p, ...f });
-    if (f.giudizio === 'troppo') esito.avvisi.push(`«${p.nome}» con ${f.carico} kg/m si piega di ${fmt(f.nelTempo, 1)} mm: troppo. Usa un pannello più spesso, accorcia la luce o aggiungi un listello sotto.`);
+    if (f.giudizio === 'troppo') esito.avvisi.push(t('«{nome}» con {carico} kg/m si piega di {f} mm: troppo. Usa un pannello più spesso, accorcia la luce o aggiungi un listello sotto.', { nome: p.nome, carico: f.carico, f: fmt(f.nelTempo, 1) }));
+
   }
   return esito;
 }

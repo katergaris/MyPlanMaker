@@ -4,12 +4,13 @@
 // poi Y (gira in pianta), poi Z (inclina di lato). In three.js è l'ordine Euler 'ZYX'.
 // Ogni pezzo ha un sistema locale: lunghezza lungo x (0..L), larghezza lungo y (0..W), spessore lungo z (0..T).
 // I tagli sono semipiani nel sistema locale: si tiene la parte dove n·x >= d.
-import { Euler, Matrix4, Vector3 } from '../vendor/three.module.js';
-import { materiale } from './materiali.js';
+import { Euler, Matrix4, Quaternion, Vector3 } from '../vendor/three.module.js';
+import { materialePezzo } from './materiali.js';
+import { lingua, t, tr } from './lingua.js';
 
 const RAD = Math.PI / 180;
 
-export function nuovoProgetto(nome = 'Nuovo progetto') {
+export function nuovoProgetto(nome = t('Nuovo progetto')) {
   return { versione: 1, nome, pezzi: [], prossimoN: 1 };
 }
 
@@ -18,7 +19,7 @@ export function nuovoId() {
 }
 
 export function dimensioni(p) {
-  const m = materiale(p.mat);
+  const m = materialePezzo(p);
   if (p.tipo === 'listello') return { L: p.L, W: m.W, T: m.T };
   if (p.forma === 'cerchio') return { L: p.D, W: p.D, T: m.T };
   if (p.forma === 'sagoma' && p.sagoma?.length) return { L: p.L, W: p.W, T: m.T }; // L e W = ingombro della sagoma (archi compresi)
@@ -39,7 +40,7 @@ const ORIENTAMENTI = {
   verticale: [0, 0, 90],    // gamba, montante, schienale (L → in alto, W → verso sinistra, T → verso di te)
   profondita: [0, 90, 0],   // traverso verso il fondo (L → verso il fondo, W → in alto, T → verso destra)
 };
-export const NOMI_ORIENTAMENTI = { orizzontale: 'Orizzontale', fianco: 'Di fianco', frontale: 'Di fronte', verticale: 'In piedi', profondita: 'In profondità' };
+export const NOMI_ORIENTAMENTI = { orizzontale: tr('Orizzontale'), fianco: tr('Di fianco'), frontale: tr('Di fronte'), verticale: tr('In piedi'), profondita: tr('In profondità') };
 
 export const rotazioneDa = nome => [...ORIENTAMENTI[nome]];
 
@@ -51,7 +52,7 @@ export function nuovoPezzo(progetto, tipo, vicinoA) {
     : { tipo, mat: 'mb18', forma: 'rett', L: 800, W: 400, D: 800, r: 0, rot: rotazioneDa('orizzontale') };
   p.id = nuovoId();
   p.n = progetto.prossimoN++;
-  p.nome = `${tipo === 'listello' ? 'Listello' : 'Pannello'} ${p.n}`;
+  p.nome = `${t(tipo === 'listello' ? 'Listello' : 'Pannello')} ${p.n}`;
   p.tagli = [];
   // Orizzontale: la larghezza va verso il fondo (-Z), così il bordo davanti resta su z = 0.
   p.pos = [0, 0, 0];
@@ -109,44 +110,87 @@ export function accosta(p, faccia, vertici) {
   return s;
 }
 
-// Adatta: allunga o accorcia il pezzo A lungo la sua lunghezza fino alla faccia giusta di B e la taglia con
-// l'angolo di quella faccia. Restituisce { ok, msg }.
-export function adatta(a, b) {
+// Accosta faccia contro faccia: fa = faccia scelta sul pezzo da muovere (o null), fb = faccia dell'altro pezzo,
+// entrambe { normale, punto } nel mondo. Con fa il pezzo prima gira finché le due facce si guardano. Poi il centro
+// del pezzo va sul punto toccato su fb (spostandosi solo lungo la faccia) e il punto più arretrato dei vertici
+// (anche di più pezzi che si muovono insieme) tocca esattamente il piano di fb.
+// Restituisce { delta: Matrix4 da applicare con trasforma, ruotato: gradi }.
+export function deltaAccosta(fa, fb, vertici) {
+  const nb = fb.normale.clone().normalize(), delta = new Matrix4();
+  let ruotato = 0;
+  if (fa) {
+    const na = fa.normale.clone().normalize(), voluto = nb.clone().negate();
+    ruotato = na.angleTo(voluto) / RAD;
+    if (ruotato > 0.01) {
+      const perno = fa.punto;
+      delta.makeTranslation(perno.x, perno.y, perno.z)
+        .multiply(new Matrix4().makeRotationFromQuaternion(new Quaternion().setFromUnitVectors(na, voluto)))
+        .multiply(new Matrix4().makeTranslation(-perno.x, -perno.y, -perno.z));
+    } else ruotato = 0;
+  }
+  const lo = new Vector3(Infinity, Infinity, Infinity), hi = new Vector3(-Infinity, -Infinity, -Infinity);
+  for (const v of vertici) { const w = v.clone().applyMatrix4(delta); lo.min(w); hi.max(w); }
+  const d = fb.punto.clone().sub(lo.add(hi).multiplyScalar(0.5));
+  d.sub(nb.clone().multiplyScalar(d.dot(nb)));
+  delta.premultiply(new Matrix4().makeTranslation(d.x, d.y, d.z));
+  let min = Infinity;
+  for (const v of vertici) min = Math.min(min, v.clone().applyMatrix4(delta).sub(fb.punto).dot(nb));
+  delta.premultiply(new Matrix4().makeTranslation(-nb.x * min, -nb.y * min, -nb.z * min));
+  return { delta, ruotato };
+}
+
+// Distanza (lungo n) tra il piano per `punto` e il vertice più arretrato: 0 = appoggiato.
+export function distanzaDaFaccia(vertici, punto, n) {
+  let min = Infinity;
+  for (const v of vertici) min = Math.min(min, v.clone().sub(punto).dot(n));
+  return min;
+}
+
+// Adatta: allunga o accorcia il pezzo A fino a una faccia di B e lo taglia con l'angolo di quella faccia.
+// opz.faccia = faccia di B toccata { normale, punto } (senza: la faccia di B più adatta); opz.asse = 'x' (lunghezza)
+// o 'y' (larghezza, solo pannelli rettangolari), scelto toccando la testa o il bordo di A (senza: quello che punta
+// di più verso la faccia). Funziona con il pezzo ruotato in qualunque modo. Restituisce { ok, msg }.
+export function adatta(a, b, opz = {}) {
   const ma = matrice(a), ra = new Matrix4().extractRotation(ma);
-  const asse = new Vector3(1, 0, 0).applyMatrix4(ra).normalize();
   const { L, W, T } = dimensioni(a);
   const centro = new Vector3(L / 2, W / 2, T / 2).applyMatrix4(ma);
+  const allungabile = a.tipo === 'pannello' && a.forma !== 'cerchio' && a.forma !== 'sagoma' && a.forma !== 'disegno';
+  const assi = opz.asse ? [opz.asse] : allungabile ? ['x', 'y'] : ['x'];
+  const versore = k => new Vector3(k === 'x' ? 1 : 0, k === 'y' ? 1 : 0, 0).applyMatrix4(ra).normalize();
 
   let scelta = null;
-  for (const f of facce(b)) {
+  const candidate = opz.faccia ? [{ n: opz.faccia.normale.clone().normalize(), p: opz.faccia.punto.clone() }] : facce(b);
+  for (const f of candidate) {
     const s = centro.clone().sub(f.p).dot(f.n);
-    if (s <= 0) continue;
-    const allineo = Math.abs(asse.dot(f.n));
-    if (!scelta || allineo > scelta.allineo + 1e-6 || (Math.abs(allineo - scelta.allineo) <= 1e-6 && s < scelta.s)) {
-      scelta = { ...f, s, allineo };
+    if (s <= 0 && !opz.faccia) continue;
+    for (const k of assi) {
+      const allineo = Math.abs(versore(k).dot(f.n));
+      if (!scelta || allineo > scelta.allineo + 1e-6 || (Math.abs(allineo - scelta.allineo) <= 1e-6 && s < scelta.s)) scelta = { ...f, s, allineo, k };
     }
   }
   if (!scelta || scelta.allineo < 0.05) {
-    return { ok: false, msg: 'I due pezzi sono paralleli: qui serve Accosta, non Adatta.' };
+    return { ok: false, msg: opz.asse ? t(opz.asse === 'x' ? "La lunghezza del pezzo corre parallela a quella faccia: tocca un'altra testa o un altro bordo, oppure usa Accosta." : "La larghezza del pezzo corre parallela a quella faccia: tocca un'altra testa o un altro bordo, oppure usa Accosta.") : t('I due pezzi sono paralleli: qui serve Accosta, non Adatta.') };
   }
-  const { n, p } = scelta;
-  const versoFine = asse.dot(n) < 0;          // la testa x = L guarda verso B
+  const { n, p, k } = scelta, i = k === 'x' ? 0 : 1, D = k === 'x' ? L : W, asse = versore(k);
+  if (k === 'y' && !allungabile) return { ok: false, msg: t('Questo pezzo si allunga solo in lunghezza.') };
+  const versoFine = asse.dot(n) < 0;          // la testa (o il bordo) a coordinata D guarda verso B
   const e = versoFine ? asse.clone() : asse.clone().negate();
-  const xTesta = versoFine ? L : 0;
+  const xTesta = versoFine ? D : 0, altro = k === 'x' ? W : L;
   let delta = -Infinity;
-  for (const y of [0, W]) for (const z of [0, T]) {
-    const c = new Vector3(xTesta, y, z).applyMatrix4(ma);
+  for (const u of [0, altro]) for (const z of [0, T]) {
+    const c = (k === 'x' ? new Vector3(xTesta, u, z) : new Vector3(u, xTesta, z)).applyMatrix4(ma);
     delta = Math.max(delta, -c.clone().sub(p).dot(n) / e.dot(n));
   }
   // Allunga solo se serve: se il pezzo entra già in B basta il taglio.
   a.tagli = a.tagli.filter(t => t.da !== b.id);
   if (delta > 0.01) {
     const allunga = Math.ceil(delta);
-    if (a.forma === 'cerchio') return { ok: false, msg: 'Un pezzo rotondo non si allunga: avvicinalo prima.' };
-    a.L = a.L + allunga;
+    if (a.forma === 'cerchio') return { ok: false, msg: t('Un pezzo rotondo non si allunga: avvicinalo prima.') };
+    if (a.forma === 'sagoma' || a.forma === 'disegno') return { ok: false, msg: t('Un pezzo sagomato o disegnato non si allunga: avvicinalo prima.') };
+    if (k === 'x') a.L = a.L + allunga; else a.W = a.W + allunga;
     if (!versoFine) {
-      a.pos = a.pos.map((c, i) => pulisci(c - asse.getComponent(i) * allunga));
-      a.tagli = a.tagli.map(t => ({ ...t, d: t.d + t.n[0] * allunga }));
+      a.pos = a.pos.map((c, j) => pulisci(c - asse.getComponent(j) * allunga));
+      a.tagli = a.tagli.map(t => ({ ...t, d: t.d + t.n[i] * allunga }));
     }
   }
   const m2 = matrice(a), inv = new Matrix4().extractRotation(m2).transpose();
@@ -155,6 +199,14 @@ export function adatta(a, b) {
   const d = p.clone().sub(pos).dot(n);
   a.tagli.push({ n: [nl.x, nl.y, nl.z].map(v => Math.round(v * 1e9) / 1e9), d: Math.round(d * 1e6) / 1e6, da: b.id });
   return { ok: true, msg: descriviTaglio(a.tagli.at(-1)) };
+}
+
+// Quale misura allunga Adatta se si tocca questa faccia del pezzo: 'x' (teste), 'y' (bordi lunghi) o null (faccia grande).
+export function assePerFaccia(p, normale) {
+  const nl = normale.clone().applyMatrix4(new Matrix4().extractRotation(matrice(p)).transpose());
+  const [x, y, z] = [Math.abs(nl.x), Math.abs(nl.y), Math.abs(nl.z)];
+  if (z >= x && z >= y) return null;
+  return x >= y ? 'x' : 'y';
 }
 
 // Dividi: n copie di A distribuite alla stessa distanza nello spazio tra A e B (che devono essere paralleli).
@@ -171,14 +223,14 @@ export function spazioTra(a, b, vertA, vertB, n) {
     if (!assiB.some(y => Math.abs(Math.abs(x.dot(y)) - 1) < 1e-4)) continue;
     if (!asse || Math.abs(x.dot(verso)) > Math.abs(asse.dot(verso))) asse = x.clone();
   }
-  if (!asse) return { ok: false, msg: 'I due pezzi devono essere paralleli (per esempio fondo e piano, o i due fianchi).' };
+  if (!asse) return { ok: false, msg: t('I due pezzi devono essere paralleli (per esempio fondo e piano, o i due fianchi).') };
   if (asse.dot(verso) < 0) asse.negate();
   const proj = pts => { let lo = Infinity, hi = -Infinity; for (const v of pts) { const t = v.dot(asse); lo = Math.min(lo, t); hi = Math.max(hi, t); } return [lo, hi]; };
   const [a0, a1] = proj(vertA), [b0] = proj(vertB);
   const spessore = a1 - a0, luce = b0 - a1;
-  if (luce <= 0.5) return { ok: false, msg: 'Tra i due pezzi non c\'è spazio libero.' };
+  if (luce <= 0.5) return { ok: false, msg: t("Tra i due pezzi non c'è spazio libero.") };
   const passo = (luce - n * spessore) / (n + 1);
-  if (passo < 5) return { ok: false, msg: `Non ci stanno ${n} pezzi da ${fmt(spessore, 1)} mm in ${fmt(luce, 1)} mm.` };
+  if (passo < 5) return { ok: false, msg: t('Non ci stanno {n} pezzi da {s} mm in {luce} mm.', { n, s: fmt(spessore, 1), luce: fmt(luce, 1) }) };
   return { ok: true, asse, spessore, luce, passo };
 }
 
@@ -261,7 +313,7 @@ export const LATI_BORDO = { A: [-1, 0, 0], B: [1, 0, 0], basso: [0, -1, 0], alto
 export function nomeBordo(p, lato) {
   const n = new Vector3(...LATI_BORDO[lato]).applyMatrix4(new Matrix4().extractRotation(matrice(p)));
   const c = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)], k = c.indexOf(Math.max(...c));
-  return [['a sinistra', 'a destra'], ['sotto', 'sopra'], ['dietro', 'davanti']][k][n.getComponent(k) > 0 ? 1 : 0];
+  return t([[tr('a sinistra'), tr('a destra')], [tr('sotto'), tr('sopra')], [tr('dietro'), tr('davanti')]][k][n.getComponent(k) > 0 ? 1 : 0]);
 }
 // Misura da tagliare: la misura finita meno lo spessore dei bordi applicati.
 export function bordatura(p) {
@@ -270,29 +322,45 @@ export function bordatura(p) {
   return { s, lati, menoL: meno('A') + meno('B'), menoW: meno('basso') + meno('alto') };
 }
 
-export const fmt = (v, dec = 0) => Number(v).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: dec });
+// Numeri nella lingua scelta (virgola o punto decimale), senza separatore delle migliaia: così si rileggono dai campi.
+export const fmt = (v, dec = 0) => (Math.abs(v) < 0.5 / 10 ** dec ? 0 : Number(v)).toLocaleString(lingua.locale, { minimumFractionDigits: 0, maximumFractionDigits: dec, useGrouping: false });
+
+// Unità con cui si scrivono e si leggono le misure nell'interfaccia (dentro il progetto è sempre tutto in mm).
+export const unita = { u: 'mm' };
+export const inUnita = mm => (unita.u === 'cm' ? mm / 10 : mm);
+// Misura nell'unità scelta, con l'unità scritta accanto se serve: 760 → «760 mm» o «76 cm».
+export const fmtU = (mm, conUnita = false) => fmt(inUnita(mm), unita.u === 'cm' ? 2 : 1) + (conUnita ? ` ${unita.u}` : '');
+// Legge una misura scritta: «76», «76 cm», «760mm», «0,76 m», «30 in» o «30"». Senza unità vale quella scelta. In mm.
+export function leggiMisura(s) {
+  const t = String(s).trim().toLowerCase().replace(/\s/g, '').replace(',', '.');
+  const m = t.match(/^(-?\d*\.?\d+)(mm|cm|m|in|"|pollici)?$/);
+  if (!m) return null;
+  const v = parseFloat(m[1]), u = m[2] || unita.u;
+  return v * ({ mm: 1, cm: 10, m: 1000, in: 25.4, '"': 25.4, pollici: 25.4 }[u]);
+}
 
 // Descrizione del taglio come la serve in laboratorio.
-export function descriviTaglio(t) {
-  const [nx, ny, nz] = t.n.map(Math.abs);
+export function descriviTaglio(tg) {
+  const [nx, ny, nz] = tg.n.map(Math.abs);
   const deg = (a, b) => Math.atan2(a, b) / RAD;
   const parti = [];
   let dove;
   if (nx >= ny && nx >= nz) {
-    dove = t.n[0] < 0 ? 'Testa B' : 'Testa A';
+    dove = t(tg.n[0] < 0 ? 'Testa B' : 'Testa A');
     const obl = deg(ny, nx), lama = deg(nz, nx);
-    if (obl > 0.05) parti.push(`obliquo ${fmt(obl, 1)}°`);
-    if (lama > 0.05) parti.push(`lama inclinata ${fmt(lama, 1)}°`);
+    if (obl > 0.05) parti.push(t('obliquo {g}°', { g: fmt(obl, 1) }));
+    if (lama > 0.05) parti.push(t('lama inclinata {g}°', { g: fmt(lama, 1) }));
   } else if (ny >= nz) {
-    dove = 'Bordo';
+    dove = t('Bordo');
     const obl = deg(nx, ny), lama = deg(nz, ny);
-    if (obl > 0.05) parti.push(`obliquo ${fmt(obl, 1)}°`);
-    if (lama > 0.05) parti.push(`lama inclinata ${fmt(lama, 1)}°`);
+    if (obl > 0.05) parti.push(t('obliquo {g}°', { g: fmt(obl, 1) }));
+    if (lama > 0.05) parti.push(t('lama inclinata {g}°', { g: fmt(lama, 1) }));
   } else {
-    dove = 'Faccia';
-    parti.push(`inclinata ${fmt(deg(Math.hypot(nx, ny), nz), 1)}°`);
+    dove = t('Faccia');
+    parti.push(t('inclinata {g}°', { g: fmt(deg(Math.hypot(nx, ny), nz), 1) }));
   }
-  return `${dove}: ${parti.length ? parti.join(', ') : 'a squadra'}`;
+  return `${dove}: ${parti.length ? parti.join(', ') : t('a squadra')}`;
+
 }
 
 // Storico per Annulla/Ripeti.

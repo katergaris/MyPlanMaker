@@ -312,6 +312,98 @@ for (const m of MODELLI) {
   prova('schema con avanzi senza sovrapposizioni', !controllaLastre(schemaDiTaglio({ ...pr, usaAvanzi: true }, avanzi), 3.2));
 }
 
+// 17. Spessori e sezioni su misura, modelli personalizzati, Accosta faccia contro faccia, unità
+{
+  const { materialePezzo } = await import('./js/materiali.js');
+  const { scelto } = await import('./js/modelli.js');
+  const { Vector3 } = await import('./vendor/three.module.js');
+  const pr = mod.nuovoProgetto();
+  const a = mod.nuovoPezzo(pr, 'pannello'), b = mod.nuovoPezzo(pr, 'pannello');
+  b.mat = 'al27'; b.spessore = 40;
+  const mb = materialePezzo(b);
+  prova('spessore su misura: lamellare 40, prezzo in proporzione', mod.dimensioni(b).T === 40 && mb.nome === 'Lamellare abete 40 (su misura)' && vicino(mb.prezzoM2, 32 * 40 / 27, 0.01) && materialePezzo(a).id === 'mb18', `${mb.nome} ${mb.prezzoM2}`);
+  const g = geometriaPezzo(b);
+  prova('spessore su misura: il solido è alto 40', vicino(g.max[2] - g.min[2], 40, 0.01));
+  const righe = righeDistinta(pr);
+  prova('distinta: T 40 e materiale su misura', righe[1].T === 40 && /su misura/.test(righe[1].materiale));
+  const gruppi = schemaDiTaglio(pr);
+  prova('schema di taglio: il su misura ha la sua lastra', gruppi.length === 2 && gruppi.some(x => x.materiale.id === 'al27@40'), gruppi.map(x => x.materiale.id).join(', '));
+  const l = mod.nuovoPezzo(pr, 'listello'); l.mat = 'ab6060'; l.sezione = [70, 50];
+  prova('listello con sezione 70×50', mod.dimensioni(l).W === 70 && mod.dimensioni(l).T === 50 && materialePezzo(l).nome === 'Abete 70×50 (su misura)', materialePezzo(l).nome);
+
+  const tav = MODELLI.find(m => m.id === 'tavolo'), v = { ...valoriDefault(tav), matT: 40, matLW: 80, matLT: 80, rientro: 100 };
+  const pt = mod.nuovoProgetto(); tav.crea(pt, v, 0);
+  const piano = pt.pezzi.find(p => p.nome === 'Piano'), gamba = pt.pezzi.find(p => p.nome === 'Gamba 1');
+  const c = controlli(pt);
+  prova('tavolo: piano da 40, gambe 80×80 alte 710, nessuna compenetrazione', mod.dimensioni(piano).T === 40 && mod.dimensioni(gamba).W === 80 && gamba.L === 710 && !c.avvisi.some(x => /compenetrano/.test(x)), c.avvisi.join(' '));
+  prova('scelto(): valori del catalogo = nessun su misura', !('spessore' in scelto({ mat: 'mb18', matT: 18 }, 'mat').r) && scelto({ mat: 'mb18', matT: 25 }, 'mat').r.spessore === 25);
+
+  // gamba sdraiata: si sceglie la sua testa e la si mette sotto il piano, nel punto toccato
+  const pa = mod.nuovoProgetto();
+  const top = mod.nuovoPezzo(pa, 'pannello'); top.L = 1000; top.W = 600; top.pos = [0, 700, 0];
+  const leg = mod.nuovoPezzo(pa, 'listello'); leg.mat = 'ab6060'; leg.L = 700; leg.rot = mod.rotazioneDa('frontale'); leg.pos = [2000, 0, 0];
+  const verts = p => { const gg = geometriaPezzo(p), m = mod.matrice(p); return gg.vertici.map(q => new Vector3(...q).applyMatrix4(m)); };
+  const testa = { normale: new Vector3(1, 0, 0), punto: new Vector3(2700, 30, 30) };
+  const sotto = { normale: new Vector3(0, -1, 0), punto: new Vector3(100, 700, -100) };
+  const { delta, ruotato } = mod.deltaAccosta(testa, sotto, verts(leg));
+  mod.trasforma(leg, delta);
+  const box = mod.ingombro(leg, verts(leg));
+  prova('accosta faccia contro faccia: gamba girata in piedi sotto il piano, centrata sul punto', vicino(ruotato, 90, 0.01) && vicino(box.max.y, 700, 0.01) && vicino(box.min.y, 0, 0.01) && vicino((box.min.x + box.max.x) / 2, 100, 0.01) && vicino((box.min.z + box.max.z) / 2, -100, 0.01),
+    `ruotato ${ruotato} · y ${box.min.y}..${box.max.y} · x ${box.min.x}..${box.max.x} · z ${box.min.z}..${box.max.z}`);
+  prova('distanza dalla faccia: 0 dopo l\'accostamento', vicino(mod.distanzaDaFaccia(verts(leg), sotto.punto, sotto.normale), 0, 0.01));
+
+  // Adatta con un pezzo ruotato di 30° in pianta: allungato in larghezza fino a un muro (faccia toccata)
+  {
+    const pq = mod.nuovoProgetto();
+    const muro = mod.nuovoPezzo(pq, 'pannello'); muro.L = 2000; muro.W = 1000; muro.rot = mod.rotazioneDa('frontale'); muro.pos = [-500, 0, -800];
+    const r = mod.nuovoPezzo(pq, 'pannello'); r.L = 400; r.W = 300; r.rot = [-90, 30, 0]; r.pos = [0, 400, 0];
+    const faccia = { normale: new Vector3(0, 0, 1), punto: new Vector3(0, 500, -800 + 18) };
+    const prima = r.W, esito = mod.adatta(r, muro, { faccia, asse: 'y' });
+    const vv = verts(r), zMin = Math.min(...vv.map(q => q.z));
+    prova('adatta un pezzo ruotato di 30°, in larghezza, fino alla faccia toccata', esito.ok && r.W > prima && r.L === 400 && vicino(zMin, -782, 0.05) && r.tagli.length === 1, `${esito.msg} · W ${r.W} · z min ${zMin}`);
+    const r2 = mod.nuovoPezzo(pq, 'pannello'); r2.rot = mod.rotazioneDa('frontale'); r2.pos = [0, 0, 0];
+    prova('adatta: la lunghezza parallela alla faccia dà un messaggio chiaro', !mod.adatta(r2, muro, { faccia, asse: 'x' }).ok);
+    prova('assePerFaccia: testa → x, bordo → y, faccia grande → null', mod.assePerFaccia(r2, new Vector3(1, 0, 0)) === 'x' && mod.assePerFaccia(r2, new Vector3(0, 1, 0)) === 'y' && mod.assePerFaccia(r2, new Vector3(0, 0, 1)) === null);
+  }
+  prova('misure scritte con l\'unità', mod.leggiMisura('76 cm') === 760 && mod.leggiMisura('760') === 760 && mod.leggiMisura('0,76m') === 760 && vicino(mod.leggiMisura('30"'), 762, 0.01) && mod.leggiMisura('abc') === null);
+  mod.unita.u = 'cm';
+  prova('unità cm: «76» vale 760 mm e si scrive 76 cm', mod.leggiMisura('76') === 760 && mod.fmtU(760, true) === '76 cm' && mod.fmtU(18) === '1,8');
+  mod.unita.u = 'mm';
+}
+
+// 18. Disegno 2D: pieni, fori passanti e scassi
+{
+  const { normalizzaDisegno, formeDaPezzo } = await import('./js/disegno2d.js');
+  const { ingombroDisegno } = await import('./js/geometria.js');
+  const pr = mod.nuovoProgetto(), p = mod.nuovoPezzo(pr, 'pannello');
+  const forme = [
+    { tipo: 'rett', cx: 1200, cy: 500, w: 400, h: 300, rot: 0, modo: 'pieno' },
+    { tipo: 'ellisse', cx: 1100, cy: 500, w: 100, h: 100, rot: 0, modo: 'vuoto' },
+    { tipo: 'rett', cx: 1300, cy: 500, w: 100, h: 50, rot: 0, modo: 'vuoto', prof: 10 },
+  ];
+  const n = normalizzaDisegno(forme);
+  prova('disegno: normalizzato in (0, 0), ingombro 400 × 300', n.L === 400 && n.W === 300 && n.forme[0].cx === 200 && n.forme[0].cy === 150, `${n.L} × ${n.W}`);
+  Object.assign(p, { forma: 'disegno', disegno: { forme: n.forme }, L: n.L, W: n.W });
+  const g = geometriaPezzo(p), cerchio = Math.PI * 50 * 50;
+  const atteso = (400 * 300 - cerchio) * 18 - 100 * 50 * 10;
+  prova('disegno: volume = pieno − foro Ø 100 − scasso 100×50×10', vicino(g.volume / atteso, 1, 0.005), `${Math.round(g.volume)} / ${Math.round(atteso)}`);
+  prova('disegno: due pieni sovrapposti si uniscono', vicino(ingombroDisegno({ forme: [forme[0], { tipo: 'rett', cx: 1450, cy: 500, w: 200, h: 100, rot: 0, modo: 'pieno' }] }).max[0], 1550, 0.01));
+  const ruotato = ingombroDisegno({ forme: [{ tipo: 'rett', cx: 0, cy: 0, w: 100, h: 100, rot: 45, modo: 'pieno' }] });
+  prova('disegno: quadrato ruotato di 45° → ingombro 141,4', vicino(ruotato.max[0] - ruotato.min[0], 141.42, 0.05));
+  const esa = ingombroDisegno({ forme: [{ tipo: 'poligono', lati: 6, cx: 0, cy: 0, w: 200, h: 200, rot: 0, modo: 'pieno' }] });
+  prova('disegno: esagono inscritto in Ø 200', vicino(esa.max[1], 100, 0.01) && vicino(esa.max[0], 86.6, 0.05));
+  const lin = ingombroDisegno({ forme: [{ tipo: 'linea', cx: 0, cy: 0, w: 0, h: 0, rot: 0, modo: 'pieno', punti: [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 0, y: 200 }] }] });
+  prova('disegno: linea a punti (triangolo) anche in senso orario', vicino(lin.max[0], 300, 0.01) && vicino(lin.max[1], 200, 0.01));
+  prova('disegno: senza pieni il pezzo è vuoto', ingombroDisegno({ forme: [forme[1]] }) === null && !geometriaPezzo({ ...p, disegno: { forme: [n.forme[1]] } }));
+  const r = righeDistinta(pr)[0];
+  prova('distinta: pezzo disegnato con foro e scasso', /disegnato/.test(r.forma.join()) && /1 foro passante/.test(r.forma.join()) && /1 scasso \(10 mm\)/.test(r.forma.join()) && r.L === 400, r.forma.join(' · '));
+  const dxf = dxfPezzi(pr);
+  prova('DXF: layer dello scasso con la profondità', /_SCASSO_10mm/.test(dxf));
+  prova('disegni: scasso tratteggiato nel disegno quotato', /pz-scasso/.test(htmlDisegno(pr, p)));
+  const tondo = mod.nuovoPezzo(pr, 'pannello'); tondo.forma = 'cerchio'; tondo.D = 500;
+  prova('forme di partenza: rettangolo, cerchio e sagoma diventano forme', formeDaPezzo(tondo)[0].tipo === 'ellisse' && formeDaPezzo(mod.nuovoPezzo(pr, 'pannello'))[0].tipo === 'rett' && formeDaPezzo({ forma: 'sagoma', L: 100, W: 50, sagoma: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 0, y: 50 }] })[0].punti.length === 3);
+}
+
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');
 const ko = esiti.filter(e => !e.ok).length;
 document.getElementById('riassunto').textContent = ko ? `FALLITE ${ko} su ${esiti.length}` : `TUTTE OK (${esiti.length})`;

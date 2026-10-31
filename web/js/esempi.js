@@ -1,15 +1,22 @@
 // Progetti di esempio, costruiti con gli stessi comandi che usa l'interfaccia.
 import { adatta, nuovoId, nuovoProgetto, rotazioneDa } from './modello.js';
+import { t, tr } from './lingua.js';
+
+// Nomi in italiano: si traducono quando l'esempio viene creato (numero a parte).
+const NOMI = [tr('Fianco sinistro'), tr('Fianco destro'), tr('Piano inclinato'), tr('Fondo'), tr('Ripiano'), tr('Schienale'), tr('Anta'),
+  tr('Piano rotondo'), tr('Gamba'), tr('Fascia davanti'), tr('Fascia dietro'), tr('Fascia sinistra'), tr('Fascia destra')];
 
 function pezzo(pr, dati) {
   const p = { id: nuovoId(), n: pr.prossimoN++, forma: 'rett', r: 0, tagli: [], ...dati };
+  const m = p.nome.match(/^(.*?)( \d+)?$/);
+  if (NOMI.includes(m[1])) p.nome = t(m[1]) + (m[2] || '');
   if (typeof p.rot === 'string') p.rot = rotazioneDa(p.rot);
   pr.pezzi.push(p);
   return p;
 }
 
 export function mobilettoLeggio() {
-  const pr = nuovoProgetto('Mobiletto con leggio');
+  const pr = nuovoProgetto(t('Mobiletto con leggio'));
   const W = 800, D = 500, HF = 750, HB = 900, T = 18;
   const incl = Math.atan2(HB - HF, D) * 180 / Math.PI;
   const fsx = pezzo(pr, { nome: 'Fianco sinistro', tipo: 'pannello', mat: 'mb18', L: 1000, W: D, rot: 'fianco', pos: [T, 0, 0] });
@@ -27,7 +34,7 @@ export function mobilettoLeggio() {
 }
 
 export function tavoloRotondo() {
-  const pr = nuovoProgetto('Tavolo rotondo');
+  const pr = nuovoProgetto(t('Tavolo rotondo'));
   const D = 1000, H = 750, T = 27, c = D / 2, g = 280, s = 60;
   pezzo(pr, { nome: 'Piano rotondo', tipo: 'pannello', mat: 'ro27', forma: 'cerchio', D, L: D, W: D, rot: 'orizzontale', pos: [0, H - T, 0] });
   const gambe = [[-1, 1], [1, 1], [1, -1], [-1, -1]];
@@ -44,6 +51,7 @@ export function tavoloRotondo() {
 }
 
 export const ESEMPI = [
-  { nome: 'Mobiletto con leggio', crea: mobilettoLeggio, nota: 'piano inclinato, fianchi e schienale adattati, anta con cerniere' },
-  { nome: 'Tavolo rotondo', crea: tavoloRotondo, nota: 'piano Ø 100 in rovere, 4 gambe e fascia' },
+  { nome: tr('Mobiletto con leggio'), crea: mobilettoLeggio, nota: tr('piano inclinato, fianchi e schienale adattati, anta con cerniere') },
+  { nome: tr('Tavolo rotondo'), crea: tavoloRotondo, nota: tr('piano Ø 100 in rovere, 4 gambe e fascia') },
+
 ];
