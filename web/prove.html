@@ -6,6 +6,7 @@
 <script type="module">
 import { avviaGeometria, geometriaPezzo } from './js/geometria.js';
 import * as mod from './js/modello.js';
+import { Vector3 } from './vendor/three.module.js';
 import { mobilettoLeggio, tavoloRotondo } from './js/esempi.js';
 import { righeDistinta } from './js/distinta.js';
 import { schemaDiTaglio } from './js/taglio.js';
@@ -423,6 +424,26 @@ for (const m of MODELLI) {
   pr.lastre = { [g0.materiale.id]: [1000, 600] };
   const g1 = schemaDiTaglio(pr)[0];
   prova('schema: lastra scelta per il progetto', g1.formatoProgetto && g1.materiale.lastra[0] === 1000 && g1.fogli.length >= 2 && g1.catalogo.lastra[0] === g0.materiale.lastra[0], `${g1.fogli.length} lastre`);
+}
+
+// 20. Adatta: faccia lontana, pezzo troppo lungo, testa A, piano inclinato
+{
+  const pr = mod.nuovoProgetto();
+  const piano = mod.nuovoPezzo(pr, 'pannello'); piano.rot = mod.rotazioneDa('orizzontale'); piano.pos = [-200, 800, 200]; piano.L = 800; piano.W = 600;
+  const gamba = (L = 700, y = 0) => { const g = mod.nuovoPezzo(pr, 'listello'); g.rot = mod.rotazioneDa('verticale'); g.pos = [100, y, 0]; g.L = L; return g; };
+  const ys = p => { const g = geometriaPezzo(p), m = mod.matrice(p), v = g.vertici.map(x => new Vector3(...x).applyMatrix4(m).y); return [Math.min(...v), Math.max(...v)]; };
+  const su = { normale: new Vector3(0, 1, 0), punto: new Vector3(0, 818, 0) }, giu = { normale: new Vector3(0, -1, 0), punto: new Vector3(0, 800, 0) };
+  let g = gamba(); let r = mod.adatta(g, piano, { faccia: su, asse: 'x', lato: 'max' });
+  prova('adatta: toccando il sopra del piano la gamba arriva a filo (non sparisce)', r.ok && vicino(ys(g)[1], 818, 0.01) && g.L === 818, `${r.msg} L ${g.L}`);
+  g = gamba(1000); r = mod.adatta(g, piano, { faccia: giu, asse: 'x' });
+  prova('adatta: un pezzo troppo lungo si accorcia fino al taglio (L = misura finita)', r.ok && g.L === 800 && vicino(ys(g)[1], 800, 0.01), `L ${g.L}`);
+  const pav = mod.nuovoPezzo(pr, 'pannello'); pav.rot = mod.rotazioneDa('orizzontale'); pav.pos = [-200, -18, 200];
+  g = gamba(700, 100); r = mod.adatta(g, pav, { faccia: { normale: new Vector3(0, 1, 0), punto: new Vector3(0, 0, 0) }, asse: 'x', lato: 'min' });
+  prova('adatta dalla testa A: scende fino al pavimento, la testa B resta ferma', r.ok && vicino(ys(g)[0], 0, 0.01) && vicino(ys(g)[1], 800, 0.01));
+  const incl = mod.nuovoPezzo(pr, 'pannello'); incl.rot = [-70, 0, 0]; incl.pos = [-200, 800, 200]; incl.L = 800; incl.W = 800;
+  g = gamba(1200); r = mod.adatta(g, incl, { asse: 'x' });
+  const gg = geometriaPezzo(g);
+  prova('adatta su piano inclinato: taglio obliquo e lunghezza = parte che resta', r.ok && /obliquo|inclinata/.test(r.msg) && vicino(g.L, gg.max[0] - gg.min[0], 0.11), `${r.msg} L ${g.L} vs ${gg.max[0] - gg.min[0]}`);
 }
 
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');

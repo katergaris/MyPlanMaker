@@ -123,8 +123,12 @@ export function deltaAccosta(fa, fb, vertici) {
     ruotato = na.angleTo(voluto) / RAD;
     if (ruotato > 0.01) {
       const perno = fa.punto;
+      // facce che guardano dalla stessa parte: mezzo giro intorno alla verticale (se possibile), non a un asse a caso
+      const su = new Vector3(0, 1, 0), q = ruotato > 179.9
+        ? new Quaternion().setFromAxisAngle(Math.abs(na.dot(su)) < 0.1 ? su : new Vector3(1, 0, 0).sub(na.clone().multiplyScalar(na.x)).normalize(), Math.PI)
+        : new Quaternion().setFromUnitVectors(na, voluto);
       delta.makeTranslation(perno.x, perno.y, perno.z)
-        .multiply(new Matrix4().makeRotationFromQuaternion(new Quaternion().setFromUnitVectors(na, voluto)))
+        .multiply(new Matrix4().makeRotationFromQuaternion(q))
         .multiply(new Matrix4().makeTranslation(-perno.x, -perno.y, -perno.z));
     } else ruotato = 0;
   }
@@ -147,6 +151,7 @@ export function distanzaDaFaccia(vertici, punto, n) {
 }
 
 // Adatta: allunga o accorcia il pezzo A fino a una faccia di B e lo taglia con l'angolo di quella faccia.
+// opz.lato = 'max' (testa B / bordo alto) o 'min' (testa A / bordo basso): la testa toccata; senza, la più vicina.
 // opz.faccia = faccia di B toccata { normale, punto } (senza: la faccia di B più adatta); opz.asse = 'x' (lunghezza)
 // o 'y' (larghezza, solo pannelli rettangolari), scelto toccando la testa o il bordo di A (senza: quello che punta
 // di più verso la faccia). Funziona con il pezzo ruotato in qualunque modo. Restituisce { ok, msg }.
@@ -171,17 +176,25 @@ export function adatta(a, b, opz = {}) {
   if (!scelta || scelta.allineo < 0.05) {
     return { ok: false, msg: opz.asse ? t(opz.asse === 'x' ? "La lunghezza del pezzo corre parallela a quella faccia: tocca un'altra testa o un altro bordo, oppure usa Accosta." : "La larghezza del pezzo corre parallela a quella faccia: tocca un'altra testa o un altro bordo, oppure usa Accosta.") : t('I due pezzi sono paralleli: qui serve Accosta, non Adatta.') };
   }
-  const { n, p, k } = scelta, i = k === 'x' ? 0 : 1, D = k === 'x' ? L : W, asse = versore(k);
+  const { p, k } = scelta, i = k === 'x' ? 0 : 1, D = k === 'x' ? L : W, asse = versore(k);
+  let n = scelta.n.clone();
   if (k === 'y' && !allungabile) return { ok: false, msg: t('Questo pezzo si allunga solo in lunghezza.') };
-  const versoFine = asse.dot(n) < 0;          // la testa (o il bordo) a coordinata D guarda verso B
+  const altro = k === 'x' ? W : L;
+  const locale = (x, u, z) => (k === 'x' ? new Vector3(x, u, z) : new Vector3(u, x, z)).applyMatrix4(ma);
+  // Quale testa si muove: quella toccata (opz.lato) o la più vicina al piano della faccia.
+  const distanza = x => Math.abs(locale(x, altro / 2, T / 2).sub(p).dot(n));
+  const lato = opz.lato || (distanza(D) <= distanza(0) ? 'max' : 'min'), versoFine = lato === 'max';
+  // La faccia va guardata dalla parte della testa che resta ferma: così si può toccare anche la faccia lontana di B
+  // (per esempio il sopra del piano, per una gamba che arriva a filo) e il taglio tiene sempre il pezzo giusto.
+  const fermo = locale(versoFine ? 0 : D, altro / 2, T / 2), sf = fermo.clone().sub(p).dot(n);
+  if (Math.abs(sf) < 0.5) return { ok: false, msg: t("La testa opposta sta proprio su quella faccia: tocca l'altra testa del pezzo.") };
+  if (sf < 0) n.negate();
   const e = versoFine ? asse.clone() : asse.clone().negate();
-  const xTesta = versoFine ? D : 0, altro = k === 'x' ? W : L;
+  if (e.dot(n) > -0.05) return { ok: false, msg: t('La faccia è dalla parte sbagliata: tocca l\'altra testa del pezzo, oppure una faccia davanti a questa testa.') };
+  const xTesta = versoFine ? D : 0;
   let delta = -Infinity;
-  for (const u of [0, altro]) for (const z of [0, T]) {
-    const c = (k === 'x' ? new Vector3(xTesta, u, z) : new Vector3(u, xTesta, z)).applyMatrix4(ma);
-    delta = Math.max(delta, -c.clone().sub(p).dot(n) / e.dot(n));
-  }
-  // Allunga solo se serve: se il pezzo entra già in B basta il taglio.
+  for (const u of [0, altro]) for (const z of [0, T]) delta = Math.max(delta, -locale(xTesta, u, z).sub(p).dot(n) / e.dot(n));
+  // Allunga se serve; se il pezzo entra già in B basta il taglio, poi più sotto si accorcia fino al taglio.
   a.tagli = a.tagli.filter(t => t.da !== b.id);
   if (delta > 0.01) {
     const allunga = Math.ceil(delta);
@@ -197,7 +210,25 @@ export function adatta(a, b, opz = {}) {
   const nl = n.clone().applyMatrix4(inv).normalize();
   const pos = new Vector3(...a.pos);
   const d = p.clone().sub(pos).dot(n);
-  a.tagli.push({ n: [nl.x, nl.y, nl.z].map(v => Math.round(v * 1e9) / 1e9), d: Math.round(d * 1e6) / 1e6, da: b.id });
+  const taglio = { n: [nl.x, nl.y, nl.z].map(v => Math.round(v * 1e9) / 1e9), d: Math.round(d * 1e6) / 1e6, da: b.id };
+  a.tagli.push(taglio);
+  // Accorcia fino al taglio: la misura del pezzo è quella che resta davvero (niente legno oltre la faccia di B).
+  if (a.forma !== 'cerchio' && a.forma !== 'sagoma' && a.forma !== 'disegno') {
+    const Dn = k === 'x' ? a.L : a.W, j = k === 'x' ? 1 : 0, ni = taglio.n[i];
+    const estremi = [];
+    for (const u of [0, altro]) for (const z of [0, T]) estremi.push(Math.min(Dn, Math.max(0, (taglio.d - taglio.n[j] * u - taglio.n[2] * z) / ni)));
+    if (versoFine) {
+      const fine = Math.max(...estremi), togli = Math.floor((Dn - fine) * 10) / 10;
+      if (togli > 0.05 && fine > 0) { if (k === 'x') a.L = pulisci(a.L - togli); else a.W = pulisci(a.W - togli); }
+    } else {
+      const inizio = Math.floor(Math.min(...estremi) * 10) / 10;
+      if (inizio > 0.05 && inizio < Dn) {
+        if (k === 'x') a.L = pulisci(a.L - inizio); else a.W = pulisci(a.W - inizio);
+        a.pos = a.pos.map((c, q) => pulisci(c + asse.getComponent(q) * inizio));
+        a.tagli = a.tagli.map(t => ({ ...t, d: Math.round((t.d - t.n[i] * inizio) * 1e6) / 1e6 }));
+      }
+    }
+  }
   return { ok: true, msg: descriviTaglio(a.tagli.at(-1)) };
 }
 
@@ -207,6 +238,12 @@ export function assePerFaccia(p, normale) {
   const [x, y, z] = [Math.abs(nl.x), Math.abs(nl.y), Math.abs(nl.z)];
   if (z >= x && z >= y) return null;
   return x >= y ? 'x' : 'y';
+}
+
+// Quale testa è la faccia toccata lungo l'asse: 'max' (testa B, bordo alto) o 'min'.
+export function latoPerFaccia(p, normale, asse) {
+  const nl = normale.clone().applyMatrix4(new Matrix4().extractRotation(matrice(p)).transpose());
+  return (asse === 'y' ? nl.y : nl.x) > 0 ? 'max' : 'min';
 }
 
 // Dividi: n copie di A distribuite alla stessa distanza nello spazio tra A e B (che devono essere paralleli).

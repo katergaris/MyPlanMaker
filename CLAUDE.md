@@ -38,7 +38,7 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   - **Prezzi facoltativi**: `impostazioni.prezzi` (condivisa, dal menu ⋯), nascosti se non è `true`.
   - `js/modello.js` — pezzi (L lungo x, W lungo y, T lungo z; tagli = semipiani locali `n·x >= d`; rotazioni ordine
     X → Y → Z, Euler three.js `'ZYX'`), orientamenti rapidi, **Accosta** (`deltaAccosta`: faccia contro faccia, anche
-    ruotando; pannello «Allinea» in `app.js`), **Adatta** (asse `x` o `y`, faccia toccata, pezzi ruotati), **Dividi**,
+    ruotando; pannello «Allinea» in `app.js`), **Adatta** (asse `x` o `y`, faccia toccata, `lato` = testa toccata (`latoPerFaccia`), la faccia si orienta verso la testa ferma, poi accorcia fino al taglio; pezzi ruotati), **Dividi**,
     trasforma (gizmo), calamita, **ridimensiona** (`assiManiglie`, `ridimensiona(p, asse, lato, nuovo)`: i tagli della
     testa mossa la seguono), copia specchiata (capovolge x locale), bordi (`nomeBordo`, `bordatura`), storico.
     Unità dell'interfaccia (`unita.u` mm/cm, `fmtU`, `leggiMisura`): nel progetto tutto resta in mm.

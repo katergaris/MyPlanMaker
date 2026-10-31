@@ -13,6 +13,10 @@
 - **Sheet and stock length per project** in the cutting layout: each material shows its sheet (L × H) or bar length,
   editable for the current project (offcuts, sheets pre-cut by the shop), with a button to go back to the catalogue.
 - Changing length or width in the piece panel now moves the cuts of end B with it.
+- **Fit fixes**: tapping the far face of the other piece (e.g. the top of a table top) now makes the piece end flush
+  with it instead of cutting it away entirely; a piece that went past the face is shortened to the cut, so its
+  length field matches the finished size; the tapped end is the one that moves (also end A, the other stays put).
+- Place: when the two tapped faces look the same way, the half turn is around the vertical, not a random axis.
 
 ## 0.12.0 — 2026-10-31
 - **Five languages**: Italian, English, French, German, Spanish. The first time the language follows the browser;

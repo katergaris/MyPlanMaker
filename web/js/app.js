@@ -210,7 +210,7 @@ function tocco(id, faccia, evento) {
     const asse = mod.assePerFaccia(p, faccia.normale);
     if (!asse) return avvisa(t('Questa è la faccia grande: tocca la testa o il bordo da allungare.'), true, 5000);
     if (asse === 'y' && (p.tipo !== 'pannello' || p.forma !== 'rett')) return avvisa(t('Questo pezzo si allunga solo in lunghezza: tocca una delle teste.'), true, 5000);
-    stato.accostaDa = { normale: faccia.normale, punto: faccia.punto, asse };
+    stato.accostaDa = { normale: faccia.normale, punto: faccia.punto, asse, lato: mod.latoPerFaccia(p, faccia.normale, asse) };
     aggiorna();
     return avvisa(t(asse === 'x' ? "Allungo la lunghezza di «{nome}». Ora tocca la faccia dell'altro pezzo dove deve arrivare." : "Allungo la larghezza di «{nome}». Ora tocca la faccia dell'altro pezzo dove deve arrivare.", { nome: p.nome }), false, 0);
   }
@@ -231,7 +231,7 @@ function tocco(id, faccia, evento) {
     }
     {
       const prova = structuredClone(p);
-      const r = mod.adatta(prova, b, { faccia, asse: stato.accostaDa?.asse });
+      const r = mod.adatta(prova, b, { faccia, asse: stato.accostaDa?.asse, lato: stato.accostaDa?.lato });
       stato.accostaDa = null;
       if (r.ok && !geometriaPezzo(prova)) { r.ok = false; r.msg = t('Il taglio toglierebbe tutto il pezzo: controlla da che parte sta.'); }
       if (!r.ok) { avvisa(r.msg, true); } else {
@@ -454,7 +454,7 @@ function ridimensionato(id, esiti) {
     const rb = new Matrix4().extractRotation(mod.matrice(b));
     const squadra = [0, 1, 2].some(i => Math.abs(new Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0).applyMatrix4(rb).dot(e)) > 0.9999);
     if (squadra) continue;
-    const r = mod.adatta(prova, b, { asse: x.k });
+    const r = mod.adatta(prova, b, { asse: x.k, lato: x.lato });
     if (r.ok && geometriaPezzo(prova)) msg += ' · ' + t('adattato a «{b}». {taglio}.', { b: b.nome, taglio: r.msg });
   }
   modifica(() => Object.assign(p, prova));
