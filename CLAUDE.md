@@ -104,5 +104,11 @@ controllarlo con `prove-ui.html` e consegnarlo come `.mpm.json` in `MyPlanMaker/
 Limiti noti: i tagli restano fissi se poi si cambia la lunghezza; Adatta non allunga sagome e cerchi; i cassetti
 solo tra fianchi affiancati in X; viti, frecce e stabilità con regole indicative; un progetto eliminato senza rete
 ricompare dal server.
+**Punto in cui ci siamo fermati (2026-10-31)**: 0.12.0 pubblicata su ZimaOS e su GitHub (commit `6b899d2`, CI verde).
+Salvo ha detto **no** alla traduzione in inglese di commenti e nomi interni del codice: restano in italiano (i nomi
+interni finiscono anche nei progetti salvati, rinominarli richiederebbe una conversione dei vecchi file).
+Proposte fatte e non ancora scelte: modello pronto «Sedia» (altezza seduta, inclinazione schienale, traversi);
+curve tra i punti nelle linee del disegno 2D, testo, selezione di più forme. Nomi dei comandi nelle altre lingue
+scelti da Claude (es. Accosta = Place/Accoler/Anlegen/Arrimar): cambiarli se Salvo non li trova chiari.
 Idee per dopo: relazioni vive tra pezzi (tagli e misure che seguono), legno curvato, rilievo dell'ambiente, sistema
 32 per i reggipiani, piedini e reggipiani in spesa, render con essenze.
