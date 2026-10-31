@@ -15,6 +15,7 @@ import { unioni } from './js/unioni.js';
 import { cerniere, maniglia } from './js/ferramenta.js';
 import { controlli, freccia } from './js/controlli.js';
 import { MODELLI, valoriDefault } from './js/modelli.js';
+import { creaCassetti } from './js/cassetti.js';
 import { listaSpesa } from './js/spesa.js';
 import { normalizza, FORME } from './js/sagome.js';
 import { foriDelPezzo, htmlDima, htmlDisegno, htmlEtichette } from './js/disegni.js';
@@ -474,6 +475,27 @@ for (const m of MODELLI) {
   prova('fori sul pezzo: ancora al bordo più vicino o al centro', l.ax === 'sx' && l.dx === 50 && l.ay === 'c' && l.dy === 0 && !('cx' in l));
   const r = righeDistinta(pr).find(x => x.nome === tav.nome);
   prova('distinta: fori sul pezzo', /1 foro passante/.test(r.forma.join()));
+}
+
+// 22. Cassetti: tipi di guida e mobile girato
+{
+  const vano = { x0: 18, x1: 782, y0: 404, y1: 750, zFronte: 0, profondita: 497, n: 1, spessoreFianchi: 18, matCassone: 'mb12', matFrontale: 'mb18', frontale: 'sovrapposto' };
+  const crea = (guida, extra = {}) => { const pr = mod.nuovoProgetto(); const r = creaCassetti(pr, { ...vano, guida, ...extra }); return { pr, r, p: nome => pr.pezzi.find(x => x.nome.endsWith(nome)) }; };
+  let c = crea({ tipo: 'sfere', gioco: 12.5 });
+  prova('cassetto a sfere: gioco 12,5 per lato e guide da 450', c.r.ok && c.r.guida === 450 && vicino(c.p('fianco sinistro').pos[0], 30.5, 0.01) && c.p('fianco sinistro').ferramenta[0].gioco === 12.5);
+  c = crea({ tipo: 'sfere', gioco: 13, lunghezza: 400 });
+  prova('cassetto: gioco e lunghezza delle guide impostabili', c.r.guida === 400 && vicino(c.p('fianco destro').pos[0], 782 - 13 - 12, 0.01));
+  c = crea({ tipo: 'sotto' });
+  prova('cassetto con guide nascoste: 5 mm per lato, 14 sotto', c.r.ok && vicino(c.p('fianco sinistro').pos[0], 23, 0.01) && vicino(c.p('fianco sinistro').pos[1], 418, 0.01) && c.p('fianco sinistro').ferramenta[0].modello === 'sotto');
+  c = crea({ tipo: 'legno', gioco: 1, listello: [20, 25] });
+  const ls = c.p('listello di scorrimento sinistro'), fs = c.p('fianco sinistro');
+  prova('cassetto su listelli: due listelli fissi, il fianco ci appoggia sopra', c.r.ok && ls && !ls.mobile && vicino(ls.pos[1] + 20, fs.pos[1], 0.01) && vicino(fs.pos[0], 19, 0.01) && !fs.ferramenta.length, JSON.stringify(ls?.pos));
+  c.pr.pezzi.forEach(x => { x.tagli = x.tagli || []; });
+  const ctr = controlli(c.pr);
+  prova('cassetto su listelli: niente compenetrazioni', !ctr.avvisi.some(a => /compenetr|entra/i.test(a)), ctr.avvisi.join(' | '));
+  c = crea({ tipo: 'sfere', gioco: 12.5 }, { ruota: Math.PI / 2 });
+  const fr = c.p('frontale'), q = mod.ingombro(fr);
+  prova('cassetto nel mobile girato: il frontale guarda verso +X', vicino(q.max.x - q.min.x, 18, 0.01) && q.max.z - q.min.z > 700);
 }
 
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');

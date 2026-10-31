@@ -49,6 +49,8 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     sistema locale); `geometriaPezzo` li sottrae (registro dei pezzi del progetto). I bloccati non si trascinano.
   - **Fori e forme sul pezzo**: `p.lavorazioni` (forme del disegno 2D senza cx/cy, con ancora `ax` sx/dx/c + `dx`,
     `ay` basso/alto/c + `dy`); `formeLavorazioni(p)`, `lavorazioneDa(f, L, W)`; editor = `apriDisegno2D(..., { sfondo, forme })`.
+  - **Vincolo delle viti**: `testeVincolate(p, asse)` / `latoDaMuovere()` in app.js: scrivendo L o W resta ferma la testa
+    fissata (unione con viti o angolari sulla testa); se lo sono tutte e due si muove la testa B.
   - Pannello del pezzo a sezioni `<details>` (`sezione()` in app.js, aperte in localStorage `mpm:sezioni`).
   - `js/geometria.js` — Manifold: profilo (rettangolo con raggi, cerchio, **sagoma** con archi a freccia) estruso,
     tagli, fori della ferramenta; tiene il solido in cache (`solido`) per `volumeComune` e `sezionePezzo` (slice).
@@ -65,7 +67,8 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     (`p.ruolo = 'frontale'`, solo da faccia), testa contro testa (angolari), pezzi ≤ 6 mm o bordi < 8 mm
     (chiodini); viti negli angoli spostate lungo l'unione; collisioni con viti, scodelle e fori.
   - `js/ferramenta.js` — cerniere, maniglie, guide; catalogo prezzi. `js/cassetti.js` — cassetti con guide
-    (gioco 12,5 per lato, guide 250-650, fuga 3). `js/modelli.js` — 7 modelli parametrici; ogni parametro `mat` ha anche
+    (`TIPI_GUIDA`: sfere / sotto / legno con listelli fissi; `v.guida` = { tipo, gioco, lunghezza, sotto, listello }; `v.ruota`
+    = angolo intorno a Y, il vano si descrive col davanti verso +Z). Il vano si trova da un tocco: `vanoDa(faccia)` in app.js. `js/modelli.js` — 7 modelli parametrici; ogni parametro `mat` ha anche
     `k+'T'` (e `k+'W'` per i listelli), letti con `scelto(v, k)`.
   - `js/controlli.js` — peso/baricentro, ribaltamento, fissaggio al muro, compenetrazioni (Manifold), freccia dei
     soli ripiani liberi. In cache finché il progetto non cambia.
@@ -78,7 +81,7 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     `poligoniDisegno`; il pezzo = unione dei pieni − vuoti passanti, estruso, − scassi). `js/esporta.js` — CSV (;), DXF R12, STL.
     `js/montaggio.js` — istruzioni di montaggio. `js/archivio.js` — progetti e impostazioni (locale + server),
     file `.mpm.json`. `js/esempi.js` — mobiletto con leggio, tavolo rotondo.
-  - `prove.html` — prove automatiche (129, "TUTTE OK"); `prove-ui.html#passo,passo` — pilota l'app per gli
+  - `prove.html` — prove automatiche (135, "TUTTE OK"); `prove-ui.html#passo,passo` — pilota l'app per gli
     screenshot (esempio:N, modello:id, crea, sel:Nome, cmd:x, tocca:Nome, faccia:Nome:nx:ny:nz, trascina:Nome:dx:dy[:ox:oy], maniglia:i:dx:dy, quota:asse:valore, stato (JSON dei pezzi),
     tracciaSu:selettore:x0:y0:x1:y1, unita:cm, vista:x, distinta, schema, ferramenta, disegni, menu:x, clic:selettore, fissaggio:tipo, progetti).
   - `vendor/` — three.js 0.186.1 (con OrbitControls e TransformControls) e manifold-3d 3.5.4 (`VERSIONI.txt`).
@@ -113,7 +116,7 @@ al codice: rilanciare `deploy/pubblica-zimaos.sh` (i dati restano).
 Per preparare un progetto per Salvo: costruirlo con le funzioni di `modello.js`/`modelli.js` (come `esempi.js`),
 controllarlo con `prove-ui.html` e consegnarlo come `.mpm.json` in `MyPlanMaker/progetti/`.
 Limiti noti: cambiando la misura si muovono solo i tagli della testa che cresce (testa B dal campo, quella trascinata dalle maniglie); Adatta non allunga sagome e cerchi; i cassetti
-solo tra fianchi affiancati in X; viti, frecce e stabilità con regole indicative; un progetto eliminato senza rete
+solo in mobili girati di 90° in 90° (il vano si cerca con gli ingombri); viti, frecce e stabilità con regole indicative; un progetto eliminato senza rete
 ricompare dal server.
 **Punto in cui ci siamo fermati (2026-10-31)**: 0.13.0 su richiesta di Salvo (Accosta/Adatta macchinosi, misure come in
 Tinkercad, lastra del taglio da scegliere; caso concreto: pannello 800 nei campi ma 755 finito per un taglio rimasto).

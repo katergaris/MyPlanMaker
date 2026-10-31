@@ -69,6 +69,8 @@ f.onload = async () => {
     if (p === 'disegni') { d.getElementById('apri-distinta').click(); d.querySelector('[data-scheda="disegni"]').click(); }
     if (p.startsWith('menu:')) w.mpm.menuAltro(p.slice(5));
     if (p === 'progetti') d.getElementById('apri-progetti').click();
+    if (p.startsWith('valore:')) { const q = decodeURIComponent(p.slice(7)), i = q.lastIndexOf('='), sel = q.slice(0, i), v = q.slice(i + 1), el = d.querySelector(sel); el.value = v; el.dispatchEvent(new w.Event('change', { bubbles: true })); }
+    if (p.startsWith('ruotaTutto:')) { const { Matrix4 } = await import('./vendor/three.module.js'), R = new Matrix4().makeRotationY(+p.slice(11) * Math.PI / 180); stato.progetto.pezzi.forEach(x => w.mpm.mod.trasforma(x, R)); w.mpm.apri(stato.progetto); }
     if (p.startsWith('blocca:')) { tocco(pezzo(p.slice(7))); comando('blocca'); }
     if (p.startsWith('sposta:')) { const [nome, ...d] = p.slice(7).split(':'), pz = stato.progetto.pezzi.find(x => x.nome === decodeURIComponent(nome)); w.mpm.mod.sposta(pz, d.map(Number)); w.mpm.apri(stato.progetto); tocco(pz.id); }
     if (p === 'stato') document.body.insertAdjacentHTML('beforeend', `<pre id="stato">${JSON.stringify({ pezzi: stato.progetto.pezzi.map(x => ({ nome: x.nome, pos: x.pos, L: x.L, W: x.W, tagli: x.tagli.length, intagli: x.intagli?.length, lav: x.lavorazioni?.length, blocc: x.bloccato })), accostato: stato.accostato, toast: d.getElementById('toast-testo').textContent })}</pre>`);

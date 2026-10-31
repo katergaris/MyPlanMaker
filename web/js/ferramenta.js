@@ -12,6 +12,7 @@ export const CATALOGO = {
   viteManiglia: { nome: tr('Vite per maniglia'), prezzo: 0.1 },
   angolare: { nome: tr('Angolare 40×40 con 4 viti 3,5×16'), prezzo: 0.7 },
   guida: { nome: tr('Coppia di guide a sfere, estrazione totale'), prezzo: 9 },
+  guidaSotto: { nome: tr('Coppia di guide nascoste sotto il cassetto'), prezzo: 22 },
 };
 
 export const MODELLI_CERNIERA = { sovrapposta: tr('Sovrapposta'), semi: tr('Semi sovrapposta'), filo: tr('A filo (interna)') };
@@ -90,8 +91,11 @@ export function foriPezzo(p) {
 export function guide(p) {
   const g = (p.ferramenta || []).find(f => f.tipo === 'guida');
   if (!g) return null;
-  const { W, T } = dimensioni(p), z = g.faccia === 'z0' ? -6.5 : T + 6.5;
-  return [{ da: [0, W / 2, z], a: [g.lunghezza, W / 2, z], alto: 12 }];
+  const { W, T } = dimensioni(p);
+  // nascoste: sotto il fianco del cassetto; a sfere: nel gioco tra il fianco del cassetto e la parete
+  if (g.modello === 'sotto') return [{ da: [0, -6, T / 2], a: [g.lunghezza, -6, T / 2], alto: 10 }];
+  const meta = Math.max(1, (g.gioco ?? 13) / 2), z = g.faccia === 'z0' ? -meta : T + meta;
+  return [{ da: [0, W / 2, z], a: [g.lunghezza, W / 2, z], alto: Math.min(12, meta * 2) }];
 }
 
 export function haCerniere(p) {

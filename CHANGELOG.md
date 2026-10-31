@@ -24,6 +24,12 @@
   bottom/centre/top) when the piece is resized; both are editable in the panel.
 - **Shorter piece panel**: sizes, thickness and material stay on top; shape, holes, orientation and position, cuts,
   edges, hardware and joints are collapsible sections (the open ones are remembered).
+- **Drawers rebuilt**: press Drawer and tap inside the opening (inner face of a side, the bottom or the back); the
+  walls, top, bottom and open front are found by themselves, also in cabinets turned by 90°. Three runner types with
+  editable sizes: ball-bearing side runners (clearance per side, length), concealed undermount runners (clearance,
+  space under the box) and wooden runner battens screwed to the walls (clearance, batten height and width).
+- **Screwed ends stay put**: typing a new length or width keeps the end fixed with screws (or other fasteners) to
+  another piece and changes the piece on the free side.
 - Place: when the two tapped faces look the same way, the half turn is around the vertical, not a random axis.
 
 ## 0.12.0 — 2026-10-31

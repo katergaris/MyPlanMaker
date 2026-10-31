@@ -13,7 +13,7 @@ import { FISSAGGI, descriviGiunto, descriviTipo, unioni } from './unioni.js';
 import { INTERASSI, LATI, MODELLI_CERNIERA, cerniere, maniglia } from './ferramenta.js';
 import { listaSpesa } from './spesa.js';
 import { MODELLI, modello, valoriDefault } from './modelli.js';
-import { creaCassetti, lunghezzaGuida } from './cassetti.js';
+import { TIPI_GUIDA, creaCassetti, lunghezzaPer } from './cassetti.js';
 import { apriEditorSagoma } from './sagome.js';
 import { apriDisegno2D, formeDaPezzo } from './disegno2d.js';
 import { htmlDima, htmlDisegno, htmlEtichette } from './disegni.js';
@@ -145,7 +145,12 @@ function comando(cmd) {
   } else if (cmd === 'modelli') {
     esciModo();
     apriModelli();
-  } else if (cmd === 'accosta' || cmd === 'adatta' || cmd === 'dividi' || cmd === 'cassetto') {
+  } else if (cmd === 'cassetto') {
+    if (stato.modo === cmd) return esciModo();
+    stato.modo = cmd; stato.accostaDa = null; stato.accostato = null;
+    aggiornaAttrezzi();
+    avvisa(t('Tocca dentro il vano dove va il cassetto (la faccia interna di un fianco, il fondo o il retro): trovo io le pareti. Esc per annullare.'), false, 0);
+  } else if (cmd === 'accosta' || cmd === 'adatta' || cmd === 'dividi') {
     if (!p) return;
     if (stato.modo === cmd) return esciModo();
     stato.modo = cmd;
@@ -154,7 +159,6 @@ function comando(cmd) {
     stato.accostato = null;
     avvisa(t(cmd === 'accosta'
       ? "Tocca la faccia di «{nome}» da appoggiare, poi la faccia dell'altro pezzo. (Se tocchi subito l'altro pezzo, «{nome}» ci si appoggia senza girarsi.) Esc per annullare."
-      : cmd === 'cassetto' ? "Tocca l'altro fianco del vano: i cassetti vanno tra «{nome}» e quello."
       : cmd === 'dividi' ? 'Tocca il pezzo opposto a «{nome}» (per esempio il piano, o l\'altro fianco): ti chiedo quanti pezzi mettere in mezzo.'
       : "Tocca la testa o il bordo di «{nome}» da allungare, poi la faccia dell'altro pezzo dove deve arrivare: lo allungo o accorcio e lo taglio con l'angolo giusto. (Se tocchi subito l'altro pezzo, scelgo io.)", { nome: p.nome }), false, 0);
   } else if (cmd === 'duplica') {
@@ -217,6 +221,13 @@ function tocco(id, faccia, evento) {
     return aggiorna();
   }
   if (stato.modo === 'accosta') return toccoAccosta(id, faccia);
+  if (stato.modo === 'cassetto') {
+    if (!id) return avvisa(t('Tocca dentro il vano, su un pezzo del mobile. Esc per annullare.'), true, 4000);
+    const v = vanoDa(faccia);
+    if (!v.ok) return avvisa(v.msg, true, 6000);
+    stato.modo = null; aggiornaAttrezzi(); $('#toast').hidden = true;
+    return apriCassetto(v);
+  }
   if (stato.modo === 'adatta' && p && id === p.id) {
     const asse = mod.assePerFaccia(p, faccia.normale);
     if (!asse) return avvisa(t('Questa è la faccia grande: tocca la testa o il bordo da allungare.'), true, 5000);
@@ -228,12 +239,6 @@ function tocco(id, faccia, evento) {
   if (stato.modo && p) {
     if (!id || id === p.id) return avvisa(t('Tocca un altro pezzo, oppure premi di nuovo il comando per uscire.'), true, 4000);
     const b = stato.progetto.pezzi.find(x => x.id === id);
-    if (stato.modo === 'cassetto') {
-      stato.modo = null;
-      aggiornaAttrezzi();
-      $('#toast').hidden = true;
-      return apriCassetto(p, b);
-    }
     if (stato.modo === 'dividi') {
       stato.modo = null;
       aggiornaAttrezzi();
@@ -429,6 +434,30 @@ function contatto(sel) {
   return migliore?.v || null;
 }
 
+// Teste del pezzo fissate ad altri pezzi (viti, confirmat, spinotti, angolari…) lungo l'asse 'x' o 'y': Set di
+// 'min' / 'max'. Conta solo un'unione sulla testa (o sul bordo) che quell'asse fa muovere, non sulle facce.
+function testeVincolate(p, asse) {
+  const i = asse === 'y' ? 1 : 0, R = new Matrix4().extractRotation(mod.matrice(p)), inv = R.clone().transpose();
+  const e = new Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, 0).applyMatrix4(R), origine = new Vector3(...p.pos), D = mod.dimensioni(p)[asse === 'y' ? 'W' : 'L'];
+  const out = new Set();
+  for (const g of unioni(stato.progetto).giunti) {
+    if (g.a !== p && g.b !== p) continue;
+    if (g.escluso || g.tipo === 'cerniere' || g.tipo === 'parte mobile' || !(g.viti?.length || g.angolari)) continue;
+    if (Math.abs(g.normale.clone().applyMatrix4(inv).getComponent(i)) < 0.9) continue;
+    const altro = g.a === p ? g.b : g.a, B = ingombroMondo(altro);
+    const dove = g.viti?.length ? g.viti.reduce((c, v) => c.add(v.testa), new Vector3()).multiplyScalar(1 / g.viti.length) : B.min.clone().add(B.max).multiplyScalar(0.5);
+    out.add(dove.sub(origine).dot(e) < D / 2 ? 'min' : 'max');
+  }
+  return out;
+}
+// Da che parte cresce o cala il pezzo quando si scrive una misura: dalla testa non fissata con le viti.
+function latoDaMuovere(p, asse, predefinito = 'max') {
+  const v = testeVincolate(p, asse);
+  if (v.has('max') && !v.has('min')) return { lato: 'min', vincolo: true };
+  if (v.has('min') && !v.has('max')) return { lato: 'max', vincolo: true };
+  return { lato: predefinito, vincolo: false, tutte: v.size === 2 };
+}
+
 // Quota scritta sul pezzo nel 3D. Lunghezza e larghezza sono quelle finite (dopo i tagli): il pezzo cresce o cala
 // della differenza, e i tagli della testa che si muove la seguono. Così un pezzo adattato si porta alla misura voluta.
 function quotaScritta(campo, valore, asse) {
@@ -439,7 +468,10 @@ function quotaScritta(campo, valore, asse) {
   const finita = g.max[i] - g.min[i], diff = v - finita;
   if (Math.abs(diff) < 0.05) return aggiorna();
   // si muove la testa con un taglio (se c'è solo all'inizio, quella), altrimenti la testa B / il bordo alto
-  const lato = p.tagli.some(x => x.n[i] < -1e-6) || !p.tagli.some(x => x.n[i] > 1e-6) ? 'max' : 'min';
+  const perTagli = p.tagli.some(x => x.n[i] < -1e-6) || !p.tagli.some(x => x.n[i] > 1e-6) ? 'max' : 'min';
+  const sc = latoDaMuovere(p, asse === 'y' ? 'y' : 'x', perTagli), lato = sc.lato;
+  if (sc.tutte) avvisa(t('Tutte e due le teste sono fissate con le viti: ho mosso la testa B (o il bordo alto). Controlla le unioni.'), false, 6000);
+  else if (sc.vincolo) avvisa(t('La testa fissata con le viti è rimasta ferma: il pezzo è cambiato dall\'altra parte.'), false, 4000);
   const prova = structuredClone(p);
   mod.ridimensiona(prova, asse === 'y' ? 'y' : 'x', lato, p[campo] + diff);
   const g2 = geometriaPezzo(prova);
@@ -557,49 +589,88 @@ function creaModello(dove) {
 
 // ---------- Cassetti ----------
 let cassettoTra = null;
-function vanoTra(a, b) {
-  const va = verticiMondo(a), vb = verticiMondo(b), s = mod.spazioTra(a, b, va, vb, 1);
-  if (!s.ok) return { ok: false, msg: s.msg };
-  if (Math.abs(s.asse.x) < 0.99) return { ok: false, msg: t('Per ora i cassetti vanno tra due fianchi affiancati in larghezza (sinistra e destra).') };
-
-  const A = mod.ingombro(a, va), B = mod.ingombro(b, vb);
-  const x0 = Math.min(A.max.x, B.max.x), x1 = Math.max(A.min.x, B.min.x);
-  const y0 = Math.max(A.min.y, B.min.y), y1 = Math.min(A.max.y, B.max.y), z0 = Math.max(A.min.z, B.min.z), z1 = Math.min(A.max.z, B.max.z);
-  // spazi già occupati da pezzi orizzontali tra i due fianchi
-  const occupati = stato.progetto.pezzi.filter(p => p !== a && p !== b).map(ingombroMondo)
-    .filter(q => q.min.x < x1 - 1 && q.max.x > x0 + 1 && q.min.z < z1 - 1 && q.max.z > z0 + 1 && q.max.y > y0 && q.min.y < y1)
-    .map(q => [q.min.y, q.max.y]).sort((p, q) => p[0] - q[0]);
-  let liberi = [], y = y0;
-  for (const [lo, hi] of occupati) { if (lo > y + 1) liberi.push([y, lo]); y = Math.max(y, hi); }
-  if (y1 > y + 1) liberi.push([y, y1]);
-  const vano = liberi.sort((p, q) => (q[1] - q[0]) - (p[1] - p[0]))[0] || [y0, y1];
-  return { ok: true, x0, x1, y0: vano[0], y1: vano[1], zFronte: z1, profondita: z1 - z0, spessore: Math.min(A.max.x - A.min.x, B.max.x - B.min.x) };
+// Vano del cassetto da un tocco dentro il mobile: dal punto toccato (spostato di poco verso l'interno) si cerca il
+// pezzo più vicino in ognuna delle 6 direzioni, con gli ingombri. Le due pareti stanno sull'asse orizzontale chiuso
+// da tutti e due i lati, il davanti è il lato aperto dell'altro asse (o quello verso chi guarda); sopra e sotto il
+// primo pezzo che si incontra, altrimenti fin dove arrivano le pareti. Funziona con il mobile girato di 90° in 90°.
+function vanoDa(faccia) {
+  const Q = faccia.punto.clone().addScaledVector(faccia.normale.clone().normalize(), 2);
+  const box = stato.progetto.pezzi.map(p => ({ p, B: ingombroMondo(p) }));
+  const assi = ['x', 'y', 'z'];
+  const colpo = (k, s) => {
+    let meglio = null;
+    for (const { p, B } of box) {
+      if (!assi.every(j => j === k || (B.min[j] < Q[j] - 0.5 && B.max[j] > Q[j] + 0.5))) continue;
+      const d = s > 0 ? B.min[k] - Q[k] : Q[k] - B.max[k];
+      if (d < -0.5) continue;
+      if (!meglio || d < meglio.d) meglio = { d, p, B, c: s > 0 ? B.min[k] : B.max[k] };
+    }
+    return meglio;
+  };
+  const h = { x: [colpo('x', -1), colpo('x', 1)], z: [colpo('z', -1), colpo('z', 1)] };
+  const chiusi = ['x', 'z'].filter(k => h[k][0] && h[k][1]);
+  if (!chiusi.length) return { ok: false, msg: t("Non trovo due pareti ai lati di quel punto: tocca dentro il vano, per esempio la faccia interna di un fianco o il fondo.") };
+  const occhio = vista.camera.getWorldDirection(new Vector3()).negate(); // verso chi guarda
+  let larg, prof;
+  if (chiusi.length === 1) { larg = chiusi[0]; prof = larg === 'x' ? 'z' : 'x'; }
+  else { prof = Math.abs(occhio.x) > Math.abs(occhio.z) ? 'x' : 'z'; larg = prof === 'x' ? 'z' : 'x'; }
+  const [pa, pb] = h[larg], [dietro, davanti] = h[prof];
+  // verso del davanti: il lato aperto, altrimenti quello verso chi guarda
+  const segno = !davanti && dietro ? 1 : davanti && !dietro ? -1 : (occhio[prof] >= 0 ? 1 : -1);
+  const pareti = [pa.B, pb.B];
+  const fronte = segno > 0 ? Math.min(...pareti.map(B => B.max[prof])) : Math.max(...pareti.map(B => B.min[prof]));
+  const fondoMobile = segno > 0 ? (dietro ? dietro.c : Math.max(...pareti.map(B => B.min[prof]))) : (davanti ? davanti.c : Math.min(...pareti.map(B => B.max[prof])));
+  const giu = colpo('y', -1), su = colpo('y', 1);
+  const y0 = giu ? giu.c : Math.max(...pareti.map(B => B.min.y)), y1 = su ? su.c : Math.min(...pareti.map(B => B.max.y));
+  // vano descritto girato col davanti verso +Z: angolo intorno alla verticale e coordinate nel sistema girato
+  const f = new Vector3(prof === 'x' ? segno : 0, 0, prof === 'z' ? segno : 0), ruota = Math.atan2(f.x, f.z);
+  const u = new Vector3(Math.cos(ruota), 0, -Math.sin(ruota));
+  const lato = B => (larg === 'x' ? [B.min.x, B.max.x] : [B.min.z, B.max.z]);
+  const interno = [pa.c, pb.c].map(c => { const q = new Vector3(); q[larg] = c; return q.dot(u); }).sort((a, b) => a - b);
+  const zf = (() => { const q = new Vector3(); q[prof] = fronte; return q.dot(f); })(), zb = (() => { const q = new Vector3(); q[prof] = fondoMobile; return q.dot(f); })();
+  const spessore = Math.min(...pareti.map(B => { const [a, b] = lato(B); return b - a; }));
+  if (interno[1] - interno[0] < 100) return { ok: false, msg: t('Spazio troppo stretto per un cassetto.') };
+  const r2 = x => Math.round(x * 100) / 100;
+  return { ok: true, x0: r2(interno[0]), x1: r2(interno[1]), y0: r2(y0), y1: r2(y1), zFronte: r2(zf), profondita: r2(zf - zb), spessore: r2(spessore), ruota, pareti: [pa.p.nome, pb.p.nome] };
 }
-function apriCassetto(a, b) {
-  const v = vanoTra(a, b);
-  if (!v.ok) return avvisa(v.msg, true, 8000);
+
+const valoriGuida = tipo => ({ ...TIPI_GUIDA[tipo] });
+function apriCassetto(v) {
   cassettoTra = v;
-  const lg = lunghezzaGuida(v.profondita);
-  $('#form-cassetto').innerHTML = `<p>${t('Spazio tra i fianchi: <b>{largo}</b>, profondità {prof}', { largo: mod.fmtU(v.x1 - v.x0, true), prof: mod.fmtU(v.profondita, true) })}${lg ? ' → ' + t('guide da <b>{l} mm</b>', { l: lg }) : ''}.</p>
-    <div class="row"><div class="field"><label>${t('Dal basso (Y)')}</label><div class="input"><input data-cas="y0" inputmode="decimal" value="${fU(v.y0)}"><small>${U()}</small></div></div>
-    <div class="field"><label>${t('Fino a (Y)')}</label><div class="input"><input data-cas="y1" inputmode="decimal" value="${fU(v.y1)}"><small>${U()}</small></div></div></div>
-    <div class="row"><div class="field"><label>${t('Quanti cassetti')}</label><div class="input"><input data-cas="n" inputmode="numeric" value="${Math.max(1, Math.min(6, Math.floor((v.y1 - v.y0) / 160)))}"></div></div>
-    <div class="field"><label>${t('Frontali')}</label><div class="input"><select data-cas="frontale"><option value="sovrapposto">${t('Sovrapposti ai fianchi')}</option><option value="filo">${t('A filo, dentro il vano')}</option></select><small>▾</small></div></div></div>
-    <div class="row"><div class="field"><label>${t('Cassone')}</label><div class="input"><select data-cas="matCassone">${materialiPer('pannello').map(m => `<option value="${m.id}" ${m.id === 'mb12' ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select><small>▾</small></div></div>
-    <div class="field"><label>${t('Frontali')}</label><div class="input"><select data-cas="matFrontale">${materialiPer('pannello').map(m => `<option value="${m.id}" ${m.id === 'mb18' ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select><small>▾</small></div></div></div>
-    <p class="nota">${t('Gioco per le guide {g} mm per lato, fuga tra i frontali 3 mm. Ogni cassetto è una parte mobile: niente viti verso il mobile.', { g: f1(12.5) })}</p>
-    <div class="azioni"><button class="btn" data-chiudi-cassetto>${t('Annulla')}</button><button class="btn primary" id="crea-cassetti">${t('Crea i cassetti')}</button></div>`;
+  disegnaFormCassetto('sfere');
   $('#dlg-cassetto').showModal();
 }
+function disegnaFormCassetto(tipo, prima = {}) {
+  const v = cassettoTra, gd = valoriGuida(tipo), lg = lunghezzaPer(tipo, v.profondita);
+  const campo = (k, nome, val, u = U()) => `<div class="field"><label>${t(nome)}</label><div class="input"><input data-cas="${k}" inputmode="decimal" value="${esc(u === U() ? fU(val) : val)}"><small>${u}</small></div></div>`;
+  const opz = (k, voci, sel) => Object.entries(voci).map(([a, b]) => `<option value="${a}" ${a === sel ? 'selected' : ''}>${esc(b)}</option>`).join('');
+  $('#form-cassetto').innerHTML = `<p>${t('Vano tra «{a}» e «{b}»: largo <b>{largo}</b>, profondo {prof}.', { a: esc(v.pareti[0]), b: esc(v.pareti[1]), largo: mod.fmtU(v.x1 - v.x0, true), prof: mod.fmtU(v.profondita, true) })}</p>
+    <div class="row">${campo('y0', 'Dal basso (Y)', prima.y0 ?? v.y0)}${campo('y1', 'Fino a (Y)', prima.y1 ?? v.y1)}</div>
+    <div class="row"><div class="field"><label>${t('Quanti cassetti')}</label><div class="input"><input data-cas="n" inputmode="numeric" value="${prima.n ?? Math.max(1, Math.min(6, Math.floor((v.y1 - v.y0) / 160)))}"></div></div>
+    <div class="field"><label>${t('Frontali')}</label><div class="input"><select data-cas="frontale">${opz('frontale', { sovrapposto: t('Sovrapposti ai fianchi'), filo: t('A filo, dentro il vano') }, prima.frontale || 'sovrapposto')}</select><small>▾</small></div></div></div>
+    <div class="group"><h3>${t('Guide')}</h3>
+      <div class="field"><label>${t('Tipo di guida')}</label><div class="input"><select data-cas="tipo">${opz('tipo', Object.fromEntries(Object.entries(TIPI_GUIDA).map(([k, x]) => [k, t(x.nome)])), tipo)}</select><small>▾</small></div></div>
+      <div class="row">${campo('gioco', 'Gioco per lato', gd.gioco)}${campo('lunghezza', tipo === 'legno' ? 'Lunghezza del cassetto' : 'Lunghezza delle guide', lg || 0)}</div>
+      ${tipo === 'sotto' ? `<div class="row">${campo('sotto', 'Spazio sotto il cassetto', gd.sotto)}<div></div></div>` : ''}
+      ${tipo === 'legno' ? `<div class="row">${campo('lAlto', 'Listello: altezza', gd.listello[0])}${campo('lLargo', 'Listello: larghezza', gd.listello[1])}</div>` : ''}
+      <p class="nota">${t(tipo === 'sfere' ? 'Il gioco è lo spazio tra il fianco del cassetto e la parete, dove sta la guida (di solito 12,5 mm). Lunghezza scelta dalla profondità: puoi scriverne un\'altra.' : tipo === 'sotto' ? 'Guide nascoste: guarda nel foglio del produttore gioco laterale e spazio sotto il cassone, cambiano da modello a modello.' : 'Due listelli avvitati alle pareti, il cassetto ci scorre sopra: conviene cera o paraffina. Il gioco è per lato.')}</p></div>
+    <div class="row"><div class="field"><label>${t('Cassone')}</label><div class="input"><select data-cas="matCassone">${materialiPer('pannello').map(m => `<option value="${m.id}" ${m.id === (prima.matCassone || 'mb12') ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select><small>▾</small></div></div>
+    <div class="field"><label>${t('Frontali')}</label><div class="input"><select data-cas="matFrontale">${materialiPer('pannello').map(m => `<option value="${m.id}" ${m.id === (prima.matFrontale || 'mb18') ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select><small>▾</small></div></div></div>
+    <p class="nota">${t('Fuga tra i frontali 3 mm. Ogni cassetto è una parte mobile: niente viti verso il mobile.')}</p>
+    <div class="azioni"><button class="btn" data-chiudi-cassetto>${t('Annulla')}</button><button class="btn primary" id="crea-cassetti">${t('Crea i cassetti')}</button></div>`;
+}
 function creaCassettiOra() {
-  const q = k => document.querySelector(`#form-cassetto [data-cas="${k}"]`).value;
-  const v = { ...cassettoTra, y0: mod.leggiMisura(q('y0')), y1: mod.leggiMisura(q('y1')), n: numero(q('n')), frontale: q('frontale'), matCassone: q('matCassone'), matFrontale: q('matFrontale'), spessoreFianchi: cassettoTra.spessore };
+  const q = k => document.querySelector(`#form-cassetto [data-cas="${k}"]`)?.value, mm = k => (q(k) === undefined ? null : mod.leggiMisura(q(k)));
+  const tipo = q('tipo');
+  const guida = { tipo, gioco: mm('gioco'), lunghezza: mm('lunghezza') || null, ...(tipo === 'sotto' ? { sotto: mm('sotto') } : {}), ...(tipo === 'legno' ? { listello: [mm('lAlto'), mm('lLargo')] } : {}) };
+  const v = { ...cassettoTra, y0: mm('y0'), y1: mm('y1'), n: numero(q('n')), frontale: q('frontale'), matCassone: q('matCassone'), matFrontale: q('matFrontale'), spessoreFianchi: cassettoTra.spessore, guida };
   if ([v.y0, v.y1, v.n].some(x => x === null) || v.y1 <= v.y0) return avvisa(t('Controlla le misure: «Fino a» deve essere più in alto di «Dal basso».'), true);
+  if (guida.gioco === null || guida.gioco < 0 || guida.gioco > 50 || (guida.listello && guida.listello.some(x => !(x > 0))) || (tipo === 'sotto' && !(guida.sotto >= 0))) return avvisa(t('Controlla le misure delle guide.'), true);
   const prova = structuredClone(stato.progetto), r = creaCassetti(prova, v);
   if (!r.ok) return avvisa(r.msg, true, 8000);
   modifica(() => { const x = creaCassetti(stato.progetto, v); stato.multi = new Set(x.nuovi.map(p => p.id)); stato.sel = x.nuovi.at(-1).id; });
   $('#dlg-cassetto').close();
-  avvisa(tn(v.n, 'Creato il cassetto con guide da {g} mm.', 'Creati {n} cassetti con guide da {g} mm.', { g: r.guida }));
+  avvisa(r.tipo === 'legno' ? tn(v.n, 'Creato il cassetto su listelli di scorrimento.', 'Creati {n} cassetti su listelli di scorrimento.') : tn(v.n, 'Creato il cassetto con guide da {g} mm.', 'Creati {n} cassetti con guide da {g} mm.', { g: r.guida }));
 }
 
 // ---------- Dividi ----------
@@ -871,7 +942,13 @@ function applicaCampo(campo, valore) {
   }
   if (p[campo] === v) return;
   // Lunghezza e larghezza dei pezzi rettangolari: cresce la testa B (o il bordo alto) e i suoi tagli la seguono.
-  if ((campo === 'L' || campo === 'W') && (p.forma || 'rett') === 'rett') return modifica(() => mod.ridimensiona(p, campo === 'L' ? 'x' : 'y', 'max', v));
+  if ((campo === 'L' || campo === 'W') && (p.forma || 'rett') === 'rett') {
+    const asse = campo === 'L' ? 'x' : 'y', sc = latoDaMuovere(p, asse);
+    modifica(() => mod.ridimensiona(p, asse, sc.lato, v));
+    if (sc.vincolo) avvisa(t('La testa fissata con le viti è rimasta ferma: il pezzo è cambiato dall\'altra parte.'), false, 4000);
+    else if (sc.tutte) avvisa(t('Tutte e due le teste sono fissate con le viti: ho mosso la testa B (o il bordo alto). Controlla le unioni.'), false, 6000);
+    return;
+  }
   modifica(() => { p[campo] = v; if (campo === 'D') { p.L = v; p.W = v; } });
   if (p.tagli.length && ['L', 'W', 'D'].includes(campo)) avvisa(t('Il pezzo ha dei tagli: restano dove sono. Se serve, toglili e rifai Adatta.'));
 }
@@ -1228,6 +1305,12 @@ function eventiDialoghi() {
   $('#dlg-cassetto').addEventListener('click', e => {
     if (e.target.closest('#crea-cassetti')) creaCassettiOra();
     if (e.target.closest('[data-chiudi-cassetto]')) $('#dlg-cassetto').close();
+  });
+  // cambiando tipo di guida, i valori di partenza del tipo nuovo (il resto resta come l'hai scritto)
+  $('#dlg-cassetto').addEventListener('change', e => {
+    if (e.target.dataset.cas !== 'tipo') return;
+    const q = k => document.querySelector(`#form-cassetto [data-cas="${k}"]`)?.value;
+    disegnaFormCassetto(e.target.value, { y0: mod.leggiMisura(q('y0')), y1: mod.leggiMisura(q('y1')), n: q('n'), frontale: q('frontale'), matCassone: q('matCassone'), matFrontale: q('matFrontale') });
   });
   $('#dividi-n').addEventListener('input', anteprimaDividi);
   $('#dividi-meno').addEventListener('click', () => { $('#dividi-n').value = Math.max(1, (numero($('#dividi-n').value) || 1) - 1); anteprimaDividi(); });
