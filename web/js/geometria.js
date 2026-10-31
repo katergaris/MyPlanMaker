@@ -1,8 +1,8 @@
 // Geometria dei pezzi con Manifold: profilo (anche con archi) estruso nello spessore, poi i tagli.
 // Le curve sono salvate esatte nel modello (raggio, diametro); qui vengono solo approssimate per il disegno.
 import Module from '../vendor/manifold.js';
-import { BufferGeometry, Float32BufferAttribute, EdgesGeometry } from '../vendor/three.module.js';
-import { dimensioni } from './modello.js';
+import { BufferGeometry, Float32BufferAttribute, EdgesGeometry, Vector3 } from '../vendor/three.module.js';
+import { dimensioni, matrice } from './modello.js';
 import { foriPezzo } from './ferramenta.js';
 
 let M = null;
@@ -128,8 +128,65 @@ export function poligoniDisegno(dis) {
   return r;
 }
 
+// ---------- Fori e forme sul pezzo (p.lavorazioni) ----------
+// Forme vuote (passanti o scassi) messe su un pezzo qualunque, con la misura fissa e il centro misurato da un bordo:
+// ax = 'sx' | 'dx' | 'c' (da sinistra, da destra, dal centro) con dx; ay = 'basso' | 'alto' | 'c' con dy. Così se il
+// pezzo cambia misura il foro resta grande uguale e alla stessa distanza dal suo bordo.
+export function formeLavorazioni(p) {
+  const { L, W } = dimensioni(p);
+  return (p.lavorazioni || []).map(l => ({
+    ...l, modo: 'vuoto',
+    cx: l.ax === 'dx' ? L - l.dx : l.ax === 'c' ? L / 2 + l.dx : l.dx,
+    cy: l.ay === 'alto' ? W - l.dy : l.ay === 'c' ? W / 2 + l.dy : l.dy,
+  }));
+}
+// Da una forma con il centro (cx, cy) a una lavorazione: l'ancora è il bordo più vicino (o il centro, se ci sta).
+export function lavorazioneDa(f, L, W, prima = null) {
+  const asse = (c, D, min, max, vecchia) => {
+    const k = vecchia || (Math.abs(c - D / 2) < 0.6 ? 'c' : c < D / 2 ? min : max);
+    return [k, Math.round((k === 'c' ? c - D / 2 : k === max ? D - c : c) * 100) / 100];
+  };
+  const [ax, dx] = asse(f.cx, L, 'sx', 'dx', prima?.ax), [ay, dy] = asse(f.cy, W, 'basso', 'alto', prima?.ay);
+  const { cx, cy, modo, ...resto } = f;
+  return { ...resto, ax, dx, ay, dy };
+}
+
+// ---------- Intagli dai pezzi bloccati (p.intagli) ----------
+// Un pezzo bloccato resta intero e "scava" i pezzi non bloccati che lo attraversano: p.intagli = [{ da, m }] con m =
+// posizione del pezzo bloccato nel sistema locale di p. Si ricalcolano a ogni modifica (aggiornaIntagli).
+let registro = new Map();
+export function aggiornaIntagli(progetto) {
+  registro = new Map(progetto.pezzi.map(p => [p.id, p]));
+  const bloccati = progetto.pezzi.filter(p => p.bloccato);
+  const box = (g, m) => { const b = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] }, v = new Vector3();
+    for (const q of g.vertici) { v.set(...q).applyMatrix4(m); [v.x, v.y, v.z].forEach((c, i) => { b.min[i] = Math.min(b.min[i], c); b.max[i] = Math.max(b.max[i], c); }); }
+    return b; };
+  for (const p of progetto.pezzi) {
+    const prima = JSON.stringify(p.intagli || []);
+    let nuovi = [];
+    if (!p.bloccato && bloccati.length) {
+      const base = geometriaPezzo({ ...p, intagli: [] });
+      if (base) {
+        const mp = matrice(p), bp = box(base, mp), inv = mp.clone().invert();
+        for (const b of bloccati) {
+          if (b.id === p.id) continue;
+          const gb = geometriaPezzo(b);
+          if (!gb) continue;
+          const mb = matrice(b), bb = box(gb, mb);
+          if (![0, 1, 2].every(i => bp.min[i] < bb.max[i] - 0.5 && bp.max[i] > bb.min[i] + 0.5)) continue;
+          if (volumeComune(base, mp, gb, mb) < 1) continue;
+          nuovi.push({ da: b.id, m: inv.clone().multiply(mb).elements.map(x => Math.round(x * 1e6) / 1e6) });
+        }
+      }
+    }
+    if (JSON.stringify(nuovi) !== prima) { if (nuovi.length) p.intagli = nuovi; else delete p.intagli; }
+  }
+}
+const intagliValidi = p => (p.intagli || []).map(x => ({ ...x, b: registro.get(x.da) })).filter(x => x.b && !x.b.intagli?.length && x.b.id !== p.id);
+
 const cache = new Map();
-export const chiave = p => JSON.stringify([p.tipo, p.mat, dimensioni(p), p.forma, p.L, p.W, p.D, p.r, p.forma === 'sagoma' ? p.sagoma : p.forma === 'disegno' ? p.disegno : 0, p.tagli.map(t => [t.n, t.d]), foriPezzo(p)]);
+export const chiave = p => JSON.stringify([p.tipo, p.mat, dimensioni(p), p.forma, p.L, p.W, p.D, p.r, p.forma === 'sagoma' ? p.sagoma : p.forma === 'disegno' ? p.disegno : 0, p.tagli.map(t => [t.n, t.d]), foriPezzo(p),
+  p.lavorazioni || 0, intagliValidi(p).map(x => [x.m, chiave(x.b)])]);
 
 // Restituisce { geometria, bordi, min, max, vertici } nel sistema locale del pezzo, o null se i tagli
 // hanno tolto tutto.
@@ -148,6 +205,22 @@ export function geometriaPezzo(p) {
     cavo.delete(); s.cs.delete(); solido.delete();
     solido = r;
   }
+  // fori e forme sul pezzo: passanti e scassi
+  if (p.lavorazioni?.length) {
+    const forme = formeLavorazioni(p);
+    // (gli scassi raggruppati per profondità e lato, come nel disegno 2D)
+    const { base: niente, scassi: cavi } = sezioniDisegno({ forme: forme.filter(f => f.prof > 0) });
+    niente?.delete();
+    const passanti = forme.filter(f => !(f.prof > 0)).map(f => new M.CrossSection([contornoForma(f)], 'NonZero'));
+    if (passanti.length) {
+      const u = unione(passanti), c = u.extrude(T + 2).translate([0, 0, -1]), r = solido.subtract(c);
+      u.delete(); c.delete(); solido.delete(); solido = r;
+    }
+    for (const sc of cavi) {
+      const prof = Math.min(sc.prof, T), c = sc.cs.extrude(prof + 1).translate([0, 0, sc.lato === 'sotto' ? -1 : T - prof]), r = solido.subtract(c);
+      c.delete(); sc.cs.delete(); solido.delete(); solido = r;
+    }
+  }
   for (const t of p.tagli) {
     const s = solido.trimByPlane(t.n, t.d);
     solido.delete();
@@ -158,6 +231,13 @@ export function geometriaPezzo(p) {
     const s = solido.subtract(cil);
     cil.delete(); solido.delete();
     solido = s;
+  }
+  // intagli: il volume dei pezzi bloccati che lo attraversano
+  for (const x of intagliValidi(p)) {
+    const gb = geometriaPezzo(x.b);
+    if (!gb) continue;
+    const c = gb.solido.transform(x.m), r = solido.subtract(c);
+    c.delete(); solido.delete(); solido = r;
   }
   let risultato = null;
   if (!solido.isEmpty()) {

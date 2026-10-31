@@ -44,6 +44,12 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     Unità dell'interfaccia (`unita.u` mm/cm, `fmtU`, `leggiMisura`): nel progetto tutto resta in mm.
   - Spessore su misura: `p.spessore` (pannelli) e `p.sezione = [W, T]` (listelli); `materialePezzo(p)` in
     `materiali.js` dà la variante (id `mat@T`, prezzo proporzionale) usata da dimensioni, distinta, taglio, disegni.
+  - **Blocca e intagli**: `p.bloccato`; `aggiornaIntagli(progetto)` in `geometria.js` (chiamata in `aggiorna()` di app.js)
+    scrive `p.intagli = [{ da, m }]` sui pezzi non bloccati che attraversano un bloccato (m = matrice del bloccato nel
+    sistema locale); `geometriaPezzo` li sottrae (registro dei pezzi del progetto). I bloccati non si trascinano.
+  - **Fori e forme sul pezzo**: `p.lavorazioni` (forme del disegno 2D senza cx/cy, con ancora `ax` sx/dx/c + `dx`,
+    `ay` basso/alto/c + `dy`); `formeLavorazioni(p)`, `lavorazioneDa(f, L, W)`; editor = `apriDisegno2D(..., { sfondo, forme })`.
+  - Pannello del pezzo a sezioni `<details>` (`sezione()` in app.js, aperte in localStorage `mpm:sezioni`).
   - `js/geometria.js` — Manifold: profilo (rettangolo con raggi, cerchio, **sagoma** con archi a freccia) estruso,
     tagli, fori della ferramenta; tiene il solido in cache (`solido`) per `volumeComune` e `sezionePezzo` (slice).
   - `js/vista3d.js` — three.js: selezione multipla, trascinamento libero dei pezzi (`afferra`, piano orizzontale o
@@ -72,7 +78,7 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     `poligoniDisegno`; il pezzo = unione dei pieni − vuoti passanti, estruso, − scassi). `js/esporta.js` — CSV (;), DXF R12, STL.
     `js/montaggio.js` — istruzioni di montaggio. `js/archivio.js` — progetti e impostazioni (locale + server),
     file `.mpm.json`. `js/esempi.js` — mobiletto con leggio, tavolo rotondo.
-  - `prove.html` — prove automatiche (116, "TUTTE OK"); `prove-ui.html#passo,passo` — pilota l'app per gli
+  - `prove.html` — prove automatiche (129, "TUTTE OK"); `prove-ui.html#passo,passo` — pilota l'app per gli
     screenshot (esempio:N, modello:id, crea, sel:Nome, cmd:x, tocca:Nome, faccia:Nome:nx:ny:nz, trascina:Nome:dx:dy[:ox:oy], maniglia:i:dx:dy, quota:asse:valore, stato (JSON dei pezzi),
     tracciaSu:selettore:x0:y0:x1:y1, unita:cm, vista:x, distinta, schema, ferramenta, disegni, menu:x, clic:selettore, fissaggio:tipo, progetti).
   - `vendor/` — three.js 0.186.1 (con OrbitControls e TransformControls) e manifold-3d 3.5.4 (`VERSIONI.txt`).

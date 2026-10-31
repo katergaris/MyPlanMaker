@@ -16,6 +16,12 @@ export function righeDistinta(progetto) {
     }
     else if (p.tipo === 'pannello' && p.forma === 'sagoma') { const c = (p.sagoma || []).filter(q => Math.abs(q.b || 0) > 0.05).length; forma.push(t('sagomato: {n} punti', { n: p.sagoma.length }) + (c ? ', ' + tn(c, '1 curva', '{n} curve') : '') + ' ' + t('(dima 1:1)')); }
     else if (p.tipo === 'pannello' && p.r > 0) forma.push(t('angoli raggio {r}', { r: fmt(p.r) }));
+    if (p.lavorazioni?.length) {
+      const fori = p.lavorazioni.filter(l => !(l.prof > 0)).length, scassi = p.lavorazioni.filter(l => l.prof > 0);
+      forma.push([fori ? tn(fori, '1 foro passante', '{n} fori passanti') : '', scassi.length ? tn(scassi.length, '1 scasso ({p} mm)', '{n} scassi ({p} mm)', { p: [...new Set(scassi.map(l => fmt(l.prof, 1)))].join(', ') }) : ''].filter(Boolean).join(', '));
+    }
+    const intagli = (p.intagli || []).map(x => progetto.pezzi.find(q => q.id === x.da)).filter(Boolean);
+    if (intagli.length) forma.push(tn(intagli.length, '1 intaglio per {nomi}', '{n} intagli per {nomi}', { nomi: intagli.map(b => `«${b.nome}»`).join(', ') }));
     const tagli = p.tagli.map(descriviTaglio);
     const costo = p.tipo === 'listello' ? (L / 1000) * m.prezzoM : (L * W / 1e6) * m.prezzoM2;
     const bo = p.tipo === 'pannello' ? bordatura(p) : { s: 0, lati: new Set(), menoL: 0, menoW: 0 };

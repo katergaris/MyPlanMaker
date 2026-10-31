@@ -451,6 +451,7 @@ export class Vista3D {
     if (!hit) return;
     const id = hit.object.userData.id, selezionato = this.stato.selezione.has(id);
     if (!selezionato && e.pointerType !== 'mouse') return;
+    if (this.opzioni.bloccati?.has(id) || (selezionato && [...this.stato.selezione].some(x => this.opzioni.bloccati?.has(x)))) return; // i pezzi bloccati non si trascinano
     e.stopPropagation();
     this.giu = null;
     const normale = this.camera.isOrthographicCamera ? this.camera.getWorldDirection(new THREE.Vector3()).negate() : new THREE.Vector3(0, 1, 0);
@@ -593,6 +594,10 @@ export class Vista3D {
         etichetta(V(x1, (y0 + y1) / 2, z1), fmtU(y1 - y0, true), c.y ? 'edit' : '', attr('y'));
         etichetta(V(x1, y0, (z0 + z1) / 2), fmtU(z1 - z0, true), 'spess' + (c.z ? ' edit' : ''), attr('z'));
       }
+    }
+    if (!esploso && this.opzioni.bloccati?.size && !this.selInizio) for (const id of this.opzioni.bloccati) {
+      const o = this.oggetti?.get(id);
+      if (o) etichetta(new THREE.Box3().setFromObject(o.children[0]).getCenter(new THREE.Vector3()), '🔒', 'lucchetto');
     }
     if (misura?.b) {
       const d = misura.a.distanceTo(misura.b), dd = misura.b.clone().sub(misura.a);

@@ -329,3 +329,26 @@ header .seg.unita button { height: 36px; min-width: 44px; flex: none; }
 .gruppo-taglio .impost.formato { margin: 6px 0 10px; }
 .gruppo-taglio .impost.formato .field { width: 190px; }
 .gruppo-taglio .impost.formato .nota { flex: 1; min-width: 200px; margin: 0; }
+.quota.lucchetto { background: rgba(255,253,250,.85); border: 1px solid var(--line); padding: 0 4px; font-size: 12px; box-shadow: none; }
+/* pannello del pezzo a sezioni (0.13) */
+details.sezione { border-top: 1px solid var(--line); padding: 2px 0; }
+details.sezione > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; font-weight: 600; font-size: 15px; }
+details.sezione > summary::-webkit-details-marker { display: none; }
+details.sezione > summary::after { content: '▸'; color: var(--accent); transition: transform .15s; }
+details.sezione[open] > summary::after { transform: rotate(90deg); }
+details.sezione > .corpo { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 12px; }
+details.sezione .corpo > .group { border: 0; padding: 0; margin: 0; }
+details.sezione .corpo > .group > h3:first-child { display: none; }
+.chipline.bloccato { background: #eef3fb; border-radius: 10px; padding: 8px 10px; }
+.lavorazione { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.lav-righe { display: grid; grid-template-columns: 64px 1fr 1fr; gap: 6px; align-items: center; }
+.lav-righe .input { height: 40px; }
+.lav-righe .input input, .lav-righe .input select { min-width: 0; width: 100%; }
+.lav-righe > * { min-width: 0; }
+.lav-righe .input { padding: 0 8px; }
+.lav-righe .input small { margin-left: 2px; }
+.lav-righe { grid-template-columns: 72px 96px 1fr; }
+.azioni.a-capo { flex-wrap: wrap; }
+.azioni.a-capo .btn { flex: 1 1 auto; }
+.lav-righe select, .lav-righe input { font-size: 14px; }
+.lav-righe .mini-sel small { display: none; }

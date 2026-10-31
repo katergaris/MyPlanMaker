@@ -62,8 +62,12 @@ function formaLinea(assoluti, modo) {
 }
 
 // pezzo: per nome e spessore; onSalva({ forme, L, W }).
-export function apriDisegno2D(pezzo, spessore, onSalva) {
-  let forme = formeDaPezzo(pezzo), scelta = -1, attrezzo = 'sel', passo = 5;
+// opz.sfondo = contorno fisso del pezzo (modalità «fori e forme sul pezzo»): si disegnano solo vuoti, che tornano
+// a onSalva({ forme }) con le coordinate del pezzo; opz.forme = i vuoti di partenza.
+export function apriDisegno2D(pezzo, spessore, onSalva, opz = {}) {
+  const sfondo = opz.sfondo || [], suPezzo = !!opz.sfondo;
+  let forme = suPezzo ? structuredClone(opz.forme || []) : formeDaPezzo(pezzo), scelta = -1, attrezzo = suPezzo ? 'ellisse' : 'sel', passo = 5;
+  const tutte = () => [...sfondo, ...forme];
   let vista = null, azione = null, linea = null, aggancio = null, cursore = null;
   const storia = [];
   const salvaStoria = () => { storia.push(JSON.stringify(forme)); if (storia.length > 100) storia.shift(); };
@@ -74,7 +78,7 @@ export function apriDisegno2D(pezzo, spessore, onSalva) {
   d.id = 'dlg-disegno';
   d.className = 'dlg larga disegno2d';
   document.body.appendChild(d);
-  d.innerHTML = `<div class="dlg-testa"><h2>${t('Disegno di «{nome}»', { nome: esc(pezzo.nome) })}</h2><span class="nota">${t('spessore {s}', { s: fmtU(spessore, true) })}</span><span class="sp"></span><button class="btn icon" data-x>✕</button></div>
+  d.innerHTML = `<div class="dlg-testa"><h2>${suPezzo ? t('Fori e forme su «{nome}»', { nome: esc(pezzo.nome) }) : t('Disegno di «{nome}»', { nome: esc(pezzo.nome) })}</h2><span class="nota">${t('spessore {s}', { s: fmtU(spessore, true) })}</span><span class="sp"></span><button class="btn icon" data-x>✕</button></div>
     <div class="dlg-corpo d2">
       <div class="d2-attrezzi">${ATTREZZI.map(([k, nome, svg]) => `<button class="tool" data-attrezzo="${k}" title="${t(nome)}"><svg viewBox="0 0 32 32">${svg}</svg>${t(nome)}</button>`).join('')}
         <hr><button class="tool" data-azione="annulla" title="${t('Annulla (Ctrl+Z)')}"><svg viewBox="0 0 32 32"><path d="M10 12H20a6 6 0 0 1 0 12h-6M10 12l5-5M10 12l5 5"/></svg>${t('Annulla')}</button>
@@ -86,17 +90,17 @@ export function apriDisegno2D(pezzo, spessore, onSalva) {
 
   // ---------- vista: centro e mm per pixel ----------
   const inquadra = () => {
-    const bb = forme.length ? forme.map(box).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) })) : { x0: 0, y0: 0, x1: 600, y1: 400 };
+    const bb = tutte().length ? tutte().map(box).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) })) : { x0: 0, y0: 0, x1: 600, y1: 400 };
     const w = svg.clientWidth || 600, h = svg.clientHeight || 400;
     vista = { cx: (bb.x0 + bb.x1) / 2, cy: (bb.y0 + bb.y1) / 2, mm: Math.max((bb.x1 - bb.x0) / w, (bb.y1 - bb.y0) / h, 0.05) * 1.25 };
   };
   const mmPx = () => vista.mm;
   const inMm = e => { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const q = pt.matrixTransform(g.getScreenCTM().inverse()); return [q.x, q.y]; };
   // riferimento dei campi: angolo in basso a sinistra dei pieni
-  const origine = () => { const b = ingombroDisegno({ forme }); return b ? b.min : [0, 0]; };
+  const origine = () => { const b = ingombroDisegno({ forme: tutte() }); return b ? b.min : [0, 0]; };
 
   // Aggancio di un punto: ai punti notevoli delle altre forme (entro 10 px), altrimenti alla griglia.
-  const notevoli = (salta = -1) => forme.flatMap((f, i) => (i === salta ? [] : puntiNotevoli(box(f))));
+  const notevoli = (salta = -1) => [...sfondo.flatMap(f => puntiNotevoli(box(f))), ...forme.flatMap((f, i) => (i === salta ? [] : puntiNotevoli(box(f))))];
   function aggancia(pt, salta = -1) {
     const soglia = 10 * mmPx();
     let meglio = null;
@@ -130,7 +134,7 @@ export function apriDisegno2D(pezzo, spessore, onSalva) {
     const righe = [];
     for (let x = Math.floor((x0 - o[0]) / gp) * gp + o[0]; x <= x1; x += gp) righe.push(`M${x},${y0}V${y1}`);
     for (let y = Math.floor((y0 - o[1]) / gp) * gp + o[1]; y <= y1; y += gp) righe.push(`M${x0},${y}H${x1}`);
-    const r = poligoniDisegno({ forme }), path = poli => poli.map(c => `M${c.map(q => `${q[0]},${q[1]}`).join('L')}Z`).join('');
+    const r = poligoniDisegno({ forme: tutte() }), path = poli => poli.map(c => `M${c.map(q => `${q[0]},${q[1]}`).join('L')}Z`).join('');
     const sc = forme[scelta], hs = 6 * s;
     const maniglie = sc ? maniglieDi(sc).map((m, j) => `<rect class="d2-maniglia" data-maniglia="${j}" x="${m[0] - hs}" y="${m[1] - hs}" width="${2 * hs}" height="${2 * hs}"/>`).join('') : '';
     const nodi = sc?.tipo === 'linea' && !sc.rot ? sc.punti.map((q, j) => `<circle class="d2-nodo" data-nodo="${j}" cx="${sc.cx + q.x}" cy="${sc.cy + q.y}" r="${hs * 0.9}"/>`).join('') : '';
@@ -146,7 +150,7 @@ export function apriDisegno2D(pezzo, spessore, onSalva) {
     aiuto.textContent = t({
       sel: 'Tocca una forma per sceglierla, trascinala per spostarla, usa i quadratini per cambiarne le misure. Trascina il foglio vuoto per scorrere, rotellina per lo zoom.',
       linea: linea ? 'Tocca per aggiungere punti; tocca il primo punto (o premi Invio) per chiudere la forma. Esc per annullare.' : 'Tocca il primo punto della linea.',
-    }[attrezzo] || 'Trascina per disegnare (Maiusc = quadrato o cerchio). Un tocco senza trascinare crea una forma da 100 mm.');
+    }[attrezzo] || (suPezzo ? 'Trascina per disegnare (Maiusc = quadrato o cerchio). Un tocco senza trascinare crea una forma da 40 mm.' : 'Trascina per disegnare (Maiusc = quadrato o cerchio). Un tocco senza trascinare crea una forma da 100 mm.'));
   }
 
   // Maniglie agli angoli del rettangolo della forma (nel suo sistema ruotato).
@@ -161,12 +165,13 @@ export function apriDisegno2D(pezzo, spessore, onSalva) {
     const campo = (k, nome, v, unitaCampo = U, extra = '') => `<div class="field"><label>${t(nome)}</label><div class="input"><input data-campo="${k}" inputmode="decimal" value="${esc(unitaCampo === U ? fmtU(v) : fmt(v, 1))}" ${extra}><small>${unitaCampo}</small></div></div>`;
     const piede = `<div class="group"><h3>${t('Griglia')}</h3><div class="seg">${[1, 5, 10].map(p => `<button data-passo="${p}" class="${p === passo ? 'on' : ''}">${fmtU(p, true)}</button>`).join('')}</div></div>
       <div class="chipline"><span>${t('Ingombro del pezzo')}</span><b id="d2-ingombro"></b></div>
-      <div class="azioni"><button class="btn" data-x>${t('Annulla')}</button><button class="btn primary" data-azione="usa">${t('Usa questo disegno')}</button></div>`;
+      <div class="azioni"><button class="btn" data-x>${t('Annulla')}</button><button class="btn primary" data-azione="usa">${t(suPezzo ? 'Applica al pezzo' : 'Usa questo disegno')}</button></div>`;
+    if (!f && suPezzo) return `<p class="nota">${t('Disegna fori e scassi sul pezzo: scegli una forma a sinistra e trascina (un tocco crea un foro da 40 mm). Restano della loro misura anche se poi il pezzo cambia misura.')}</p>${piede}`;
     if (!f) return `<p class="nota">${t("Scegli un attrezzo a sinistra e disegna. Ogni forma è <b>piena</b> (diventa legno) o <b>vuota</b> (un foro passante o uno scasso): il pezzo è l'unione dei pieni meno i vuoti.")}</p>
       <p class="nota">${t("Le posizioni si leggono dall'angolo in basso a sinistra del pezzo: X verso destra, Y verso l'alto.")}</p>${piede}`;
     const b = box(f), o = origine();
     return `<div class="kicker">${t(NOMI[f.tipo])}</div>
-      <div class="seg"><button data-modo="pieno" class="${f.modo !== 'vuoto' ? 'on' : ''}">${t('Pieno')}</button><button data-modo="passante" class="${f.modo === 'vuoto' && !(f.prof > 0) ? 'on' : ''}">${t('Foro passante')}</button><button data-modo="scasso" class="${f.modo === 'vuoto' && f.prof > 0 ? 'on' : ''}">${t('Scasso')}</button></div>
+      <div class="seg">${suPezzo ? '' : `<button data-modo="pieno" class="${f.modo !== 'vuoto' ? 'on' : ''}">${t('Pieno')}</button>`}<button data-modo="passante" class="${f.modo === 'vuoto' && !(f.prof > 0) ? 'on' : ''}">${t('Foro passante')}</button><button data-modo="scasso" class="${f.modo === 'vuoto' && f.prof > 0 ? 'on' : ''}">${t('Scasso')}</button></div>
       ${f.modo === 'vuoto' && f.prof > 0 ? `<div class="row">${campo('prof', 'Profondità', f.prof)}<div class="field"><label>${t('Da')}</label><div class="seg"><button data-lato="sopra" class="${f.lato !== 'sotto' ? 'on' : ''}">${t('Sopra')}</button><button data-lato="sotto" class="${f.lato === 'sotto' ? 'on' : ''}">${t('Sotto')}</button></div></div></div>` : ''}
       <div class="row">${campo('x', 'X dal bordo sinistro', b.x0 - o[0])}${campo('y', 'Y dal bordo in basso', b.y0 - o[1])}</div>
       <div class="row">${campo('w', 'Larghezza', f.w)}${campo('h', 'Altezza', f.h)}</div>
@@ -182,7 +187,7 @@ export function apriDisegno2D(pezzo, spessore, onSalva) {
     const aperto = lato.querySelector('.d2-serie')?.open;
     lato.innerHTML = htmlLato();
     if (aperto) lato.querySelector('.d2-serie').open = true;
-    const b = ingombroDisegno({ forme });
+    const b = ingombroDisegno({ forme: tutte() });
     lato.querySelector('#d2-ingombro').textContent = b ? `${fmtU(b.max[0] - b.min[0])} × ${fmtU(b.max[1] - b.min[1])} ${unita.u}` : t('nessun pieno');
   }
   const tutto = () => { disegna(); aggiornaLato(); };
@@ -265,7 +270,7 @@ export function apriDisegno2D(pezzo, spessore, onSalva) {
   }, { passive: false });
   svg.addEventListener('dblclick', () => { if (linea) chiudiLinea(); });
 
-  const formaBase = (tipo, c) => ({ tipo, cx: c[0], cy: c[1], w: 100, h: 100, rot: 0, modo: forme.some(f => f.modo !== 'vuoto') ? 'vuoto' : 'pieno', ...(tipo === 'poligono' ? { lati: 6 } : {}), ...(tipo === 'rett' ? { r: 0 } : {}) });
+  const formaBase = (tipo, c) => ({ tipo, cx: c[0], cy: c[1], w: suPezzo ? 40 : 100, h: suPezzo ? 40 : 100, rot: 0, modo: tutte().some(f => f.modo !== 'vuoto') ? 'vuoto' : 'pieno', ...(tipo === 'poligono' ? { lati: 6 } : {}), ...(tipo === 'rett' ? { r: 0 } : {}) });
   function anteprimaNuova() {
     const { da, a } = azione;
     if (azione.anteprima) forme.pop();
@@ -278,7 +283,7 @@ export function apriDisegno2D(pezzo, spessore, onSalva) {
   function chiudiLinea() {
     if (!linea || linea.punti.length < 3) return;
     salvaStoria();
-    forme.push(formaLinea(linea.punti, forme.some(f => f.modo !== 'vuoto') ? 'vuoto' : 'pieno'));
+    forme.push(formaLinea(linea.punti, tutte().some(f => f.modo !== 'vuoto') ? 'vuoto' : 'pieno'));
     scelta = forme.length - 1; linea = null; cursore = null; attrezzo = 'sel';
     tutto();
   }
@@ -326,6 +331,7 @@ export function apriDisegno2D(pezzo, spessore, onSalva) {
     if (b.dataset.passo) { passo = +b.dataset.passo; return tutto(); }
     if (b.dataset.azione === 'annulla') { if (storia.length) { forme = JSON.parse(storia.pop()); scelta = Math.min(scelta, forme.length - 1); } return tutto(); }
     if (b.dataset.azione === 'inquadra') { inquadra(); return disegna(); }
+    if (b.dataset.azione === 'usa' && suPezzo) { d.close(); return onSalva({ forme: forme.map(f => ({ ...f, modo: 'vuoto' })) }); }
     if (b.dataset.azione === 'usa') {
       const n = normalizzaDisegno(forme);
       if (!n) { aiuto.textContent = t('Serve almeno una forma piena: è quella che diventa legno.'); aiuto.classList.add('errore'); return; }
@@ -337,7 +343,7 @@ export function apriDisegno2D(pezzo, spessore, onSalva) {
     if (b.dataset.modo) Object.assign(f, b.dataset.modo === 'pieno' ? { modo: 'pieno', prof: 0 } : b.dataset.modo === 'passante' ? { modo: 'vuoto', prof: 0 } : { modo: 'vuoto', prof: f.prof > 0 ? f.prof : Math.min(10, spessore / 2) });
     else if (b.dataset.lato) f.lato = b.dataset.lato;
     else if (b.dataset.centra) {
-      const o = ingombroDisegno({ forme: forme.filter((x, i) => i !== scelta) }) || ingombroDisegno({ forme }), bx = box(f), k = b.dataset.centra === 'x' ? 0 : 1;
+      const o = suPezzo ? ingombroDisegno({ forme: sfondo }) : ingombroDisegno({ forme: forme.filter((x, i) => i !== scelta) }) || ingombroDisegno({ forme }), bx = box(f), k = b.dataset.centra === 'x' ? 0 : 1;
       if (o) { const centro = (o.min[k] + o.max[k]) / 2; if (k === 0) f.cx = arrot(f.cx + centro - (bx.x0 + bx.x1) / 2); else f.cy = arrot(f.cy + centro - (bx.y0 + bx.y1) / 2); }
     } else if (b.dataset.azione === 'duplica') { const c = structuredClone(f); c.cx += passo * 4; c.cy -= passo * 4; forme.push(c); scelta = forme.length - 1; }
     else if (b.dataset.azione === 'elimina') { forme.splice(scelta, 1); scelta = -1; }

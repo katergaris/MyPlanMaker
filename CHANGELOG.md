@@ -16,6 +16,14 @@
 - **Fit fixes**: tapping the far face of the other piece (e.g. the top of a table top) now makes the piece end flush
   with it instead of cutting it away entirely; a piece that went past the face is shortened to the cut, so its
   length field matches the finished size; the tapped end is the one that moves (also end A, the other stays put).
+- **Lock** (selection bar, key B): a locked piece can't be moved by mistake and **notches** every unlocked piece
+  that passes through it, automatically and live (e.g. lock the legs, duplicate the table top and lower it: the
+  shelf gets the leg notches). Notches are listed in the piece panel and in the cut list.
+- **Holes and shapes on a placed piece**: «+ Hole Ø 40» or «Draw holes and shapes…» (the 2D editor with the piece
+  outline fixed). Through holes and pockets keep their size and their distance from an edge (left/centre/right,
+  bottom/centre/top) when the piece is resized; both are editable in the panel.
+- **Shorter piece panel**: sizes, thickness and material stay on top; shape, holes, orientation and position, cuts,
+  edges, hardware and joints are collapsible sections (the open ones are remembered).
 - Place: when the two tapped faces look the same way, the half turn is around the vertical, not a random axis.
 
 ## 0.12.0 — 2026-10-31

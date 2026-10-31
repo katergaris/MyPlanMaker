@@ -6,7 +6,7 @@ localStorage.setItem('mpm:guida-vista', '1');
 localStorage.setItem('mpm:lingua', new URLSearchParams(location.search).get('lingua') || 'it');
 // Pilota l'app per le prove con chromium headless. Passi nell'hash, separati da virgole:
 // esempio:N  sel:Nome  cmd:comando  tocca:Nome  vista:nome  distinta  schema  ferramenta  progetti
-// tracciaSu:selettore:x0:y0:x1:y1 (trascina col mouse sull'elemento, in pixel dal suo angolo)  trascina:Nome:dx:dy[:ox:oy] (mouse dal centro del pezzo, in pixel)  maniglia:i:dx:dy  quota:asse:valore  faccia:Nome:nx:ny:nz (tocca il centro della faccia del pezzo che guarda in quella direzione)  unita:cm
+// tracciaSu:selettore:x0:y0:x1:y1 (trascina col mouse sull'elemento, in pixel dal suo angolo)  trascina:Nome:dx:dy[:ox:oy] (mouse dal centro del pezzo, in pixel)  maniglia:i:dx:dy  quota:asse:valore  blocca:Nome  sposta:Nome:dx:dy:dz  stato  faccia:Nome:nx:ny:nz (tocca il centro della faccia del pezzo che guarda in quella direzione)  unita:cm
 const f = document.getElementById('f');
 const attendi = ms => new Promise(r => setTimeout(r, ms));
 f.onload = async () => {
@@ -69,7 +69,9 @@ f.onload = async () => {
     if (p === 'disegni') { d.getElementById('apri-distinta').click(); d.querySelector('[data-scheda="disegni"]').click(); }
     if (p.startsWith('menu:')) w.mpm.menuAltro(p.slice(5));
     if (p === 'progetti') d.getElementById('apri-progetti').click();
-    if (p === 'stato') document.body.insertAdjacentHTML('beforeend', `<pre id="stato">${JSON.stringify({ pezzi: stato.progetto.pezzi.map(x => ({ nome: x.nome, pos: x.pos, L: x.L, W: x.W, tagli: x.tagli.length })), accostato: stato.accostato, toast: d.getElementById('toast-testo').textContent })}</pre>`);
+    if (p.startsWith('blocca:')) { tocco(pezzo(p.slice(7))); comando('blocca'); }
+    if (p.startsWith('sposta:')) { const [nome, ...d] = p.slice(7).split(':'), pz = stato.progetto.pezzi.find(x => x.nome === decodeURIComponent(nome)); w.mpm.mod.sposta(pz, d.map(Number)); w.mpm.apri(stato.progetto); tocco(pz.id); }
+    if (p === 'stato') document.body.insertAdjacentHTML('beforeend', `<pre id="stato">${JSON.stringify({ pezzi: stato.progetto.pezzi.map(x => ({ nome: x.nome, pos: x.pos, L: x.L, W: x.W, tagli: x.tagli.length, intagli: x.intagli?.length, lav: x.lavorazioni?.length, blocc: x.bloccato })), accostato: stato.accostato, toast: d.getElementById('toast-testo').textContent })}</pre>`);
     if (p === 'mancanti') document.body.insertAdjacentHTML('beforeend', `<pre id="mancanti">${JSON.stringify([...w.mpm.lingua.mancanti])}</pre>`);
     await attendi(400);
   }

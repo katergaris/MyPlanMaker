@@ -4,7 +4,7 @@
 <body><h1>Prove del modello</h1><ul id="esiti"></ul><pre id="riassunto">in corso…</pre>
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 <script type="module">
-import { avviaGeometria, geometriaPezzo } from './js/geometria.js';
+import { aggiornaIntagli, avviaGeometria, formeLavorazioni, geometriaPezzo, lavorazioneDa } from './js/geometria.js';
 import * as mod from './js/modello.js';
 import { Vector3 } from './vendor/three.module.js';
 import { mobilettoLeggio, tavoloRotondo } from './js/esempi.js';
@@ -444,6 +444,36 @@ for (const m of MODELLI) {
   g = gamba(1200); r = mod.adatta(g, incl, { asse: 'x' });
   const gg = geometriaPezzo(g);
   prova('adatta su piano inclinato: taglio obliquo e lunghezza = parte che resta', r.ok && /obliquo|inclinata/.test(r.msg) && vicino(g.L, gg.max[0] - gg.min[0], 0.11), `${r.msg} L ${g.L} vs ${gg.max[0] - gg.min[0]}`);
+}
+
+// 21. Pezzi bloccati che intagliano, fori e forme sul pezzo
+{
+  const pr = mod.nuovoProgetto();
+  const piano = mod.nuovoPezzo(pr, 'pannello'); piano.rot = mod.rotazioneDa('orizzontale'); piano.pos = [0, 300, 0]; piano.L = 1000; piano.W = 600;
+  const gamba = mod.nuovoPezzo(pr, 'listello'); gamba.rot = mod.rotazioneDa('verticale'); gamba.pos = [100, 0, -100]; gamba.L = 700;
+  const vol0 = geometriaPezzo(piano).volume;
+  aggiornaIntagli(pr);
+  prova('intagli: senza pezzi bloccati la sovrapposizione non taglia', !piano.intagli);
+  gamba.bloccato = true; aggiornaIntagli(pr);
+  const vol1 = geometriaPezzo(piano).volume, atteso = 45 * 45 * 18;
+  prova('intagli: la gamba bloccata scava il ripiano (45 × 45 × 18)', piano.intagli?.length === 1 && vicino(vol0 - vol1, atteso, 5), `${vol0 - vol1} vs ${atteso}`);
+  prova('intagli: la gamba bloccata resta intera', !gamba.intagli && vicino(geometriaPezzo(gamba).volume, 45 * 45 * 700, 5));
+  mod.sposta(gamba, [200, 0, 0]); aggiornaIntagli(pr);
+  const g = geometriaPezzo(piano), m = mod.matrice(piano);
+  prova('intagli: se la gamba si sposta, l\'intaglio la segue', vicino(geometriaPezzo(piano).volume, vol1, 5) && piano.intagli[0].m[12] > 250, String(piano.intagli[0].m[12]));
+  mod.sposta(gamba, [2000, 0, 0]); aggiornaIntagli(pr);
+  prova('intagli: se non si toccano più, l\'intaglio sparisce', !piano.intagli && vicino(geometriaPezzo(piano).volume, vol0, 1));
+  const tav = mod.nuovoPezzo(pr, 'pannello'); tav.rot = [0, 0, 0]; tav.pos = [0, 0, 0]; tav.L = 800; tav.W = 400;
+  tav.lavorazioni = [{ tipo: 'ellisse', w: 40, h: 40, rot: 0, prof: 0, ax: 'dx', dx: 100, ay: 'c', dy: 0 }];
+  const v0 = geometriaPezzo(tav).volume;
+  prova('fori sul pezzo: foro Ø 40 passante', vicino(800 * 400 * 18 - v0, Math.PI * 400 * 18, 300), String(800 * 400 * 18 - v0));
+  mod.ridimensiona(tav, 'x', 'max', 1000);
+  const f = formeLavorazioni(tav)[0];
+  prova('fori sul pezzo: ridimensionando resta Ø 40 e a 100 dal bordo destro', f.w === 40 && f.cx === 900 && f.cy === 200);
+  const l = lavorazioneDa({ tipo: 'rett', cx: 50, cy: 200, w: 30, h: 10, modo: 'vuoto' }, 1000, 400);
+  prova('fori sul pezzo: ancora al bordo più vicino o al centro', l.ax === 'sx' && l.dx === 50 && l.ay === 'c' && l.dy === 0 && !('cx' in l));
+  const r = righeDistinta(pr).find(x => x.nome === tav.nome);
+  prova('distinta: fori sul pezzo', /1 foro passante/.test(r.forma.join()));
 }
 
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');

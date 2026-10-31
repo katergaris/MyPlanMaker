@@ -1,6 +1,6 @@
 // MyPlanMaker: collega modello, vista 3D, pannello delle proprietà e salvataggio.
 import { Box3, Matrix4, Vector3 } from '../vendor/three.module.js';
-import { avviaGeometria, geometriaPezzo } from './geometria.js';
+import { aggiornaIntagli, avviaGeometria, formeLavorazioni, geometriaPezzo, lavorazioneDa } from './geometria.js';
 import { Vista3D } from './vista3d.js';
 import * as mod from './modello.js';
 import { MATERIALI, applicaCatalogo, materiale, materialeBase, materialePezzo, materialiPer } from './materiali.js';
@@ -15,7 +15,7 @@ import { listaSpesa } from './spesa.js';
 import { MODELLI, modello, valoriDefault } from './modelli.js';
 import { creaCassetti, lunghezzaGuida } from './cassetti.js';
 import { apriEditorSagoma } from './sagome.js';
-import { apriDisegno2D } from './disegno2d.js';
+import { apriDisegno2D, formeDaPezzo } from './disegno2d.js';
 import { htmlDima, htmlDisegno, htmlEtichette } from './disegni.js';
 import { csvDistinta, dxfPezzi, scarica, stlProgetto } from './esporta.js';
 import { htmlIstruzioni, istruzioni } from './montaggio.js';
@@ -67,11 +67,13 @@ function modifica(fn) {
 }
 
 function aggiorna() {
+  aggiornaIntagli(stato.progetto);
   const u = unioni(stato.progetto);
   vista.aggiorna(stato.progetto, {
     selezione: selezione(), primario: stato.sel, viti: u.viti, mostraViti: stato.mostraViti, vitiErrate: u.errate,
-    esploso: stato.esploso, gizmo: stato.modo ? null : stato.gizmo, misura: stato.misura, segno: stato.modo === 'accosta' || stato.modo === 'adatta' ? stato.accostaDa : null,
-    maniglie: !stato.modo && stato.gizmo !== 'rotate' && selezione().size === 1,
+    esploso: stato.esploso, gizmo: stato.modo || pezziSel().some(p => p.bloccato) ? null : stato.gizmo, misura: stato.misura, segno: stato.modo === 'accosta' || stato.modo === 'adatta' ? stato.accostaDa : null,
+    maniglie: !stato.modo && stato.gizmo !== 'rotate' && selezione().size === 1 && !pezzoSel()?.bloccato,
+    bloccati: new Set(stato.progetto.pezzi.filter(p => p.bloccato).map(p => p.id)),
   });
   disegnaAccostato();
   document.querySelector('[data-vista="esploso"]')?.classList.toggle('on', stato.esploso);
@@ -181,6 +183,15 @@ function comando(cmd) {
   } else if (cmd === 'sposta' || cmd === 'ruota') {
     stato.gizmo = stato.gizmo === (cmd === 'sposta' ? 'translate' : 'rotate') ? null : (cmd === 'sposta' ? 'translate' : 'rotate');
     aggiorna();
+  } else if (cmd === 'blocca') {
+    const sel = pezziSel();
+    if (!sel.length) return;
+    const blocca = !sel.every(x => x.bloccato);
+    modifica(() => sel.forEach(x => { if (blocca) x.bloccato = true; else delete x.bloccato; }));
+    const intagliati = stato.progetto.pezzi.filter(x => x.intagli?.some(i => sel.some(b => b.id === i.da)));
+    avvisa(blocca
+      ? t('Bloccato: non si sposta per sbaglio, e i pezzi che lo attraversano ricevono gli intagli da soli.') + (intagliati.length ? ' ' + t('Intagliati: {nomi}.', { nomi: intagliati.map(x => `«${x.nome}»`).join(', ') }) : '')
+      : t('Sbloccato: gli intagli che faceva negli altri pezzi sono spariti.'), false, 6000);
   } else if (cmd === 'multipla') {
     stato.aggiungiSel = !stato.aggiungiSel;
     disegnaBarraSel();
@@ -468,6 +479,7 @@ function disegnaBarraSel() {
   b.querySelector('[data-cmd="sposta"]').classList.toggle('on', stato.gizmo === 'translate');
   b.querySelector('[data-cmd="ruota"]').classList.toggle('on', stato.gizmo === 'rotate');
   b.querySelector('[data-cmd="multipla"]').classList.toggle('on', stato.aggiungiSel);
+  b.querySelector('[data-cmd="blocca"]').classList.toggle('on', pezziSel().every(p => p.bloccato));
   b.querySelector('.conta').textContent = n > 1 ? t('{n} pezzi', { n }) : '';
 }
 
@@ -622,7 +634,7 @@ function disegnaProprieta() {
     if (k !== chiavePannello) { chiavePannello = k; el.innerHTML = htmlMulti(pezziSel()); }
     return;
   }
-  const chiave = p ? JSON.stringify([p.id, p.tipo, p.forma, p.tagli.length, p.mat, p.ferramenta]) : 'progetto' + JSON.stringify(riepilogo(stato.progetto).materiali);
+  const chiave = p ? JSON.stringify([p.id, p.tipo, p.forma, p.tagli.length, p.mat, p.ferramenta, p.lavorazioni, p.bloccato, p.intagli?.map(x => x.da), U()]) : 'progetto' + JSON.stringify(riepilogo(stato.progetto).materiali);
   if (chiave === chiavePannello) return aggiornaValori(el, p);
   chiavePannello = chiave;
   el.innerHTML = p ? htmlPezzo(p) : htmlProgetto();
@@ -688,34 +700,61 @@ function htmlPezzo(p) {
       return `<div class="chipline"><span>${esc(mod.descriviTaglio(tg))}${da ? `<br><small class="nota">${t('contro «{nome}»', { nome: esc(da.nome) })}</small>` : ''}</span><button class="link" data-togli="${i}">${t('Togli')}</button></div>`;
     }).join('')
     : `<p class="nota">${t("Nessun taglio. Con <b>Adatta</b> lo tagli contro un altro pezzo con l'angolo giusto.")}</p>`;
+  const intagli = (p.intagli || []).map(x => stato.progetto.pezzi.find(q => q.id === x.da)).filter(Boolean)
+    .map(b => `<div class="chipline"><span>${t('Intaglio per «{nome}»', { nome: esc(b.nome) })}<br><small class="nota">${t('si aggiorna da solo se sposti uno dei due pezzi')}</small></span></div>`).join('');
+  const nomeForma = { cerchio: tr('Rotondo'), sagoma: tr('Sagoma'), disegno: tr('Disegno') }[p.forma] || tr('Rettangolo');
+  const nTagli = p.tagli.length + (p.intagli?.length || 0), nLav = p.lavorazioni?.length || 0;
   return `
     <div><div class="kicker">${t('Pezzo {n} · {tipo}', { n: p.n, tipo: t(p.tipo) })}</div><input class="titolo" data-campo="nome" aria-label="${t('Nome del pezzo')}"></div>
-    ${forma}
+    ${p.bloccato ? `<div class="chipline bloccato"><span>🔒 ${t('Bloccato: intaglia i pezzi che lo attraversano')}</span><button class="link" data-azione="sblocca">${t('Sblocca')}</button></div>` : ''}
     ${misure}
     ${p.tipo === 'pannello' ? campoNum('spessore', 'Spessore', mod.dimensioni(p).T) : ''}
     <div data-info class="group"></div>
     <div class="field"><label>${t('Materiale')}</label><div class="input"><select data-campo="mat">${mats}</select><small>▾</small></div></div>
-    <div class="group"><h3>${t('Orientamento')}</h3><div class="seg">${orient}</div>
+    ${forma ? sezione('forma', t('Forma: {forma}', { forma: t(nomeForma) }), forma) : ''}
+    ${sezione('fori', nLav ? t('Fori e forme ({n})', { n: nLav }) : t('Fori e forme'), htmlLavorazioni(p))}
+    ${sezione('posizione', t('Orientamento e posizione'), `<div class="seg">${orient}</div>
       <div class="field"><label>${t('Rotazione attorno agli assi X, Y, Z')}</label><div class="row3">
         <div class="input"><input data-campo="rot0" inputmode="decimal"><small>°</small></div>
         <div class="input"><input data-campo="rot1" inputmode="decimal"><small>°</small></div>
         <div class="input"><input data-campo="rot2" inputmode="decimal"><small>°</small></div></div></div>
       <div class="stepper"><button class="btn icon" data-inclina="-1" title="${t('Inclina indietro di 1°')}">−</button><div class="input"><span class="nota">${t('Inclina (asse X) di 1°')}</span></div><button class="btn icon" data-inclina="1" title="${t('Inclina avanti di 1°')}">+</button></div>
-    </div>
-    <div class="group"><h3>${t('Posizione')}</h3>
       <div class="row3">
         <div class="field"><label>${t('X destra')}</label><div class="input"><input data-campo="pos0" inputmode="decimal"><small>${U()}</small></div></div>
         <div class="field"><label>${t('Y altezza')}</label><div class="input"><input data-campo="pos1" inputmode="decimal"><small>${U()}</small></div></div>
         <div class="field"><label>${t('Z verso di te')}</label><div class="input"><input data-campo="pos2" inputmode="decimal"><small>${U()}</small></div></div>
       </div>
-      <button class="btn" data-azione="terra">${t('Appoggia a terra')}</button>
-    </div>
-    <div class="group"><h3>${t('Tagli')}</h3>${tagli}</div>
-    ${p.tipo === 'pannello' ? htmlBordi(p) : ''}
-    ${p.tipo === 'pannello' ? htmlFerramenta(p) : ''}
-    <div class="group" data-unioni></div>
+      <button class="btn" data-azione="terra">${t('Appoggia a terra')}</button>`)}
+    ${sezione('tagli', nTagli ? t('Tagli e intagli ({n})', { n: nTagli }) : t('Tagli e intagli'), tagli + intagli)}
+    ${p.tipo === 'pannello' ? sezione('bordi', t('Bordi e venatura'), htmlBordi(p)) : ''}
+    ${p.tipo === 'pannello' ? sezione('ferramenta', t('Ferramenta'), htmlFerramenta(p)) : ''}
+    ${sezione('unioni', t('Unioni e viti'), '<div class="group" data-unioni></div>')}
     ${p.gruppo ? `<button class="btn" data-azione="gruppo">${t('Seleziona tutto «{nome}»', { nome: esc(nomeGruppo(p)) })}</button>` : ''}
     <div class="azioni"><button class="btn" data-azione="duplica">${t('Duplica')}</button><button class="btn danger" data-azione="elimina">${t('Elimina')}</button></div>`;
+}
+
+// Sezioni del pannello del pezzo: chiuse finché non servono (si ricorda quali sono aperte).
+const sezioniAperte = new Set(JSON.parse(localStorage.getItem('mpm:sezioni') || '[]'));
+const sezione = (k, titolo, corpo) => `<details class="sezione" data-sezione="${k}" ${sezioniAperte.has(k) ? 'open' : ''}><summary>${titolo}</summary><div class="corpo">${corpo}</div></details>`;
+
+// Fori e forme sul pezzo: misura fissa, centro misurato da un bordo (come nel disegno del pezzo).
+const ANCORE_X = { sx: tr('da sinistra'), c: tr('dal centro'), dx: tr('da destra') }, ANCORE_Y = { basso: tr('dal basso'), c: tr('dal centro'), alto: tr("dall'alto") };
+function nomeLavorazione(l) {
+  const tipo = l.tipo === 'ellisse' && Math.abs(l.w - l.h) < 0.01 ? t('Foro Ø {d}', { d: fU(l.w) }) : `${t({ rett: tr('Rettangolo'), ellisse: tr('Ellisse'), poligono: tr('Poligono'), linea: tr('Linea') }[l.tipo] || l.tipo)} ${fU(l.w)} × ${fU(l.h)}`;
+  return `${tipo} ${U()} · ${l.prof > 0 ? t('scasso {p} mm', { p: f1(l.prof) }) : t('passante')}`;
+}
+function htmlLavorazioni(p) {
+  const righe = (p.lavorazioni || []).map((l, i) => {
+    const sel = (k, voci, v) => `<span class="input mini-sel"><select data-lav="${i}:${k}">${Object.entries(voci).map(([a, b]) => `<option value="${a}" ${a === v ? 'selected' : ''}>${t(b)}</option>`).join('')}</select><small>▾</small></span>`;
+    const num = (k, v) => `<span class="input mini-num-u"><input data-lav="${i}:${k}" inputmode="decimal" value="${esc(fU(v))}"><small>${U()}</small></span>`;
+    const tondo = l.tipo === 'ellisse' && Math.abs(l.w - l.h) < 0.01;
+    return `<div class="lavorazione"><div class="chipline"><b>${esc(nomeLavorazione(l))}</b><button class="link" data-lav-togli="${i}">${t('Togli')}</button></div>
+      <div class="lav-righe"><span class="nota">${t(tondo ? 'Diametro' : 'Misure')}</span>${tondo ? num('d', l.w) : num('w', l.w) + num('h', l.h)}</div>
+      <div class="lav-righe"><span class="nota">${t('Centro')} ↔</span>${num('dx', l.dx)}${sel('ax', ANCORE_X, l.ax)}</div>
+      <div class="lav-righe"><span class="nota">${t('Centro')} ↕</span>${num('dy', l.dy)}${sel('ay', ANCORE_Y, l.ay)}</div></div>`;
+  }).join('');
+  return `${righe || `<p class="nota">${t('Fori passanti e scassi sul pezzo: restano della loro misura e alla stessa distanza dal bordo anche se il pezzo cambia misura.')}</p>`}
+    <div class="azioni a-capo"><button class="btn" data-azione="foro-nuovo">${t('+ Foro Ø 40')}</button><button class="btn" data-azione="fori">${t('Disegna fori e forme…')}</button></div>`;
 }
 
 function htmlFerramenta(p) {
@@ -847,6 +886,18 @@ function apriSagoma(p) {
   });
 }
 
+// Fori e forme sul pezzo con l'editor del disegno 2D: il contorno resta fisso, si aggiungono solo vuoti.
+function apriFori(p) {
+  const { L, W } = mod.dimensioni(p), prima = p.lavorazioni || [];
+  apriDisegno2D(p, mod.dimensioni(p).T, n => {
+    modifica(() => {
+      const l = n.forme.map((f, i) => lavorazioneDa(f, L, W, prima[i] && prima[i].tipo === f.tipo ? prima[i] : null));
+      if (l.length) p.lavorazioni = l; else delete p.lavorazioni;
+    });
+    avvisa(tn(n.forme.length, '1 foro o forma sul pezzo. Il centro è misurato dal bordo più vicino: lo cambi nella sezione «Fori e forme».', '{n} fori o forme sul pezzo. Il centro è misurato dal bordo più vicino: lo cambi nella sezione «Fori e forme».'));
+  }, { sfondo: formeDaPezzo({ ...p, L, W }), forme: formeLavorazioni(p) });
+}
+
 function apriDisegno(p) {
   apriDisegno2D(p, mod.dimensioni(p).T, n => {
     modifica(() => { p.forma = 'disegno'; p.disegno = { forme: n.forme }; p.L = n.L; p.W = n.W; });
@@ -867,6 +918,18 @@ function eventiProprieta() {
       pr.fissaggi = { ...(pr.fissaggi || {}), [k]: v };
       pr.unioniEscluse = (pr.unioniEscluse || []).filter(x => x !== k);
     });
+    else if (e.target.dataset.lav && p) {
+      const [i, k] = e.target.dataset.lav.split(':'), l = p.lavorazioni?.[+i];
+      if (!l) return;
+      if (k === 'ax' || k === 'ay') {
+        // cambia il bordo di riferimento lasciando il foro dov'è
+        const f = formeLavorazioni(p)[+i], { L, W } = mod.dimensioni(p), n = lavorazioneDa(f, L, W, { ...l, [k]: e.target.value });
+        return modifica(() => { p.lavorazioni[+i] = n; });
+      }
+      const v = mod.leggiMisura(e.target.value);
+      if (v === null || (k !== 'dx' && k !== 'dy' && v <= 0)) { avvisa(t('Scrivi un numero, per esempio {esempio} (in {u}; puoi anche scrivere «60 cm» o «600 mm»).', { esempio: U() === 'cm' ? '4' : '40', u: U() }), true); return disegnaProprieta(); }
+      modifica(() => { if (k === 'd') { l.w = v; l.h = v; } else l[k] = v; });
+    }
     else if (e.target.hasAttribute('data-fissaggio-def')) modifica(() => { stato.progetto.fissaggioPredefinito = e.target.value; });
     else if (e.target.hasAttribute('data-bordo-spessore') && p) modifica(() => { p.bordatura = { ...(p.bordatura || { lati: [] }), spessore: numero(e.target.value) || 0 }; });
     else if (e.target.dataset.sposta !== undefined) {
@@ -886,7 +949,13 @@ function eventiProprieta() {
       modifica(() => { stato.progetto.caricoRipiani = v; });
     }
   });
-  el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.campo) e.target.blur(); });
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.target.dataset.campo || e.target.dataset.lav)) e.target.blur(); });
+  el.addEventListener('toggle', e => {
+    const k = e.target.dataset?.sezione;
+    if (!k) return;
+    if (e.target.open) sezioniAperte.add(k); else sezioniAperte.delete(k);
+    localStorage.setItem('mpm:sezioni', JSON.stringify([...sezioniAperte]));
+  }, true);
   el.addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -934,6 +1003,13 @@ function eventiProprieta() {
     else if (b.dataset.azione === 'sagoma' && p) apriSagoma(p);
     else if (b.dataset.azione === 'disegno' && p) apriDisegno(p);
     else if (b.dataset.azione === 'dima' && p) stampaHtml(htmlDima(stato.progetto, p), 'dima');
+    else if (b.dataset.azione === 'sblocca' && p) comando('blocca');
+    else if (b.dataset.azione === 'fori' && p) apriFori(p);
+    else if (b.dataset.azione === 'foro-nuovo' && p) {
+      modifica(() => { p.lavorazioni = [...(p.lavorazioni || []), { tipo: 'ellisse', w: 40, h: 40, rot: 0, prof: 0, ax: 'c', dx: 0, ay: 'c', dy: 0 }]; });
+      avvisa(t('Foro Ø 40 al centro del pezzo: scrivi misura e distanza dal bordo qui sotto, oppure «Disegna fori e forme…».'));
+    }
+    else if (b.dataset.lavTogli !== undefined && p) modifica(() => { p.lavorazioni = p.lavorazioni.filter((x, i) => i !== +b.dataset.lavTogli); if (!p.lavorazioni.length) delete p.lavorazioni; });
     else if (b.dataset.azione) comando(b.dataset.azione);
   });
 }
@@ -1427,14 +1503,14 @@ async function avvio() {
     else if ((e.key === 'Delete' || e.key === 'Backspace') && pezzoSel()) comando('elimina');
     else if (ctrl || e.altKey) return;
     else if (e.key.startsWith('Arrow') || e.key === 'PageUp' || e.key === 'PageDown') {
-      const sel = pezziSel();
+      const sel = pezziSel().filter(p => !p.bloccato);
       if (!sel.length) return;
       e.preventDefault();
       const passo = e.shiftKey ? 10 : 1;
       const d = { ArrowLeft: [-passo, 0, 0], ArrowRight: [passo, 0, 0], ArrowUp: [0, 0, -passo], ArrowDown: [0, 0, passo], PageUp: [0, passo, 0], PageDown: [0, -passo, 0] }[e.key];
       modifica(() => sel.forEach(p => mod.sposta(p, d)));
     } else {
-      const tasti = { p: 'pannello', l: 'listello', c: 'accosta', a: 'adatta', d: 'dividi', m: 'misura', g: 'sposta', r: 'ruota', s: 'specchia', t: 'modelli', k: 'cassetto' };
+      const tasti = { b: 'blocca', p: 'pannello', l: 'listello', c: 'accosta', a: 'adatta', d: 'dividi', m: 'misura', g: 'sposta', r: 'ruota', s: 'specchia', t: 'modelli', k: 'cassetto' };
       if (tasti[k]) { e.preventDefault(); comando(tasti[k]); }
     }
   });
