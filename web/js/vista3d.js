@@ -4,7 +4,7 @@ import * as THREE from '../vendor/three.module.js';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { TransformControls } from '../vendor/TransformControls.js';
 import { materiale } from './materiali.js';
-import { fmt, fmtU, matrice } from './modello.js';
+import { assiManiglie, dimensioni, fmt, fmtU, matrice } from './modello.js';
 import { geometriaPezzo } from './geometria.js';
 import { cerniere, guide, maniglia } from './ferramenta.js';
 
@@ -41,12 +41,22 @@ function ferramentaPezzo(p) {
   return g;
 }
 
+// Campo delle proprietà che corrisponde a ogni quota del pezzo (x = lunghezza, y = larghezza, z = spessore).
+function campiQuote(p) {
+  if (p.tipo === 'listello') return { x: 'L', y: 'sezW', z: 'sezT' };
+  if (p.forma === 'cerchio') return { x: 'D', y: 'D', z: 'spessore' };
+  if (p.forma === 'rett') return { x: 'L', y: 'W', z: 'spessore' };
+  return { z: 'spessore' };
+}
+
 export class Vista3D {
-  constructor(contenitore, { onTocco, onTrasforma, onAfferra }) {
+  constructor(contenitore, { onTocco, onTrasforma, onAfferra, onRidimensiona, onQuota }) {
     this.el = contenitore;
     this.onTocco = onTocco;
     this.onTrasforma = onTrasforma;
     this.onAfferra = onAfferra;
+    this.onRidimensiona = onRidimensiona;
+    this.onQuota = onQuota;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setClearColor('#f4f1ec');
@@ -66,6 +76,8 @@ export class Vista3D {
     this.scena.add(this.gruppo);
     this.extra = new THREE.Group();
     this.scena.add(this.extra);
+    this.maniglie = new THREE.Group();
+    this.scena.add(this.maniglie);
 
     this.prospettica = new THREE.PerspectiveCamera(35, 1, 10, 50000);
     this.prospettica.position.set(1800, 1500, 2400);
@@ -96,6 +108,8 @@ export class Vista3D {
     // Trascinamento libero dei pezzi (come in Tinkercad): ascoltato sul contenitore in fase di cattura, così parte
     // prima di OrbitControls e TransformControls e li esclude quando il dito o il mouse è su un pezzo.
     contenitore.addEventListener('pointerdown', e => this.afferra(e), true);
+    // Quote del pezzo selezionato: si toccano per scrivere la misura (come in Tinkercad).
+    this.sovra.addEventListener('click', e => { const q = e.target.closest('[data-quota]'); if (q) this.apriQuota(q); });
     this.giu = null;
     this.renderer.domElement.addEventListener('pointerdown', e => { this.giu = this.gizmo.axis ? null : [e.clientX, e.clientY]; });
     this.renderer.domElement.addEventListener('pointerup', e => {
@@ -126,11 +140,11 @@ export class Vista3D {
 
   // opzioni: { selezione: Set di id, primario, viti, mostraViti, vitiErrate, esploso, gizmo: 'translate'|'rotate'|null, misura }
   aggiorna(progetto, opzioni = {}) {
-    const { selezione = new Set(), primario = null, viti = [], mostraViti = true, vitiErrate = new Set(), esploso = false, gizmo = 'translate', misura = null, segno = null } = opzioni;
+    const { selezione = new Set(), primario = null, viti = [], mostraViti = true, vitiErrate = new Set(), esploso = false, gizmo = 'translate', misura = null, segno = null, maniglie = false } = opzioni;
     this.progetto = progetto;
     this.opzioni = opzioni;
-    this.stato = { selezione, primario, esploso, gizmo, misura };
-    for (const c of [...this.gruppo.children, ...this.extra.children]) {
+    this.stato = { selezione, primario, esploso, gizmo, misura, maniglie };
+    for (const c of [...this.gruppo.children, ...this.extra.children, ...this.maniglie.children]) {
       c.parent.remove(c);
       c.traverse(o => {
         if (o.material && !CONDIVISI.has(o.material)) o.material.dispose();
@@ -150,6 +164,7 @@ export class Vista3D {
       const linee = new THREE.LineSegments(g.bordi, new THREE.LineBasicMaterial({ color: sel ? ACCENTO : '#8a6b45', transparent: !sel, opacity: sel ? 1 : 0.55 }));
       const obj = new THREE.Group();
       obj.add(mesh, linee, ferramentaPezzo(p));
+      obj.userData.linee = linee;
       obj.matrixAutoUpdate = false;
       const m = matrice(p);
       if (centro) {
@@ -174,6 +189,7 @@ export class Vista3D {
     }
     if (misura) this.disegnaMisura(misura);
     if (segno) this.disegnaSegno(segno);
+    if (maniglie && primario && !esploso) this.creaManiglie(progetto.pezzi.find(p => p.id === primario));
     this.aggiornaGizmo();
     this.disegna();
   }
@@ -236,6 +252,167 @@ export class Vista3D {
     if (!d.equals(new THREE.Matrix4())) this.onTrasforma(d);
   }
 
+  // ---------- maniglie per cambiare le misure (come in Tinkercad) ----------
+  // Quadratini sulle teste (lunghezza), sui bordi (larghezza) e negli angoli (tutte e due) del pezzo selezionato.
+  creaManiglie(p) {
+    const obj = p && this.oggetti.get(p.id), g = p && geometriaPezzo(p), assi = p ? assiManiglie(p) : [];
+    if (!obj || !g || !assi.length) return;
+    const { L, W } = dimensioni(p), zc = (g.min[2] + g.max[2]) / 2, m = obj.matrix, r = new THREE.Matrix4().extractRotation(m);
+    const dir = k => new THREE.Vector3(k === 'x' ? 1 : 0, k === 'y' ? 1 : 0, 0).applyMatrix4(r).normalize();
+    const lato = (k, s) => ({ k, lato: s, e: dir(k).multiplyScalar(s === 'max' ? 1 : -1), len: k === 'x' ? (p.forma === 'cerchio' ? p.D : L) : W });
+    const xs = { min: g.min[0], max: g.max[0], c: (g.min[0] + g.max[0]) / 2 }, ys = { min: g.min[1], max: g.max[1], c: (g.min[1] + g.max[1]) / 2 };
+    const posti = [];
+    if (p.forma === 'cerchio') posti.push([xs.max, ys.c, [lato('x', 'max')]]);
+    else {
+      for (const s of ['min', 'max']) posti.push([xs[s], ys.c, [lato('x', s)]]);
+      if (assi.includes('y')) {
+        for (const s of ['min', 'max']) posti.push([xs.c, ys[s], [lato('y', s)]]);
+        for (const sx of ['min', 'max']) for (const sy of ['min', 'max']) posti.push([xs[sx], ys[sy], [lato('x', sx), lato('y', sy)], true]);
+      }
+    }
+    const geo = new THREE.BoxGeometry(1, 1, 1), bordo = new THREE.MeshBasicMaterial({ color: ACCENTO, depthTest: false, transparent: true });
+    const dentro = new THREE.MeshBasicMaterial({ color: '#ffffff', depthTest: false, transparent: true }), presa = new THREE.MeshBasicMaterial({ visible: false });
+    for (const [x, y, lati, angolo] of posti) {
+      const h = new THREE.Group();
+      h.position.copy(new THREE.Vector3(x, y, zc).applyMatrix4(m));
+      h.quaternion.setFromRotationMatrix(r);
+      const a = new THREE.Mesh(geo, bordo), b = new THREE.Mesh(geo, dentro), c = new THREE.Mesh(geo, presa);
+      a.renderOrder = 30; b.renderOrder = 31; b.scale.setScalar(0.62); c.scale.setScalar(2);
+      if (angolo) b.material = bordo, a.material = dentro; // gli angoli al contrario: pieni di blu
+      for (const x of [a, b, c]) x.userData.propria = true;
+      h.add(a, b, c);
+      h.userData = { lati, id: p.id, presa: c, piano: new THREE.Vector3(0, 0, 1).applyMatrix4(r).normalize() };
+      this.maniglie.add(h);
+    }
+    this.maniglie.visible = true;
+  }
+
+  mmPerPixel(punto) {
+    const h = this.el.clientHeight || 1;
+    if (this.camera.isOrthographicCamera) return (this.ortogonale.top - this.ortogonale.bottom) / this.ortogonale.zoom / h;
+    return 2 * this.camera.position.distanceTo(punto) * Math.tan(THREE.MathUtils.degToRad(this.prospettica.fov / 2)) / h;
+  }
+
+  scalaManiglie() {
+    for (const h of this.maniglie.children) h.scale.setScalar(13 * this.mmPerPixel(h.position));
+  }
+
+  manigliaSotto(ray) {
+    if (!this.maniglie.visible || !this.maniglie.children.length) return null;
+    this.maniglie.updateMatrixWorld(true);
+    const hit = ray.intersectObjects(this.maniglie.children.map(h => h.userData.presa), false)[0];
+    return hit ? hit.object.parent : null;
+  }
+
+  // Altri pezzi come intervalli lungo una direzione: per l'aggancio delle maniglie.
+  intervalli(esclusi, dirs) {
+    const out = [], v = new THREE.Vector3();
+    for (const [id, o] of this.oggetti) {
+      if (esclusi.has(id)) continue;
+      const pos = o.children[0].geometry.attributes.position, r = dirs.map(() => [Infinity, -Infinity]);
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(o.matrix);
+        dirs.forEach((d, j) => { const t = v.dot(d); if (t < r[j][0]) r[j][0] = t; if (t > r[j][1]) r[j][1] = t; });
+      }
+      out.push({ id, r });
+    }
+    return out;
+  }
+
+  trascinaManiglia(e, h) {
+    e.stopPropagation();
+    this.giu = null;
+    const { lati, id, piano: n } = h.userData, obj = this.oggetti.get(id), p = this.progetto.pezzi.find(x => x.id === id);
+    const tela = this.renderer.domElement, H0 = h.position.clone();
+    try { tela.setPointerCapture(e.pointerId); } catch { /* alcuni browser non lo permettono qui */ }
+    // direzioni dei lati del pezzo (locali x, y, z nel mondo) per l'aggancio agli altri pezzi
+    const r = new THREE.Matrix4().extractRotation(obj.matrix), ax = [0, 1, 2].map(i => new THREE.Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0).applyMatrix4(r));
+    const propri = (() => { const pos = obj.children[0].geometry.attributes.position, v = new THREE.Vector3(), rr = ax.map(() => [Infinity, -Infinity]);
+      for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrix); ax.forEach((d, j) => { const t = v.dot(d); rr[j][0] = Math.min(rr[j][0], t); rr[j][1] = Math.max(rr[j][1], t); }); }
+      return rr; })();
+    const altri = this.intervalli(new Set([id]), ax);
+    const pianoTr = new THREE.Plane().setFromNormalAndCoplanarPoint(n, H0);
+    this.selInizio = [obj];
+    const d = { mosso: false, x: e.clientX, y: e.clientY };
+    const muovi = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      if (!d.mosso && Math.hypot(ev.clientX - d.x, ev.clientY - d.y) < 4) return;
+      d.mosso = true;
+      const ray = this.raggio(ev).ray, soglia = 10 * this.mmPerPixel(H0);
+      let P;
+      if (lati.length === 1) {
+        // punto della retta della maniglia più vicino al raggio del mouse
+        const e1 = lati[0].e, w0 = H0.clone().sub(ray.origin), b = e1.dot(ray.direction), den = 1 - b * b;
+        if (den < 1e-6) return;
+        const s = (b * w0.dot(ray.direction) - w0.dot(e1)) / den;
+        P = H0.clone().addScaledVector(e1, s);
+      } else {
+        P = ray.intersectPlane(pianoTr, new THREE.Vector3());
+        if (!P) return;
+      }
+      const spinta = P.sub(H0);
+      d.esiti = lati.map(l => {
+        const i = l.k === 'x' ? 0 : 1, segno = l.lato === 'max' ? 1 : -1, delta = spinta.dot(l.e);
+        // dove arriva la testa lungo l'asse locale (coordinata con segno sul versore locale)
+        const fine = (segno > 0 ? propri[i][1] : propri[i][0]) + segno * delta;
+        let migliore = null;
+        for (const o of altri) {
+          const sopra = [0, 1, 2].every(j => j === i || (o.r[j][0] < propri[j][1] - 0.5 && o.r[j][1] > propri[j][0] + 0.5));
+          if (!sopra) continue;
+          for (const [t, vicino] of [[o.r[i][0], segno > 0], [o.r[i][1], segno < 0]]) {
+            const dd = t - fine;
+            if (Math.abs(dd) <= soglia && (!migliore || Math.abs(dd) < Math.abs(migliore.dd))) migliore = { dd, id: o.id, vicino };
+          }
+        }
+        let valore = l.len + delta + (migliore ? segno * migliore.dd : 0);
+        if (!migliore) valore = Math.round(valore);
+        valore = Math.max(1, valore);
+        return { k: l.k, lato: l.lato, valore, len: l.len, aggancio: migliore ? { id: migliore.id, vicino: migliore.vicino } : null };
+      });
+      // anteprima: il pezzo si stira tenendo ferma la testa opposta
+      const M = new THREE.Matrix4();
+      for (const x of d.esiti) {
+        const i = x.k === 'x' ? 0 : 1, sc = x.valore / x.len, fermo = x.lato === 'max' ? 0 : x.len;
+        const S = new THREE.Matrix4().makeScale(i === 0 || p.forma === 'cerchio' ? sc : 1, i === 1 || p.forma === 'cerchio' ? sc : 1, 1);
+        const T = v => new THREE.Matrix4().makeTranslation(i === 0 ? v : 0, i === 1 ? v : 0, 0);
+        M.multiply(T(fermo)).multiply(S).multiply(T(-fermo));
+      }
+      obj.matrix.copy(obj.userData.base.clone().multiply(M)); obj.updateMatrixWorld(true);
+      this.maniglie.visible = false;
+      this.evidenzia(d.esiti.map(x => x.aggancio?.id).filter(Boolean));
+      const nomi = { x: p.forma === 'cerchio' ? 'Ø' : 'L', y: 'W' };
+      this.etichettaMovimento = d.esiti.map(x => `${nomi[x.k]} ${fmtU(x.valore, true)}${x.aggancio ? ' ⇥' : ''}`).join('  ');
+      this.disegna();
+    };
+    const fine = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      tela.removeEventListener('pointermove', muovi);
+      tela.removeEventListener('pointerup', fine);
+      tela.removeEventListener('pointercancel', fine);
+      try { tela.releasePointerCapture(e.pointerId); } catch { /* già rilasciato */ }
+      this.selInizio = null;
+      this.etichettaMovimento = '';
+      this.evidenzia([]);
+      const esiti = d.esiti?.filter(x => Math.abs(x.valore - x.len) > 0.05);
+      if (d.mosso && esiti?.length && ev.type === 'pointerup') this.onRidimensiona(id, esiti);
+      else this.aggiorna(this.progetto, this.opzioni);
+    };
+    tela.addEventListener('pointermove', muovi);
+    tela.addEventListener('pointerup', fine);
+    tela.addEventListener('pointercancel', fine);
+  }
+
+  // Bordi verdi sui pezzi a cui ci si sta agganciando.
+  evidenzia(ids) {
+    const s = new Set(ids);
+    for (const [id, o] of this.oggetti) {
+      const l = o.userData.linee;
+      if (!l) continue;
+      if (s.has(id)) { if (!l.userData.prima) l.userData.prima = { c: l.material.color.clone(), o: l.material.opacity, t: l.material.transparent }; l.material.color.set('#2f7d4f'); l.material.opacity = 1; l.material.transparent = false; }
+      else if (l.userData.prima) { const q = l.userData.prima; l.material.color.copy(q.c); l.material.opacity = q.o; l.material.transparent = q.t; delete l.userData.prima; }
+    }
+  }
+
   // ---------- trascinamento libero ----------
   raggio(e) {
     const r = this.renderer.domElement.getBoundingClientRect();
@@ -265,8 +442,10 @@ export class Vista3D {
   // selezionato continua a girare la vista. Il piano di scorrimento: orizzontale nella vista 3D (per alzare c'è la
   // freccia), quello dello schermo nelle viste ortogonali. Maiusc = solo lungo la direzione principale.
   afferra(e) {
-    if (this.stato.gizmo !== 'translate' || this.stato.esploso || e.button > 0 || !e.isPrimary || !this.progetto) return;
-    const ray = this.raggio(e);
+    if (e.target.closest?.('[data-quota], .editor-quota') || e.button > 0 || !e.isPrimary || !this.progetto) return;
+    const ray = this.raggio(e), maniglia = this.manigliaSotto(ray);
+    if (maniglia) return this.trascinaManiglia(e, maniglia);
+    if (this.stato.gizmo !== 'translate' || this.stato.esploso) return;
     if (this.sulGizmo(ray)) return;
     const hit = this.pezzoSotto(ray);
     if (!hit) return;
@@ -277,6 +456,8 @@ export class Vista3D {
     const normale = this.camera.isOrthographicCamera ? this.camera.getWorldDirection(new THREE.Vector3()).negate() : new THREE.Vector3(0, 1, 0);
     const piano = new THREE.Plane().setFromNormalAndCoplanarPoint(normale, hit.point);
     const d = { id, selezionato, piano, inizio: hit.point.clone(), x: e.clientX, y: e.clientY, mosso: false, evento: e };
+    // assi su cui si scorre (quelli del piano di trascinamento): lì agisce la calamita dal vivo
+    const assiPiano = ['x', 'y', 'z'].filter(k => Math.abs(normale[k]) < 0.5);
     const tela = this.renderer.domElement;
     try { tela.setPointerCapture(e.pointerId); } catch { /* alcuni browser non lo permettono qui */ }
     const muovi = ev => {
@@ -287,12 +468,37 @@ export class Vista3D {
         if (!d.selezionato) this.onAfferra(d.id, ev); // l'app seleziona e ridisegna: da qui si muove la nuova selezione
         this.selInizio = [...this.stato.selezione].map(x => this.oggetti.get(x)).filter(Boolean);
         this.gizmo.getHelper().visible = false;
+        this.maniglie.visible = false;
+        const box = o => new THREE.Box3().setFromObject(o.children[0]);
+        d.S = this.selInizio.map(box).reduce((a, b) => a.union(b));
+        const sel = new Set(this.stato.selezione);
+        d.altri = [...this.oggetti].filter(([x]) => !sel.has(x)).map(([x, o]) => ({ id: x, B: box(o) }));
       }
       const p = this.raggio(ev).ray.intersectPlane(d.piano, new THREE.Vector3());
       if (!p) return;
       const v = p.sub(d.inizio);
       if (ev.shiftKey) { const k = ['x', 'y', 'z'].reduce((a, b) => (Math.abs(v[b]) > Math.abs(v[a]) ? b : a)); for (const a of ['x', 'y', 'z']) if (a !== k) v[a] = 0; }
       for (const a of ['x', 'y', 'z']) v[a] = Math.round(v[a] / 5) * 5;
+      // Calamita dal vivo: facce, bordi e centri si allineano a quelli dei pezzi vicini (entro ~10 pixel).
+      const soglia = 10 * this.mmPerPixel(d.inizio), S = d.S.clone().translate(v), agganci = [];
+      const entra = (A, B) => ['x', 'y', 'z'].every(j => A.min[j] < B.max[j] - 0.5 && A.max[j] > B.min[j] + 0.5);
+      const dentro = new Set(d.altri.filter(q => entra(S, q.B)));
+      if (!ev.altKey) for (const k of assiPiano) {
+        let migliore = null;
+        for (const o of d.altri) {
+          const B = o.B;
+          if (!['x', 'y', 'z'].every(j => j === k || (S.min[j] < B.max[j] + soglia && S.max[j] > B.min[j] - soglia))) continue;
+          for (const dd of [B.max[k] - S.min[k], B.min[k] - S.max[k], B.min[k] - S.min[k], B.max[k] - S.max[k], (B.min[k] + B.max[k] - S.min[k] - S.max[k]) / 2]) {
+            if (Math.abs(dd) > soglia || (migliore && Math.abs(dd) >= Math.abs(migliore.dd) - 1e-6)) continue;
+            // niente aggancio che fa entrare il pezzo in quello a cui si aggancia, o in un pezzo che prima non toccava
+            const T = S.clone(); T.min[k] += dd; T.max[k] += dd;
+            if (d.altri.some(q => (q === o || !dentro.has(q)) && entra(T, q.B))) continue;
+            migliore = { dd, id: o.id };
+          }
+        }
+        if (migliore) { v[k] += migliore.dd; S.min[k] += migliore.dd; S.max[k] += migliore.dd; agganci.push(migliore.id); }
+      }
+      this.evidenzia(agganci);
       d.delta = new THREE.Matrix4().makeTranslation(v.x, v.y, v.z);
       for (const o of this.selInizio) { o.matrix.copy(d.delta.clone().multiply(o.userData.base)); o.updateMatrixWorld(true); }
       this.etichettaMovimento = [['X', v.x], ['Y', v.y], ['Z', v.z]].filter(([, x]) => Math.abs(x) > 0.05).map(([k, x]) => `${k} ${x > 0 ? '+' : ''}${fmtU(x, true)}`).join('  ');
@@ -305,10 +511,12 @@ export class Vista3D {
       tela.removeEventListener('pointercancel', fine);
       try { tela.releasePointerCapture(e.pointerId); } catch { /* già rilasciato */ }
       this.gizmo.getHelper().visible = true;
+      this.maniglie.visible = true;
       if (!d.mosso) return ev.type === 'pointerup' && this.tocca(ev);
       this.selInizio = null;
       this.etichettaMovimento = '';
-      if (d.delta && !d.delta.equals(new THREE.Matrix4())) this.onTrasforma(d.delta);
+      this.evidenzia([]);
+      if (d.delta && !d.delta.equals(new THREE.Matrix4())) this.onTrasforma(d.delta, { libero: true });
       else this.aggiorna(this.progetto, this.opzioni);
     };
     tela.addEventListener('pointermove', muovi);
@@ -373,15 +581,17 @@ export class Vista3D {
   disegnaSovra() {
     if (!this.progetto) { this.sovra.innerHTML = ''; return; }
     const parti = [], linee = [];
-    const etichetta = (v, testo, cls = '') => { const [x, y, z] = this.proietta(v); if (z < 1) parti.push(`<span class="quota ${cls}" style="left:${x}px;top:${y}px">${testo}</span>`); };
+    const etichetta = (v, testo, cls = '', attr = '') => { const [x, y, z] = this.proietta(v); if (z < 1) parti.push(`<span class="quota ${cls}"${attr} style="left:${x}px;top:${y}px">${testo}</span>`); };
     const { primario, misura, esploso } = this.stato;
     const p = this.progetto.pezzi.find(x => x.id === primario);
     if (p && !esploso && this.oggetti?.get(p.id) && !this.selInizio) {
       const g = geometriaPezzo(p), m = this.oggetti.get(p.id).matrix;
       if (g) {
         const [x0, y0, z0] = g.min, [x1, y1, z1] = g.max, V = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(m);
-        etichetta(V((x0 + x1) / 2, y0, z1), fmtU(x1 - x0, true));
-        etichetta(V(x1, (y0 + y1) / 2, z1), fmtU(y1 - y0, true));
+        const c = campiQuote(p), attr = k => (c[k] ? ` data-quota="${c[k]}" data-asse="${k}"` : '');
+        etichetta(V((x0 + x1) / 2, y0, z1), fmtU(x1 - x0, true), c.x ? 'edit' : '', attr('x'));
+        etichetta(V(x1, (y0 + y1) / 2, z1), fmtU(y1 - y0, true), c.y ? 'edit' : '', attr('y'));
+        etichetta(V(x1, y0, (z0 + z1) / 2), fmtU(z1 - z0, true), 'spess' + (c.z ? ' edit' : ''), attr('z'));
       }
     }
     if (misura?.b) {
@@ -407,6 +617,32 @@ export class Vista3D {
     }
     if (this.etichettaMovimento && this.selInizio) parti.push(`<span class="quota movimento" style="left:50%;top:76px">${this.etichettaMovimento}</span>`);
     this.sovra.innerHTML = `<svg class="quote-linee">${linee.join('')}</svg>${parti.join('')}`;
+  }
+
+  // Campo per scrivere una quota toccata: compare al posto dell'etichetta, Invio conferma, Esc annulla.
+  apriQuota(q) {
+    this.editorQuota?.remove();
+    const campo = q.dataset.quota, r = q.getBoundingClientRect(), base = this.el.getBoundingClientRect();
+    const box = document.createElement('div');
+    box.className = 'editor-quota';
+    box.style.left = `${r.left + r.width / 2 - base.left}px`;
+    box.style.top = `${r.top + r.height / 2 - base.top}px`;
+    box.innerHTML = `<input inputmode="decimal" value="${q.textContent.replace(/\s*(mm|cm)$/, '')}"><small>${q.textContent.match(/(mm|cm)$/)?.[1] || ''}</small>`;
+    this.el.appendChild(box);
+    this.editorQuota = box;
+    const input = box.querySelector('input');
+    let fatto = false;
+    const chiudi = conferma => {
+      if (fatto) return;
+      fatto = true;
+      box.remove();
+      if (this.editorQuota === box) this.editorQuota = null;
+      if (conferma) this.onQuota?.(campo, input.value, q.dataset.asse);
+    };
+    input.addEventListener('keydown', ev => { if (ev.key === 'Enter') chiudi(true); else if (ev.key === 'Escape') { ev.stopPropagation(); chiudi(false); } });
+    input.addEventListener('blur', () => chiudi(true));
+    input.focus();
+    input.select();
   }
 
   // Ingombro dei soli pezzi di legno (senza ferramenta né viti).
@@ -455,16 +691,17 @@ export class Vista3D {
   }
 
   immagine() {
-    const h = this.gizmo.getHelper();
-    h.visible = false;
+    const h = this.gizmo.getHelper(), mv = this.maniglie.visible;
+    h.visible = false; this.maniglie.visible = false;
     this.renderer.render(this.scena, this.camera);
     const url = this.renderer.domElement.toDataURL('image/png');
-    h.visible = true;
+    h.visible = true; this.maniglie.visible = mv;
     this.disegna();
     return url;
   }
 
   disegna() {
+    this.scalaManiglie();
     this.renderer.render(this.scena, this.camera);
     this.disegnaSovra();
   }

@@ -1,5 +1,5 @@
 // MyPlanMaker: collega modello, vista 3D, pannello delle proprietà e salvataggio.
-import { Box3, Vector3 } from '../vendor/three.module.js';
+import { Box3, Matrix4, Vector3 } from '../vendor/three.module.js';
 import { avviaGeometria, geometriaPezzo } from './geometria.js';
 import { Vista3D } from './vista3d.js';
 import * as mod from './modello.js';
@@ -71,6 +71,7 @@ function aggiorna() {
   vista.aggiorna(stato.progetto, {
     selezione: selezione(), primario: stato.sel, viti: u.viti, mostraViti: stato.mostraViti, vitiErrate: u.errate,
     esploso: stato.esploso, gizmo: stato.modo ? null : stato.gizmo, misura: stato.misura, segno: stato.modo === 'accosta' || stato.modo === 'adatta' ? stato.accostaDa : null,
+    maniglie: !stato.modo && stato.gizmo !== 'rotate' && selezione().size === 1,
   });
   disegnaAccostato();
   document.querySelector('[data-vista="esploso"]')?.classList.toggle('on', stato.esploso);
@@ -123,7 +124,7 @@ function comando(cmd) {
     const vicino = p || pr.pezzi.reduce((a, b) => (!a || mod.ingombro(b).max.x > mod.ingombro(a).max.x ? b : a), null);
     modifica(() => seleziona(mod.nuovoPezzo(pr, cmd, vicino).id));
     vista.vista(vista.nomeVista);
-    avvisa(t('Aggiunto: scrivi le misure a destra, poi usa Accosta per metterlo contro un altro pezzo.'));
+    avvisa(t('Aggiunto: trascinalo al suo posto (si aggancia agli altri pezzi). Per le misure trascina i quadratini blu, oppure tocca una misura e scrivila.'));
   } else if (cmd === 'disegno') {
     // Nuovo pannello disegnato in 2D: si crea solo se il disegno viene usato.
     esciModo();
@@ -381,16 +382,83 @@ function eventiAccostato() {
   el.addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
 }
 
-// Fine di un trascinamento col gizmo: applica la trasformazione a tutti i pezzi selezionati, poi la calamita.
-function trasformato(delta) {
+// Fine di uno spostamento: applica la trasformazione a tutti i pezzi selezionati. Col gizmo poi la calamita (nel
+// trascinamento libero agisce già dal vivo). Se alla fine la selezione appoggia su un altro pezzo, compare il
+// riquadro «Allinea» per scrivere le distanze dai bordi.
+function trasformato(delta, { libero = false } = {}) {
   const sel = pezziSel();
   if (!sel.length) return aggiorna();
   let spinta = [0, 0, 0];
   modifica(() => {
     for (const p of sel) mod.trasforma(p, delta);
-    if (stato.gizmo === 'translate') spinta = mod.calamita(stato.progetto, new Set(sel.map(p => p.id)), ingombroMondo);
+    if (stato.gizmo === 'translate' && !libero) spinta = mod.calamita(stato.progetto, new Set(sel.map(p => p.id)), ingombroMondo);
+    if (stato.gizmo === 'translate') stato.accostato = contatto(sel);
   });
   if (spinta.some(v => v)) avvisa(t('Agganciato al pezzo vicino ({spinta}).', { spinta: spinta.map((v, i) => (v ? `${'XYZ'[i]} ${v > 0 ? '+' : ''}${mod.fmtU(v)}` : '')).filter(Boolean).join(', ') + ' ' + U() }), false, 3000);
+}
+
+// Il pezzo su cui appoggia la selezione (faccia contro faccia, con un po' di sovrapposizione), per il riquadro «Allinea».
+function contatto(sel) {
+  const A = ingombroSel(sel), ids = new Set(sel.map(p => p.id));
+  let migliore = null;
+  for (const b of stato.progetto.pezzi) {
+    if (ids.has(b.id)) continue;
+    const B = ingombroMondo(b);
+    ['x', 'y', 'z'].forEach((k, i) => {
+      const altri = ['x', 'y', 'z'].filter(j => j !== k), area = altri.reduce((a, j) => a * Math.max(0, Math.min(A.max[j], B.max[j]) - Math.max(A.min[j], B.min[j])), 1);
+      if (area < 1) return;
+      for (const [gap, segno] of [[A.min[k] - B.max[k], 1], [B.min[k] - A.max[k], -1]]) {
+        if (Math.abs(gap) > 0.5 || (migliore && migliore.area >= area)) continue;
+        const n = [0, 0, 0]; n[i] = segno;
+        const punto = B.min.clone().add(B.max).multiplyScalar(0.5); punto[k] = segno > 0 ? B.max[k] : B.min[k];
+        migliore = { area, v: { ids: [...ids], b: b.id, n, punto: punto.toArray() } };
+      }
+    });
+  }
+  return migliore?.v || null;
+}
+
+// Quota scritta sul pezzo nel 3D. Lunghezza e larghezza sono quelle finite (dopo i tagli): il pezzo cresce o cala
+// della differenza, e i tagli della testa che si muove la seguono. Così un pezzo adattato si porta alla misura voluta.
+function quotaScritta(campo, valore, asse) {
+  const p = pezzoSel();
+  if (!p || !((campo === 'L' || campo === 'W') && (p.forma || 'rett') === 'rett')) { applicaCampo(campo, valore); return aggiorna(); }
+  const v = mod.leggiMisura(valore), g = geometriaPezzo(p), i = asse === 'y' ? 1 : 0;
+  if (v === null || v <= 0 || !g) { avvisa(t('La misura deve essere maggiore di zero.'), true); return aggiorna(); }
+  const finita = g.max[i] - g.min[i], diff = v - finita;
+  if (Math.abs(diff) < 0.05) return aggiorna();
+  // si muove la testa con un taglio (se c'è solo all'inizio, quella), altrimenti la testa B / il bordo alto
+  const lato = p.tagli.some(x => x.n[i] < -1e-6) || !p.tagli.some(x => x.n[i] > 1e-6) ? 'max' : 'min';
+  const prova = structuredClone(p);
+  mod.ridimensiona(prova, asse === 'y' ? 'y' : 'x', lato, p[campo] + diff);
+  const g2 = geometriaPezzo(prova);
+  if (!g2) { avvisa(t('Il taglio toglierebbe tutto il pezzo: controlla da che parte sta.'), true); return aggiorna(); }
+  modifica(() => Object.assign(p, prova));
+  const ora = g2.max[i] - g2.min[i];
+  if (Math.abs(ora - v) > 0.5) avvisa(t('Misura finita {ora}: i tagli del pezzo non permettono di arrivare a {voluta}. Controllali nella sezione Tagli.', { ora: mod.fmtU(ora, true), voluta: mod.fmtU(v, true) }), true);
+}
+
+// Fine del trascinamento di una maniglia: nuove misure. Se la testa si è fermata contro una faccia obliqua di un
+// altro pezzo, Adatta la taglia con l'angolo giusto.
+function ridimensionato(id, esiti) {
+  const p = stato.progetto.pezzi.find(x => x.id === id);
+  if (!p) return aggiorna();
+  const prova = structuredClone(p);
+  for (const x of esiti) mod.ridimensiona(prova, x.k, x.lato, x.valore);
+  let msg = esiti.map(x => `${x.k === 'x' ? (p.forma === 'cerchio' ? t('Diametro') : t('Lunghezza')) : t('Larghezza')} ${mod.fmtU(x.valore, true)}`).join(', ');
+  for (const x of esiti) {
+    const b = x.aggancio?.vicino && stato.progetto.pezzi.find(q => q.id === x.aggancio.id);
+    if (!b || p.forma === 'cerchio') continue;
+    // faccia di b a squadra con l'asse? allora basta la misura, niente taglio
+    const e = new Vector3(x.k === 'x' ? 1 : 0, x.k === 'y' ? 1 : 0, 0).applyMatrix4(new Matrix4().extractRotation(mod.matrice(prova)));
+    const rb = new Matrix4().extractRotation(mod.matrice(b));
+    const squadra = [0, 1, 2].some(i => Math.abs(new Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0).applyMatrix4(rb).dot(e)) > 0.9999);
+    if (squadra) continue;
+    const r = mod.adatta(prova, b, { asse: x.k });
+    if (r.ok && geometriaPezzo(prova)) msg += ' · ' + t('adattato a «{b}». {taglio}.', { b: b.nome, taglio: r.msg });
+  }
+  modifica(() => Object.assign(p, prova));
+  avvisa(msg, false, 3500);
 }
 
 function disegnaBarraSel() {
@@ -596,7 +664,9 @@ function htmlInfo(p) {
   const testoFreccia = fr ? `<div class="${fr.giudizio === 'troppo' ? 'avviso' : 'ok'}">${fr.giudizio === 'troppo' ? '⚠' : '✓'} ${t('Con {carico} kg/m si piega di {f} mm nel tempo ({giudizio}).', { carico: fr.carico, f: f1(fr.nelTempo), giudizio: t({ ottimo: tr('ottimo'), accettabile: tr('si nota appena'), troppo: tr('troppo') }[fr.giudizio]) })}</div>` : '';
   const suMisura = prezzo !== cat
     ? `<div class="chipline"><span>${p.tipo === 'listello' ? t('Sezione su misura (a catalogo {w} × {t})', { w: cat.W, t: cat.T }) : t('Spessore su misura (a catalogo {t} mm)', { t: cat.T })}</span><button class="link" data-azione="catalogo">${t('Torna a catalogo')}</button></div>` : '';
-  return `<div class="chipline"><span>${t('Misura finita')}</span><b>${fU(L)} × ${fU(W)} × ${fU(T)} ${U()}</b></div>${suMisura}
+  const d = mod.dimensioni(p), piuCorto = p.tagli.length && (p.forma || 'rett') === 'rett' && (d.L - L > 0.5 || (p.tipo !== 'listello' && d.W - W > 0.5));
+  const notaTagli = piuCorto ? `<p class="nota">${t('Più piccola dei campi qui sopra per via dei tagli. Per arrivare a una misura finita, tocca la misura sul pezzo nel 3D e scrivila: il taglio si sposta con la testa.')}</p>` : '';
+  return `<div class="chipline"><span>${t('Misura finita')}</span><b>${fU(L)} × ${fU(W)} × ${fU(T)} ${U()}</b></div>${notaTagli}${suMisura}
     ${prezzi() ? `<div class="chipline"><span>${t('Costo del pezzo')}</span><b>${euro(costo)}</b></div>` : ''}${testoFreccia}`;
 }
 
@@ -732,6 +802,7 @@ function htmlProgetto() {
     <div><div class="kicker">${t('Progetto')}</div><input class="titolo" data-campo="nomeProgetto" aria-label="${t('Nome del progetto')}"></div>
     <p class="nota">${t('Tocca un pezzo per modificarlo, oppure aggiungi un <b>Pannello</b> o un <b>Listello</b> con gli attrezzi a sinistra.')}</p>
     <div class="group"><h3>${t('Come si costruisce')}</h3>
+      <p class="nota">${t('<b>Trascina</b> un pezzo per spostarlo: si allinea da solo ai pezzi vicini. Trascina i <b>quadratini blu</b> per cambiarne le misure (si fermano contro gli altri pezzi), oppure tocca una misura sul pezzo e scrivila.')}</p>
       <p class="nota">${t("<b>Accosta</b>: scegli un pezzo, tocca la sua faccia da appoggiare e poi il punto sull'altro pezzo dove metterlo. Poi scrivi la distanza dai bordi.")}</p>
       <p class="nota">${t("<b>Adatta</b>: scegli un pezzo, tocca la sua testa o il bordo da allungare, poi la faccia dell'altro pezzo dove deve finire: si allunga o accorcia e prende il taglio con l'angolo giusto, anche se è ruotato.")}</p></div>
     <div class="group"><h3>${t('Materiali')}</h3>${mats || `<p class="nota">${t('Ancora nessun pezzo.')}</p>`}</div>
@@ -760,6 +831,8 @@ function applicaCampo(campo, valore) {
     return;
   }
   if (p[campo] === v) return;
+  // Lunghezza e larghezza dei pezzi rettangolari: cresce la testa B (o il bordo alto) e i suoi tagli la seguono.
+  if ((campo === 'L' || campo === 'W') && (p.forma || 'rett') === 'rett') return modifica(() => mod.ridimensiona(p, campo === 'L' ? 'x' : 'y', 'max', v));
   modifica(() => { p[campo] = v; if (campo === 'D') { p.L = v; p.W = v; } });
   if (p.tagli.length && ['L', 'W', 'D'].includes(campo)) avvisa(t('Il pezzo ha dei tagli: restano dove sono. Se serve, toglili e rifai Adatta.'));
 }
@@ -916,7 +989,12 @@ function htmlSchema(perStampa = false) {
     const unita = lastra ? tn(g.nuovi, 'lastra {mis}', 'lastre {mis}', { mis: `${m.lastra[0]}×${m.lastra[1]}` }) : tn(g.nuovi, 'barra da {l} mm', 'barre da {l} mm', { l: mod.fmt(m.barra) });
     const fuori = g.fuori.length ? `<div class="avviso">${t(lastra ? (g.fuori.length === 1 ? 'Non entra in una lastra: {pezzi}. Va giuntato o comprato a parte.' : 'Non entrano in una lastra: {pezzi}. Va giuntato o comprato a parte.') : (g.fuori.length === 1 ? 'Non entra in una barra: {pezzi}. Va giuntato o comprato a parte.' : 'Non entrano in una barra: {pezzi}. Va giuntato o comprato a parte.'), { pezzi: g.fuori.map(p => `n° ${p.n} ${esc(p.nome)} (${p.L}${lastra ? `×${p.W}` : ''})`).join(', ') })}</div>` : '';
     const disegni = g.fogli.map((f, i) => `<div class="lastra">${svgLastra(f, lastra ? 460 : 640)}<span>${f.avanzo ? `<b class="avanzo">${t('Avanzo del magazzino {mis}', { mis: `${f1(f.L)}${lastra ? `×${f1(f.H)}` : ''}` })}</b>` : `${t(lastra ? 'Lastra' : 'Barra')} ${i + 1 - g.daAvanzi}`} · ${t('usata al {p}%', { p: Math.round(f.uso * 100) })}</span></div>`).join('');
+    const formato = lastra
+      ? `<div class="field"><label>${t('Lastra (L × H)')}</label><div class="input"><input data-formato="${esc(m.id)}" inputmode="decimal" value="${m.lastra[0]} × ${m.lastra[1]}"><small>mm</small></div></div>`
+      : `<div class="field"><label>${t('Lunghezza della barra')}</label><div class="input"><input data-formato="${esc(m.id)}" inputmode="decimal" value="${m.barra}"><small>mm</small></div></div>`;
+    const torna = g.formatoProgetto ? `<button class="btn" data-formato-catalogo="${esc(m.id)}">${t('Torna a {mis} del catalogo', { mis: lastra ? `${g.catalogo.lastra[0]}×${g.catalogo.lastra[1]}` : g.catalogo.barra })}</button>` : '';
     return `<div class="gruppo-taglio"><h3>${esc(m.nome)}</h3>
+      <div class="impost formato">${formato}${torna}<p class="nota">${t(g.formatoProgetto ? 'Misura scelta per questo progetto.' : 'Misura del catalogo: cambiala qui per questo progetto (per esempio un avanzo o una lastra già tagliata dal negozio).')}</p></div>
       <div class="riga"><span>${t('Da comprare:')} <b>${g.nuovi} ${unita}</b></span>${g.daAvanzi ? `<span>${t('Dal magazzino:')} <b>${tn(g.daAvanzi, '{n} avanzo', '{n} avanzi')}</b></span>` : ''}${prezzi() ? `<span>${t('Costo:')} <b>${euro(g.totale)}</b></span>` : ''}${lastra ? `<span>${t(m.venatura ? 'Venatura rispettata: pezzi non ruotati' : 'Pezzi ruotabili (↻ = ruotato)')}</span>` : ''}</div>
       ${fuori}<div class="lastre">${disegni}</div></div>`;
   }).join('');
@@ -1092,8 +1170,23 @@ function eventiDialoghi() {
     if (b) stampaHtml(htmlDima(stato.progetto, stato.progetto.pezzi.find(p => p.id === b.dataset.dima)), 'dima');
   });
   $('#etichette').addEventListener('click', () => stampaHtml(htmlEtichette(stato.progetto, righeDistinta(stato.progetto)), 'etichette'));
+  $('#distinta').addEventListener('click', e => {
+    const b = e.target.closest('[data-formato-catalogo]');
+    if (!b) return;
+    modifica(() => { const l = { ...(stato.progetto.lastre || {}) }; delete l[b.dataset.formatoCatalogo]; stato.progetto.lastre = l; });
+    mostraDistinta('schema');
+  });
   $('#distinta').addEventListener('change', e => {
     if (e.target.hasAttribute('data-usa-avanzi')) { modifica(() => { stato.progetto.usaAvanzi = e.target.checked; }); return mostraDistinta('schema'); }
+    if (e.target.dataset.formato) {
+      const id = e.target.dataset.formato, g = schema().find(x => x.materiale.id === id), barra = g?.tipo === 'listello';
+      const v = e.target.value.split(/[x×*]/i).map(numero);
+      const ok = barra ? v.length === 1 && v[0] >= 50 && v[0] <= 20000 : v.length === 2 && v.every(x => x >= 50 && x <= 20000);
+      if (!g || !ok) { avvisa(t(barra ? 'Scrivi la lunghezza della barra in mm, per esempio 3000.' : 'Scrivi la lastra come 2500×1250 (in mm, tra 50 e 20000).'), true); return mostraDistinta('schema'); }
+      const f = v.map(x => Math.round(x * 10) / 10), cat = g.catalogo, uguale = barra ? f[0] === cat.barra : f[0] === cat.lastra[0] && f[1] === cat.lastra[1];
+      modifica(() => { const l = { ...(stato.progetto.lastre || {}) }; if (uguale) delete l[id]; else l[id] = f; stato.progetto.lastre = l; });
+      return mostraDistinta('schema');
+    }
     const k = e.target.dataset.taglio;
     if (!k) return;
     const v = numero(e.target.value);
@@ -1304,7 +1397,10 @@ async function avvio() {
   await avviaGeometria();
   impostazioni = await archivio.caricaImpostazioni();
   applicaCatalogo(impostazioni);
-  vista = new Vista3D($('#vista3d'), { onTocco: tocco, onTrasforma: trasformato, onAfferra: (id, ev) => { seleziona(id, stato.aggiungiSel || ev.ctrlKey || ev.metaKey); aggiorna(); } });
+  vista = new Vista3D($('#vista3d'), {
+    onTocco: tocco, onTrasforma: trasformato, onAfferra: (id, ev) => { seleziona(id, stato.aggiungiSel || ev.ctrlKey || ev.metaKey); aggiorna(); },
+    onRidimensiona: ridimensionato, onQuota: quotaScritta,
+  });
   $('#barra-sel').addEventListener('click', e => { const b = e.target.closest('button'); if (b) comando(b.dataset.cmd); });
   document.querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => comando(b.dataset.cmd)));
   $('#viste').addEventListener('click', e => {

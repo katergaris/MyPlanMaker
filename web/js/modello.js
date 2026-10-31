@@ -262,6 +262,32 @@ export function trasforma(p, delta) {
 
 export function sposta(p, d) { p.pos = p.pos.map((c, i) => pulisci(c + d[i])); }
 
+// Quali misure si cambiano con le maniglie: x (lunghezza) per tutti i pezzi rettangolari e rotondi, y (larghezza)
+// per i pannelli rettangolari. Sagome e disegni no (le misure vengono dal disegno).
+export function assiManiglie(p) {
+  if (p.tipo === 'listello') return p.forma === 'rett' || !p.forma ? ['x'] : [];
+  if (p.forma === 'cerchio') return ['x'];
+  return p.forma === 'rett' ? ['x', 'y'] : [];
+}
+
+// Ridimensiona con una maniglia: asse 'x' (L, o D per i rotondi) o 'y' (W), lato 'max' (la testa a coordinata L/W)
+// o 'min' (la testa a 0: il pezzo si sposta perché l'altra testa resti ferma). I tagli della testa che si muove
+// la seguono; gli altri restano dove sono.
+export function ridimensiona(p, asse, lato, nuovo) {
+  const i = asse === 'x' ? 0 : 1, campo = p.forma === 'cerchio' ? 'D' : asse === 'x' ? 'L' : 'W';
+  const prima = p[campo], d = Math.round(nuovo * 10) / 10 - prima;
+  if (!(prima + d >= 1) || Math.abs(d) < 0.01) return 0;
+  p[campo] = prima + d;
+  if (campo === 'D') { p.L = p.D; p.W = p.D; }
+  if (lato === 'min') {
+    const e = new Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, 0).applyMatrix4(new Matrix4().extractRotation(matrice(p)));
+    p.pos = p.pos.map((c, j) => pulisci(c - e.getComponent(j) * d));
+    // il pezzo è "scivolato" di d lungo l'asse: i tagli lontani dalla testa mossa devono restare fermi nel mondo
+    p.tagli = p.tagli.map(t => (t.n[i] > 1e-6 ? t : { ...t, d: t.d + t.n[i] * d }));
+  } else p.tagli = p.tagli.map(t => (t.n[i] < -1e-6 ? { ...t, d: t.d + t.n[i] * d } : t));
+  return d;
+}
+
 // Calamita: dopo uno spostamento, avvicina la selezione alle facce degli altri pezzi se sono entro `soglia` mm
 // (per ogni asse separatamente). `box` = funzione che dà l'ingombro { min, max } di un pezzo.
 export function calamita(progetto, ids, box, soglia = 12) {

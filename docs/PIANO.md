@@ -90,3 +90,6 @@ pezzi, istruzioni di montaggio con vista esplosa, dime di foratura stampabili 1:
   fissaggi a scelta; compenetrazioni; bordatura e venatura; sagome; disegni, dime 1:1, etichette; CSV/DXF/STL;
   montaggio; laboratorio; magazzino avanzi; catalogo materiali; versioni; guida; tablet in verticale; README,
   screenshot, licenza MIT, Docker, CI. Fatte quasi tutte le voci di fase 1, 1b e parte della fase 2.
+- 2026-10-31, 0.13: maniglie alla Tinkercad (con aggancio alle facce e Adatta automatico sulle facce oblique), quote
+  da scrivere sul pezzo (misure finite), calamita dal vivo nel trascinamento, lastra/barra scelta per progetto nello
+  schema di taglio. Su richiesta di Salvo: Accosta e Adatta erano macchinosi.

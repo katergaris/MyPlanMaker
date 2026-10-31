@@ -404,6 +404,27 @@ for (const m of MODELLI) {
   prova('forme di partenza: rettangolo, cerchio e sagoma diventano forme', formeDaPezzo(tondo)[0].tipo === 'ellisse' && formeDaPezzo(mod.nuovoPezzo(pr, 'pannello'))[0].tipo === 'rett' && formeDaPezzo({ forma: 'sagoma', L: 100, W: 50, sagoma: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 0, y: 50 }] })[0].punti.length === 3);
 }
 
+// 19. Maniglie (ridimensiona) e lastra scelta per il progetto
+{
+  const pr = mod.nuovoProgetto(), p = mod.nuovoPezzo(pr, 'pannello');
+  p.rot = [0, 0, 0]; p.pos = [0, 0, 0]; p.L = 800; p.W = 400;
+  p.tagli = [{ n: [-1, 0, 0], d: -755, da: null }]; // testa B tagliata a 755
+  const lung = q => { const g = geometriaPezzo(q); return g.max[0] - g.min[0]; };
+  prova('ridimensiona: pezzo tagliato a 755, la testa B col taglio si allunga', vicino(lung(p), 755, 0.01));
+  mod.ridimensiona(p, 'x', 'max', 845);
+  prova('ridimensiona: il taglio della testa B segue (755 → 800 finiti)', p.L === 845 && vicino(lung(p), 800, 0.01), `${p.L} ${lung(p)}`);
+  const q = mod.nuovoPezzo(pr, 'pannello'); q.rot = [0, 0, 0]; q.pos = [1000, 0, 0]; q.L = 500; q.W = 300;
+  mod.ridimensiona(q, 'x', 'min', 600);
+  prova('ridimensiona dal lato A: la testa B resta ferma', q.L === 600 && vicino(q.pos[0], 900, 0.01));
+  mod.ridimensiona(q, 'y', 'max', 350);
+  prova('ridimensiona la larghezza', q.W === 350);
+  prova('maniglie: sagome no, listelli solo in lunghezza', mod.assiManiglie({ tipo: 'listello', forma: 'rett' }).join() === 'x' && !mod.assiManiglie({ tipo: 'pannello', forma: 'sagoma' }).length);
+  const g0 = schemaDiTaglio(pr)[0];
+  pr.lastre = { [g0.materiale.id]: [1000, 600] };
+  const g1 = schemaDiTaglio(pr)[0];
+  prova('schema: lastra scelta per il progetto', g1.formatoProgetto && g1.materiale.lastra[0] === 1000 && g1.fogli.length >= 2 && g1.catalogo.lastra[0] === g0.materiale.lastra[0], `${g1.fogli.length} lastre`);
+}
+
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');
 const ko = esiti.filter(e => !e.ok).length;
 document.getElementById('riassunto').textContent = ko ? `FALLITE ${ko} su ${esiti.length}` : `TUTTE OK (${esiti.length})`;

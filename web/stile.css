@@ -319,3 +319,13 @@ header .seg.unita button { height: 36px; min-width: 44px; flex: none; }
 }
 .dlg-testa [data-chiudi] { margin-left: auto; }
 .pannello-accosta .azioni { flex-wrap: wrap; }
+/* maniglie e quote da scrivere (0.13) */
+.quota.edit { pointer-events: auto; cursor: text; }
+.quota.edit:hover { outline: 2px solid #fff; }
+.quota.spess { background: var(--panel); color: var(--accent); border: 1px solid var(--accent); font-size: 12px; }
+.editor-quota { position: absolute; z-index: 5; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 4px; background: var(--panel); border: 2px solid var(--accent); border-radius: 8px; padding: 2px 8px; box-shadow: 0 4px 12px rgba(0,0,0,.18); }
+.editor-quota input { width: 80px; height: 34px; border: 0; outline: 0; font: 600 15px system-ui; background: transparent; color: var(--text); font-variant-numeric: tabular-nums; }
+.editor-quota small { color: var(--muted, #7a7066); }
+.gruppo-taglio .impost.formato { margin: 6px 0 10px; }
+.gruppo-taglio .impost.formato .field { width: 190px; }
+.gruppo-taglio .impost.formato .nota { flex: 1; min-width: 200px; margin: 0; }

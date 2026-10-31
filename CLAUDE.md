@@ -39,14 +39,19 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   - `js/modello.js` — pezzi (L lungo x, W lungo y, T lungo z; tagli = semipiani locali `n·x >= d`; rotazioni ordine
     X → Y → Z, Euler three.js `'ZYX'`), orientamenti rapidi, **Accosta** (`deltaAccosta`: faccia contro faccia, anche
     ruotando; pannello «Allinea» in `app.js`), **Adatta** (asse `x` o `y`, faccia toccata, pezzi ruotati), **Dividi**,
-    trasforma (gizmo), calamita, copia specchiata (capovolge x locale), bordi (`nomeBordo`, `bordatura`), storico.
+    trasforma (gizmo), calamita, **ridimensiona** (`assiManiglie`, `ridimensiona(p, asse, lato, nuovo)`: i tagli della
+    testa mossa la seguono), copia specchiata (capovolge x locale), bordi (`nomeBordo`, `bordatura`), storico.
     Unità dell'interfaccia (`unita.u` mm/cm, `fmtU`, `leggiMisura`): nel progetto tutto resta in mm.
   - Spessore su misura: `p.spessore` (pannelli) e `p.sezione = [W, T]` (listelli); `materialePezzo(p)` in
     `materiali.js` dà la variante (id `mat@T`, prezzo proporzionale) usata da dimensioni, distinta, taglio, disegni.
   - `js/geometria.js` — Manifold: profilo (rettangolo con raggi, cerchio, **sagoma** con archi a freccia) estruso,
     tagli, fori della ferramenta; tiene il solido in cache (`solido`) per `volumeComune` e `sezionePezzo` (slice).
   - `js/vista3d.js` — three.js: selezione multipla, trascinamento libero dei pezzi (`afferra`, piano orizzontale o
-    dello schermo, passo 5 mm; col dito solo pezzi già selezionati), gizmo (in Sposta solo la freccia Y), quote del pezzo e
+    dello schermo, passo 5 mm; col dito solo pezzi già selezionati; **calamita dal vivo**
+    su facce, bordi e centri, senza far entrare un pezzo nell'altro, Alt = senza; a fine trascinamento `contatto()` in app.js
+    apre «Allinea»), **maniglie** (`creaManiglie`/`trascinaManiglia`: teste, bordi, angoli; aggancio alle facce, faccia
+    obliqua → `adatta` in `ridimensionato()` di app.js), **quote cliccabili** (`apriQuota` → `quotaScritta()`: L e W
+    finite), gizmo (in Sposta solo la freccia Y), quote del pezzo e
     d'ingombro (viste ortogonali), esploso, misura (aggancio agli spigoli), fissaggi colorati per tipo.
   - `js/unioni.js` — contatti tra pezzi (facce complanari opposte, area con `CrossSection.intersect`) e fissaggi:
     viti (regole indicative), confirmat, spinotti, eccentrici, colla; scelta per unione in `progetto.fissaggi`,
@@ -59,7 +64,7 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   - `js/controlli.js` — peso/baricentro, ribaltamento, fissaggio al muro, compenetrazioni (Manifold), freccia dei
     soli ripiani liberi. In cache finché il progetto non cambia.
   - `js/distinta.js` (misure finite e da tagliare, venatura), `js/taglio.js` (MaxRects su lastre, barre, avanzi
-    del magazzino prima), `js/spesa.js` (lista della spesa), `js/materiali.js` (catalogo + `applicaCatalogo`).
+    del magazzino prima; `progetto.lastre[idMateriale] = [L, H]` o `[L]` = lastra/barra scelta per il progetto, dallo schema), `js/spesa.js` (lista della spesa), `js/materiali.js` (catalogo + `applicaCatalogo`).
   - `js/disegni.js` — disegni quotati con tabella fori, dima 1:1 A4 (190 × 272 utili, 10 mm di sovrapposizione),
     etichette 70 × 37. `js/sagome.js` — editor delle sagome. `js/disegno2d.js` — **Disegno 2D**
     (forma `'disegno'`, `p.disegno.forme`: rett/ellisse/poligono/linea con centro, w × h, rot, `modo` pieno/vuoto, `prof`
@@ -67,8 +72,8 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     `poligoniDisegno`; il pezzo = unione dei pieni − vuoti passanti, estruso, − scassi). `js/esporta.js` — CSV (;), DXF R12, STL.
     `js/montaggio.js` — istruzioni di montaggio. `js/archivio.js` — progetti e impostazioni (locale + server),
     file `.mpm.json`. `js/esempi.js` — mobiletto con leggio, tavolo rotondo.
-  - `prove.html` — prove automatiche (110, "TUTTE OK"); `prove-ui.html#passo,passo` — pilota l'app per gli
-    screenshot (esempio:N, modello:id, crea, sel:Nome, cmd:x, tocca:Nome, faccia:Nome:nx:ny:nz, trascina:Nome:dx:dy,
+  - `prove.html` — prove automatiche (116, "TUTTE OK"); `prove-ui.html#passo,passo` — pilota l'app per gli
+    screenshot (esempio:N, modello:id, crea, sel:Nome, cmd:x, tocca:Nome, faccia:Nome:nx:ny:nz, trascina:Nome:dx:dy[:ox:oy], maniglia:i:dx:dy, quota:asse:valore, stato (JSON dei pezzi),
     tracciaSu:selettore:x0:y0:x1:y1, unita:cm, vista:x, distinta, schema, ferramenta, disegni, menu:x, clic:selettore, fissaggio:tipo, progetti).
   - `vendor/` — three.js 0.186.1 (con OrbitControls e TransformControls) e manifold-3d 3.5.4 (`VERSIONI.txt`).
 - `tests/test_server.py`, `tests/test_lingue.py` — `python3 -m unittest discover -s tests`.
@@ -94,17 +99,18 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   la shell (la riga contiene la parola). Usare il PID.
 
 ## Stato
-**0.12.0** (2026-10-31): 5 lingue, prezzi facoltativi, repository in inglese (0.11.0 disegno 2D; 0.10.0 spessori su misura, spostamento libero, nuovo Accosta/Adatta, mm/cm); vedi `CHANGELOG.md`. Repository privato `katergaris/MyPlanMaker`, branch `main`, pronto per
+**0.13.0** (2026-10-31): maniglie alla Tinkercad, quote da scrivere sul pezzo, calamita dal vivo, lastra per progetto (0.12.0 5 lingue, prezzi facoltativi, repository in inglese; 0.11.0 disegno 2D; 0.10.0 spessori su misura, spostamento libero, nuovo Accosta/Adatta, mm/cm); vedi `CHANGELOG.md`. Repository privato `katergaris/MyPlanMaker`, branch `main`, pronto per
 la pubblicazione (README, screenshot, licenza, CI) ma **ancora privato**: renderlo pubblico solo se Salvo lo chiede.
 **Installato su ZimaOS il 2026-10-29**: `http://192.168.0.20:8098` (LAN), `http://10.77.0.201:8098` (rete interna). HTTPS
 Tailscale `https://pve.van-pike.ts.net:8098` (dal 2026-10-30, `tailscale serve` su pve). Dopo ogni modifica
 al codice: rilanciare `deploy/pubblica-zimaos.sh` (i dati restano).
 Per preparare un progetto per Salvo: costruirlo con le funzioni di `modello.js`/`modelli.js` (come `esempi.js`),
 controllarlo con `prove-ui.html` e consegnarlo come `.mpm.json` in `MyPlanMaker/progetti/`.
-Limiti noti: i tagli restano fissi se poi si cambia la lunghezza; Adatta non allunga sagome e cerchi; i cassetti
+Limiti noti: cambiando la misura si muovono solo i tagli della testa che cresce (testa B dal campo, quella trascinata dalle maniglie); Adatta non allunga sagome e cerchi; i cassetti
 solo tra fianchi affiancati in X; viti, frecce e stabilità con regole indicative; un progetto eliminato senza rete
 ricompare dal server.
-**Punto in cui ci siamo fermati (2026-10-31)**: 0.12.0 pubblicata su ZimaOS e su GitHub (commit `6b899d2`, CI verde).
+**Punto in cui ci siamo fermati (2026-10-31)**: 0.13.0 su richiesta di Salvo (Accosta/Adatta macchinosi, misure come in
+Tinkercad, lastra del taglio da scegliere; caso concreto: pannello 800 nei campi ma 755 finito per un taglio rimasto).
 Salvo ha detto **no** alla traduzione in inglese di commenti e nomi interni del codice: restano in italiano (i nomi
 interni finiscono anche nei progetti salvati, rinominarli richiederebbe una conversione dei vecchi file).
 Proposte fatte e non ancora scelte: modello pronto «Sedia» (altezza seduta, inclinazione schienale, traversi);

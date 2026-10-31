@@ -105,10 +105,12 @@ export function schemaDiTaglio(progetto, avanzi = []) {
     perMat.get(id).push({ ...r, L: r.Ltaglio, W: r.Wtaglio });
   }
   return [...perMat].map(([id, pezzi]) => {
-    const m = perId.get(id);
+    // Lastra (o barra) scelta per questo progetto, se diversa da quella del catalogo: progetto.lastre[id] = [L, H] o [L].
+    const f = progetto.lastre?.[id], cat = perId.get(id);
+    const m = !f ? cat : cat.tipo === 'listello' ? { ...cat, barra: f[0] } : { ...cat, lastra: [f[0], f[1]] };
     const miei = progetto.usaAvanzi === false ? [] : avanzi.filter(a => a.mat === id);
     const g = m.tipo === 'listello' ? barre(pezzi, m, imp, miei) : lastre(pezzi, m, imp, miei);
     const nuovi = g.fogli.filter(f => !f.avanzo).length;
-    return { materiale: m, tipo: m.tipo, ...g, nuovi, daAvanzi: g.fogli.length - nuovi, totale: nuovi * g.prezzoUnita };
+    return { materiale: m, tipo: m.tipo, ...g, nuovi, daAvanzi: g.fogli.length - nuovi, totale: nuovi * g.prezzoUnita, formatoProgetto: !!f, catalogo: cat };
   });
 }

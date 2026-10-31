@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.13.0 — 2026-10-31
+- **Resize handles like Tinkercad**: blue squares on the ends, edges and corners of the selected piece change its
+  length and width by dragging. They stop against the faces of other pieces; when the face is slanted the piece also
+  gets the right angled cut (Fit, without the command). The cuts on the moving end follow it.
+- **Sizes on the piece can be typed**: tap the length, width or thickness label in 3D. Length and width are the
+  *finished* sizes: a piece trimmed by a cut reaches the size you type (the cut moves with the end). The piece panel
+  explains when the finished size is smaller than the fields because of cuts.
+- **Live snapping while dragging**: faces, edges and centres line up with nearby pieces while moving (green edges),
+  never pushing a piece into another one; Alt disables it. When the piece ends up resting on another one, the
+  «Align» panel opens to type the distances from the edges.
+- **Sheet and stock length per project** in the cutting layout: each material shows its sheet (L × H) or bar length,
+  editable for the current project (offcuts, sheets pre-cut by the shop), with a button to go back to the catalogue.
+- Changing length or width in the piece panel now moves the cuts of end B with it.
+
 ## 0.12.0 — 2026-10-31
 - **Five languages**: Italian, English, French, German, Spanish. The first time the language follows the browser;
   it can be changed from the ⋯ menu. Numbers, dates and currency follow the chosen language. A test checks that
