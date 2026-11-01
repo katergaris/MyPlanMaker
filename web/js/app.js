@@ -3,7 +3,7 @@ import { Box3, Matrix4, Vector3 } from '../vendor/three.module.js';
 import { aggiornaIntagli, avviaGeometria, formeLavorazioni, geometriaPezzo, lavorazioneDa } from './geometria.js';
 import { Vista3D } from './vista3d.js';
 import * as mod from './modello.js';
-import { MATERIALI, applicaCatalogo, materiale, materialeBase, materialePezzo, materialiPer } from './materiali.js';
+import { MATERIALI, applicaCatalogo, materiale, materialeBase, materialePezzo, materialiPer, SPESSORI_COMUNI, SEZIONI_COMUNI, materialeDaId } from './materiali.js';
 import { euro, riepilogo, righeDistinta } from './distinta.js';
 import * as archivio from './archivio.js';
 import { ESEMPI } from './esempi.js';
@@ -525,10 +525,13 @@ function disegnaBarraSel() {
 let modelloScelto = MODELLI[0].id, valoriModello = valoriDefault(MODELLI[0]);
 // Un materiale del modello: tendina più spessore (pannelli) o sezione (listelli), già scritti con i valori del catalogo.
 function campoMateriale(par, v) {
+  // Nei modelli si scrivono solo spessori e sezioni: il tipo di legno resta «non specificato» (si sceglie dopo sui pezzi).
   const m = materiale(v), T = valoriModello[par.k + 'T'] || m.T, W = valoriModello[par.k + 'W'] || m.W;
   const num = (k, nome, x) => `<div class="field"><label>${nome}</label><div class="input"><input data-par="${k}" inputmode="decimal" value="${esc(fU(x))}"><small>${U()}</small></div></div>`;
-  return `<div class="mat-riga"><div class="field"><label>${t(par.nome)}</label><div class="input"><select data-par="${par.k}" data-mat-modello>${materialiPer(par.filtro).map(x => `<option value="${x.id}" ${x.id === v ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select><small>▾</small></div></div>
-    ${m.tipo === 'listello' ? num(par.k + 'W', t('Larghezza'), W) + num(par.k + 'T', t('Spessore'), T) : num(par.k + 'T', t('Spessore'), T)}</div>`;
+  const nascosto = `<input type="hidden" data-par="${par.k}" value="${esc(v)}">`;
+  return m.tipo === 'listello'
+    ? nascosto + num(par.k + 'W', t('{nome}: sezione, larghezza', { nome: t(par.nome) }), W) + num(par.k + 'T', t('{nome}: sezione, spessore', { nome: t(par.nome) }), T)
+    : nascosto + num(par.k + 'T', t('{nome}: spessore', { nome: t(par.nome) }), T);
 }
 function campoParametro(par, v) {
   if (par.tipo === 'mat') return campoMateriale(par, v);
@@ -540,8 +543,8 @@ function apriModelli() {
   const m = modello(modelloScelto);
   $('#form-modello').innerHTML = `<h3 style="font-size:18px;color:var(--text);margin:0">${esc(t(m.nome))}</h3><p class="nota">${esc(t(m.descr))} ${t('Dopo puoi cambiare ogni pezzo come vuoi.')}</p>
     <div class="griglia">${m.parametri.filter(p => p.tipo !== 'mat').map(p => campoParametro(p, valoriModello[p.k] ?? p.def)).join('')}</div>
-    <details class="materiali-modello"><summary>${t('Materiali e spessori')}</summary><p class="nota">${t('Lo spessore parte da quello del materiale: puoi scriverne un altro.')}</p>
-      <div class="griglia">${m.parametri.filter(p => p.tipo === 'mat').map(p => campoParametro(p, valoriModello[p.k] ?? p.def)).join('')}</div></details>
+    <h3 class="sotto-titolo">${t('Spessori')}</h3>
+    <div class="griglia">${m.parametri.filter(p => p.tipo === 'mat').map(p => campoParametro(p, valoriModello[p.k] ?? p.def)).join('')}</div>
     <div class="azioni"><button class="btn" data-crea="nuovo">${t('Crea in un nuovo progetto')}</button><button class="btn primary" data-crea="qui">${t('Aggiungi a questo progetto')}</button></div>`;
   if (!$('#dlg-modelli').open) $('#dlg-modelli').showModal();
 }
@@ -660,8 +663,7 @@ function disegnaFormCassetto(tipo, prima = {}) {
       ${tipo === 'sotto' ? `<div class="row">${campo('sotto', 'Spazio sotto il cassetto', gd.sotto)}<div></div></div>` : ''}
       ${tipo === 'legno' ? `<div class="row">${campo('lAlto', 'Listello: altezza', gd.listello[0])}${campo('lLargo', 'Listello: larghezza', gd.listello[1])}</div>` : ''}
       <p class="nota">${t(tipo === 'sfere' ? 'Il gioco è lo spazio tra il fianco del cassetto e la parete, dove sta la guida (di solito 12,5 mm). Lunghezza scelta dalla profondità: puoi scriverne un\'altra.' : tipo === 'sotto' ? 'Guide nascoste: guarda nel foglio del produttore gioco laterale e spazio sotto il cassone, cambiano da modello a modello.' : 'Due listelli avvitati alle pareti, il cassetto ci scorre sopra: conviene cera o paraffina. Il gioco è per lato.')}</p></div>
-    <div class="row"><div class="field"><label>${t('Cassone')}</label><div class="input"><select data-cas="matCassone">${materialiPer('pannello').map(m => `<option value="${m.id}" ${m.id === (prima.matCassone || 'mb12') ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select><small>▾</small></div></div>
-    <div class="field"><label>${t('Frontali')}</label><div class="input"><select data-cas="matFrontale">${materialiPer('pannello').map(m => `<option value="${m.id}" ${m.id === (prima.matFrontale || 'mb18') ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select><small>▾</small></div></div></div>
+    <div class="row">${campo('spCassone', 'Spessore del cassone', prima.spCassone || 12)}${campo('spFrontale', 'Spessore dei frontali', prima.spFrontale || 18)}</div>
     <p class="nota">${t('Fuga tra i frontali 3 mm. Ogni cassetto è una parte mobile: niente viti verso il mobile.')}</p>
     <div class="azioni"><button class="btn" data-chiudi-cassetto>${t('Annulla')}</button><button class="btn primary" id="crea-cassetti">${t('Crea i cassetti')}</button></div>`;
 }
@@ -669,7 +671,7 @@ function creaCassettiOra() {
   const q = k => document.querySelector(`#form-cassetto [data-cas="${k}"]`)?.value, mm = k => (q(k) === undefined ? null : mod.leggiMisura(q(k)));
   const tipo = q('tipo');
   const guida = { tipo, gioco: mm('gioco'), lunghezza: mm('lunghezza') || null, ...(tipo === 'sotto' ? { sotto: mm('sotto') } : {}), ...(tipo === 'legno' ? { listello: [mm('lAlto'), mm('lLargo')] } : {}) };
-  const v = { ...cassettoTra, y0: mm('y0'), y1: mm('y1'), n: numero(q('n')), frontale: q('frontale'), matCassone: q('matCassone'), matFrontale: q('matFrontale'), spessoreFianchi: cassettoTra.spessore, guida };
+  const v = { ...cassettoTra, y0: mm('y0'), y1: mm('y1'), n: numero(q('n')), frontale: q('frontale'), matCassone: 'pan', matFrontale: 'pan', extraCassone: { spessore: mm('spCassone') }, extraFrontale: { spessore: mm('spFrontale') }, spessoreFianchi: cassettoTra.spessore, guida };
   if ([v.y0, v.y1, v.n].some(x => x === null) || v.y1 <= v.y0) return avvisa(t('Controlla le misure: «Fino a» deve essere più in alto di «Dal basso».'), true);
   if (guida.gioco === null || guida.gioco < 0 || guida.gioco > 50 || (guida.listello && guida.listello.some(x => !(x > 0))) || (tipo === 'sotto' && !(guida.sotto >= 0))) return avvisa(t('Controlla le misure delle guide.'), true);
   const prova = structuredClone(stato.progetto), r = creaCassetti(prova, v);
@@ -711,7 +713,7 @@ function disegnaProprieta() {
     if (k !== chiavePannello) { chiavePannello = k; el.innerHTML = htmlMulti(pezziSel()); }
     return;
   }
-  const chiave = p ? JSON.stringify([p.id, p.tipo, p.forma, p.tagli.length, p.mat, p.ferramenta, p.lavorazioni, p.bloccato, p.intagli?.map(x => x.da), U()]) : 'progetto' + JSON.stringify(riepilogo(stato.progetto).materiali);
+  const chiave = p ? JSON.stringify([p.id, p.tipo, p.forma, p.tagli.length, p.mat, p.spessore, p.sezione, p.ferramenta, p.lavorazioni, p.bloccato, p.intagli?.map(x => x.da), U()]) : 'progetto' + JSON.stringify(riepilogo(stato.progetto).materiali);
   if (chiave === chiavePannello) return aggiornaValori(el, p);
   chiavePannello = chiave;
   el.innerHTML = p ? htmlPezzo(p) : htmlProgetto();
@@ -747,20 +749,33 @@ function htmlInfo(p) {
   const g = geometriaPezzo(p), { T } = mod.dimensioni(p);
   if (!g) return `<div class="avviso">${t('I tagli hanno tolto tutto il pezzo. Togline uno o annulla.')}</div>`;
   const L = g.max[0] - g.min[0], W = g.max[1] - g.min[1];
-  const prezzo = materialePezzo(p), cat = materiale(p.mat);
+  const prezzo = materialePezzo(p);
   const costo = p.tipo === 'listello' ? (L / 1000) * prezzo.prezzoM : (L * W / 1e6) * prezzo.prezzoM2;
   const fr = controlli(stato.progetto).frecce.find(x => x.p.id === p.id);
   const testoFreccia = fr ? `<div class="${fr.giudizio === 'troppo' ? 'avviso' : 'ok'}">${fr.giudizio === 'troppo' ? '⚠' : '✓'} ${t('Con {carico} kg/m si piega di {f} mm nel tempo ({giudizio}).', { carico: fr.carico, f: f1(fr.nelTempo), giudizio: t({ ottimo: tr('ottimo'), accettabile: tr('si nota appena'), troppo: tr('troppo') }[fr.giudizio]) })}</div>` : '';
-  const suMisura = prezzo !== cat
-    ? `<div class="chipline"><span>${p.tipo === 'listello' ? t('Sezione su misura (a catalogo {w} × {t})', { w: cat.W, t: cat.T }) : t('Spessore su misura (a catalogo {t} mm)', { t: cat.T })}</span><button class="link" data-azione="catalogo">${t('Torna a catalogo')}</button></div>` : '';
   const d = mod.dimensioni(p), piuCorto = p.tagli.length && (p.forma || 'rett') === 'rett' && (d.L - L > 0.5 || (p.tipo !== 'listello' && d.W - W > 0.5));
   const notaTagli = piuCorto ? `<p class="nota">${t('Più piccola dei campi qui sopra per via dei tagli. Per arrivare a una misura finita, tocca la misura sul pezzo nel 3D e scrivila: il taglio si sposta con la testa.')}</p>` : '';
-  return `<div class="chipline"><span>${t('Misura finita')}</span><b>${fU(L)} × ${fU(W)} × ${fU(T)} ${U()}</b></div>${notaTagli}${suMisura}
+  return `<div class="chipline"><span>${t('Misura finita')}</span><b>${fU(L)} × ${fU(W)} × ${fU(T)} ${U()}</b></div>${notaTagli}
     ${prezzi() ? `<div class="chipline"><span>${t('Costo del pezzo')}</span><b>${euro(costo)}</b></div>` : ''}${testoFreccia}`;
 }
 
+// Pulsanti con le misure che si trovano in negozio (spessori dei pannelli, sezioni dei listelli).
+function misureRapide(p) {
+  const d = mod.dimensioni(p);
+  return p.tipo === 'listello'
+    ? `<div class="rapide" aria-label="${t('Sezioni comuni')}">${SEZIONI_COMUNI.map(([w, s]) => `<button data-sezione-rapida="${w}x${s}" class="${d.W === w && d.T === s ? 'on' : ''}">${w}×${s}</button>`).join('')}</div>`
+    : `<div class="rapide" aria-label="${t('Spessori comuni')}">${SPESSORI_COMUNI.map(s => `<button data-spessore-rapido="${s}" class="${d.T === s ? 'on' : ''}">${fU(s)}</button>`).join('')}</div>`;
+}
+
+// Tipo di legno: facoltativo («non specificato» = materiale generico). Cambiandolo restano spessore e sezione.
+function htmlLegno(p) {
+  const mats = materialiPer(p.tipo).map(m => `<option value="${m.id}">${esc(m.generico ? t('Non specificato') : m.nome)}</option>`).join('');
+  return `<p class="nota">${t('Facoltativo. Serve per il colore, la venatura e controlli di peso e flessione più precisi; distinta e taglio funzionano anche senza.')}</p>
+    <div class="input"><select data-campo="mat" aria-label="${t('Tipo di legno')}">${mats}</select><small>▾</small></div>`;
+}
+
 function htmlPezzo(p) {
-  const mats = materialiPer(p.tipo).map(m => `<option value="${m.id}">${esc(m.nome)}</option>`).join('');
+  const cat = materiale(p.mat);
   const rotondo = p.tipo === 'pannello' && p.forma === 'cerchio';
   const misure = p.tipo === 'listello'
     ? `${campoNum('L', 'Lunghezza', p.L)}<div class="row">${campoNum('sezW', 'Sezione: larghezza', mod.dimensioni(p).W)}${campoNum('sezT', 'Sezione: spessore', mod.dimensioni(p).T)}</div>`
@@ -786,8 +801,9 @@ function htmlPezzo(p) {
     ${p.bloccato ? `<div class="chipline bloccato"><span>🔒 ${t('Bloccato: intaglia i pezzi che lo attraversano')}</span><button class="link" data-azione="sblocca">${t('Sblocca')}</button></div>` : ''}
     ${misure}
     ${p.tipo === 'pannello' ? campoNum('spessore', 'Spessore', mod.dimensioni(p).T) : ''}
+    ${misureRapide(p)}
     <div data-info class="group"></div>
-    <div class="field"><label>${t('Materiale')}</label><div class="input"><select data-campo="mat">${mats}</select><small>▾</small></div></div>
+    ${sezione('legno', t('Tipo di legno: {nome}', { nome: cat.generico ? t('non specificato') : materialePezzo(p).nome }), htmlLegno(p))}
     ${forma ? sezione('forma', t('Forma: {forma}', { forma: t(nomeForma) }), forma) : ''}
     ${sezione('fori', nLav ? t('Fori e forme ({n})', { n: nLav }) : t('Fori e forme'), htmlLavorazioni(p))}
     ${sezione('posizione', t('Orientamento e posizione'), `<div class="seg">${orient}</div>
@@ -864,7 +880,8 @@ function htmlBordi(p) {
     <div class="chipline"><button class="link" data-bordi-tutti="si">${t('Tutti')}</button><button class="link" data-bordi-tutti="no">${t('Nessuno')}</button>
     <span class="input" style="height:40px;width:130px"><select data-bordo-spessore>${[0.4, 1, 2].map(x => `<option value="${x}" ${x === (bo.s || 1) ? 'selected' : ''}>${f1(x)} mm</option>`).join('')}</select><small>▾</small></span></div>
     ${bo.lati.size ? `<p class="nota">${t('Da tagliare: {misure} mm (misura finita meno il bordo).', { misure: `${f1((geometriaPezzo(p)?.max[0] - geometriaPezzo(p)?.min[0]) - bo.menoL)} × ${f1((geometriaPezzo(p)?.max[1] - geometriaPezzo(p)?.min[1]) - bo.menoW)}` })}</p>` : ''}`;
-  const vena = m.venatura ? `<div class="field"><label>${t('Venatura')}</label><div class="seg">${[['L', tr('Lungo la lunghezza')], ['W', tr('Lungo la larghezza')], ['libera', tr('Non importa')]].map(([k, testo]) => `<button data-vena="${k}" class="${(p.venatura || 'L') === k ? 'on' : ''}">${t(testo)}</button>`).join('')}</div></div>` : '';
+  // Venatura da rispettare nello schema di taglio: predefinita dal tipo di legno («non importa» se non specificato).
+  const vena = `<div class="field"><label>${t('Venatura')}</label><div class="seg">${[['libera', tr('Non importa')], ['L', tr('Lungo la lunghezza')], ['W', tr('Lungo la larghezza')]].map(([k, testo]) => `<button data-vena="${k}" class="${(p.venatura || (m.venatura ? 'L' : 'libera')) === k ? 'on' : ''}">${t(testo)}</button>`).join('')}</div></div>`;
   return `<div class="group"><h3>${t('Bordi e venatura')}</h3>${rotondo ? `<p class="nota">${t('Bordo rotondo: si borda a mano dopo il taglio.')}</p>` : `<p class="nota">${t('Bordi da rivestire (tocca per scegliere):')}</p>${lati}`}${vena}</div>`;
 }
 
@@ -905,7 +922,7 @@ function htmlMulti(pezzi) {
         <div class="field"><label>${t('Z verso di te')}</label><div class="input"><input data-sposta="2" inputmode="decimal" value="0"><small>${U()}</small></div></div>
       </div>
       <p class="nota">${t('Oppure trascina i pezzi nel 3D (passo 5 mm, poi si agganciano ai pezzi vicini); la freccia sopra li alza.')}</p></div>
-    <div class="group"><h3>${t('Materiale per tutti')}</h3><div class="input"><select data-mat-multi><option value="">${t('— scegli —')}</option>${['pannello', 'listello'].filter(tp => pezzi.some(p => p.tipo === tp)).map(tp => materialiPer(tp).map(m => `<option value="${m.id}">${esc(m.nome)}</option>`).join('')).join('')}</select><small>▾</small></div></div>
+    <div class="group"><h3>${t('Tipo di legno per tutti')}</h3><div class="input"><select data-mat-multi><option value="">${t('— scegli —')}</option>${['pannello', 'listello'].filter(tp => pezzi.some(p => p.tipo === tp)).map(tp => materialiPer(tp).map(m => `<option value="${m.id}">${esc(m.generico ? `${t(tp === 'pannello' ? 'Pannelli' : 'Listelli')}: ${t('non specificato')}` : m.nome)}</option>`).join('')).join('')}</select><small>▾</small></div></div>
     <div class="azioni"><button class="btn" data-azione="duplica">${t('Duplica')}</button><button class="btn" data-azione="specchia">${t('Copia specchiata')}</button></div>
     <div class="azioni"><button class="btn" data-azione="raggruppa">${t('Raggruppa')}</button>${pezzi.some(p => p.gruppo) ? `<button class="btn" data-azione="separa">${t('Separa il gruppo')}</button>` : ''}</div>
     <div class="azioni"><button class="btn danger" data-azione="elimina">${t('Elimina tutti')}</button></div>`;
@@ -927,12 +944,25 @@ function htmlProgetto() {
     <div class="group" data-controlli></div>`;
 }
 
+// Cambia il tipo di legno tenendo spessore e sezione che il pezzo ha già.
+function cambiaLegno(p, id) {
+  const d = mod.dimensioni(p);
+  p.mat = id;
+  delete p.spessore; delete p.sezione;
+  impostaMisura(p, d.W, d.T);
+}
+function impostaMisura(p, W, T) {
+  const cat = materiale(p.mat);
+  if (p.tipo === 'listello') { if (W === cat.W && T === cat.T) delete p.sezione; else p.sezione = [W, T]; }
+  else if (T === cat.T) delete p.spessore; else p.spessore = T;
+}
+
 function applicaCampo(campo, valore) {
   const p = pezzoSel(), pr = stato.progetto;
   if (campo === 'nomeProgetto') { const v = valore.trim(); if (v && v !== pr.nome) modifica(() => { pr.nome = v; }); return; }
   if (!p) return;
   if (campo === 'nome') { const v = valore.trim(); if (v && v !== p.nome) modifica(() => { p.nome = v; }); return; }
-  if (campo === 'mat') return modifica(() => { p.mat = valore; delete p.spessore; delete p.sezione; });
+  if (campo === 'mat') return modifica(() => cambiaLegno(p, valore));
   const v = LUNGHEZZE.has(campo) ? mod.leggiMisura(valore) : numero(valore);
   if (v === null) { avvisa(t('Scrivi un numero, per esempio {esempio} (in {u}; puoi anche scrivere «60 cm» o «600 mm»).', { esempio: U() === 'cm' ? `60 ${t('o')} ${mod.fmt(1.8, 1)}` : `600 ${t('o')} ${mod.fmt(16.5, 1)}`, u: U() }), true); return disegnaProprieta(); }
   const m = campo.match(/^(pos|rot)(\d)$/);
@@ -1023,7 +1053,7 @@ function eventiProprieta() {
       e.target.value = '0';
     } else if (e.target.hasAttribute('data-mat-multi') && e.target.value) {
       const id = e.target.value, tipo = materiale(id).tipo;
-      modifica(() => pezziSel().filter(x => x.tipo === tipo).forEach(x => { x.mat = id; delete x.spessore; delete x.sezione; }));
+      modifica(() => pezziSel().filter(x => x.tipo === tipo).forEach(x => cambiaLegno(x, id)));
       chiavePannello = '';
     }
     else if (e.target.hasAttribute('data-carico')) {
@@ -1060,6 +1090,8 @@ function eventiProprieta() {
     });
     else if (b.dataset.bordiTutti && p) modifica(() => { p.bordatura = { spessore: (p.bordatura || {}).spessore || 1, lati: b.dataset.bordiTutti === 'si' ? ['A', 'B', 'basso', 'alto'] : [] }; });
     else if (b.dataset.vena && p) modifica(() => { p.venatura = b.dataset.vena; });
+    else if (b.dataset.spessoreRapido && p) modifica(() => impostaMisura(p, null, +b.dataset.spessoreRapido));
+    else if (b.dataset.sezioneRapida && p) { const [W, T] = b.dataset.sezioneRapida.split('x').map(Number); modifica(() => impostaMisura(p, W, T)); }
     else if (b.dataset.togliFerr && p) modifica(() => { p.ferramenta = p.ferramenta.filter(f => f.tipo !== b.dataset.togliFerr); });
     else if (b.dataset.cernLato && p) modifica(() => { ferr(p, 'cerniere').lato = b.dataset.cernLato; });
     else if (b.dataset.cernModello && p) modifica(() => { ferr(p, 'cerniere').modello = b.dataset.cernModello; });
@@ -1431,7 +1463,7 @@ function eventiDialoghi() {
   $('#dlg-cassetto').addEventListener('change', e => {
     if (e.target.dataset.cas !== 'tipo') return;
     const q = k => document.querySelector(`#form-cassetto [data-cas="${k}"]`)?.value;
-    disegnaFormCassetto(e.target.value, { y0: mod.leggiMisura(q('y0')), y1: mod.leggiMisura(q('y1')), n: q('n'), frontale: q('frontale'), matCassone: q('matCassone'), matFrontale: q('matFrontale') });
+    disegnaFormCassetto(e.target.value, { y0: mod.leggiMisura(q('y0')), y1: mod.leggiMisura(q('y1')), n: q('n'), frontale: q('frontale'), spCassone: mod.leggiMisura(q('spCassone')), spFrontale: mod.leggiMisura(q('spFrontale')) });
   });
   $('#dividi-n').addEventListener('input', anteprimaDividi);
   $('#dividi-meno').addEventListener('click', () => { $('#dividi-n').value = Math.max(1, (numero($('#dividi-n').value) || 1) - 1); anteprimaDividi(); });
@@ -1512,6 +1544,7 @@ const TIPI_PEZZO = [tr('pannello'), tr('listello')]; // per t(p.tipo)
 
 function mostraMenu() {
   $('#menu-prezzi').textContent = t(prezzi() ? '💶 Nascondi prezzi e costi' : '💶 Mostra prezzi e costi');
+  $('[data-menu="materiali"] span').textContent = t(prezzi() ? 'Materiali e prezzi' : 'Lastre e barre');
   $('#menu-lingue').innerHTML = Object.entries(LINGUE).map(([k, v]) => `<button data-menu="lingua:${k}" class="${k === lingua.cod ? 'on' : ''}" title="${v}">${k.toUpperCase()}</button>`).join('');
 }
 
@@ -1531,9 +1564,10 @@ function apriMagazzino(scheda) {
   if (scheda === 'avanzi') {
     h = `<p class="nota">${t('Gli avanzi che hai in laboratorio. Lo schema di taglio li usa prima di farti comprare lastre o barre nuove.')}</p>
       <table class="distinta"><thead><tr><th>${t('Materiale')}</th><th style="text-align:right">${t('Lunghezza')}</th><th style="text-align:right">${t('Larghezza')}</th><th style="text-align:right">${t('Quanti')}</th><th></th></tr></thead><tbody>
-      ${avanzi.map((a, i) => `<tr><td>${esc(materiale(a.mat).nome)}</td><td class="num">${f1(a.L)}</td><td class="num">${materiale(a.mat).tipo === 'listello' ? '—' : f1(a.W)}</td><td class="num">${a.qta}</td><td><button class="link" data-togli-avanzo="${i}">${t('Togli')}</button></td></tr>`).join('') || `<tr><td colspan="5" class="nota">${t('Ancora nessun avanzo.')}</td></tr>`}</tbody></table>
+      ${avanzi.map((a, i) => `<tr><td>${esc(materialeDaId(a.mat).nome)}</td><td class="num">${f1(a.L)}</td><td class="num">${materialeDaId(a.mat).tipo === 'listello' ? '—' : f1(a.W)}</td><td class="num">${a.qta}</td><td><button class="link" data-togli-avanzo="${i}">${t('Togli')}</button></td></tr>`).join('') || `<tr><td colspan="5" class="nota">${t('Ancora nessun avanzo.')}</td></tr>`}</tbody></table>
       <h3>${t('Aggiungi un avanzo')}</h3>
-      <div class="griglia-form"><div class="field"><label>${t('Materiale')}</label><div class="input"><select id="av-mat">${opzioni('mb18')}</select><small>▾</small></div></div>
+      <div class="griglia-form"><div class="field"><label>${t('Materiale')}</label><div class="input"><select id="av-mat">${opzioni('pan')}</select><small>▾</small></div></div>
+      <div class="field"><label>${t('Spessore (o sezione 45×45)')}</label><div class="input"><input id="av-T" inputmode="decimal" placeholder="18"><small>mm</small></div></div>
       <div class="field"><label>${t('Lunghezza')}</label><div class="input"><input id="av-L" inputmode="decimal"><small>mm</small></div></div>
       <div class="field"><label>${t('Larghezza (pannelli)')}</label><div class="input"><input id="av-W" inputmode="decimal"><small>mm</small></div></div>
       <div class="field"><label>${t('Quanti')}</label><div class="input"><input id="av-q" inputmode="numeric" value="1"></div></div></div>
@@ -1569,10 +1603,14 @@ function eventiMagazzino() {
     if (b.dataset.mag) return apriMagazzino(b.dataset.mag);
     if (b.dataset.togliAvanzo) { impostazioni.avanzi.splice(+b.dataset.togliAvanzo, 1); salvaImp(); return apriMagazzino('avanzi'); }
     if (b.id === 'av-aggiungi') {
-      const mat = $('#av-mat').value, L = numero($('#av-L').value), W = numero($('#av-W').value), q = Math.round(numero($('#av-q').value) || 1);
-      const listello = materiale(mat).tipo === 'listello';
+      const base = $('#av-mat').value, L = numero($('#av-L').value), W = numero($('#av-W').value), q = Math.round(numero($('#av-q').value) || 1);
+      const listello = materiale(base).tipo === 'listello', sp = $('#av-T').value.split(/[x×*]/i).map(numero).filter(Boolean);
       if (!L || L <= 0 || (!listello && (!W || W <= 0))) return avvisa(t("Scrivi le misure dell'avanzo."), true);
-      impostazioni.avanzi = [...(impostazioni.avanzi || []), { mat, L, W: listello ? materiale(mat).W : W, qta: q }];
+      // Lo stesso id del materiale dei pezzi con quella misura (es. «pan@12»): così lo schema di taglio lo trova.
+      const pz = { tipo: materiale(base).tipo, mat: base };
+      if (sp.length) impostaMisura(pz, listello ? sp[0] : null, sp[sp.length - 1]);
+      const m = materialePezzo(pz);
+      impostazioni.avanzi = [...(impostazioni.avanzi || []), { mat: m.id, L, W: listello ? m.W : W, qta: q }];
       salvaImp(); return apriMagazzino('avanzi');
     }
     if (b.dataset.matRipristina) { delete impostazioni.materiali[b.dataset.matRipristina]; salvaImp(); return apriMagazzino('materiali'); }

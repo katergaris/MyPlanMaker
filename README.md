@@ -15,7 +15,7 @@ custom thickness), at any angle, also curved. It is not a CAD to learn: sizes ar
 and there are few commands.
 
 - **Ready-made templates** as a starting point: bookcase, base cabinet with doors, wall cabinet, chest of drawers,
-  open shelving, table (also round), bench. Every size, material and thickness can be changed, and afterwards each
+  open shelving, table (also round), bench. Every size and thickness can be changed, and afterwards each
   piece can be edited as if you had made it by hand.
 - **Drag pieces directly in 3D**, like in Tinkercad: 5 mm steps, magnetic snapping to nearby pieces, an arrow to
   raise or lower them. Multiple selection, mirrored copy, groups, keyboard shortcuts.
@@ -39,13 +39,13 @@ and there are few commands.
   with the hole table, **1:1 templates** on A4 sheets, labels, **assembly instructions**, **workshop mode** for
   the tablet with pieces to tick off.
 - **Exports**: PDF (print), CSV for cutting services, DXF for CNC and laser, STL, PNG, project file.
-- **Your materials** with sheet and length sizes, edge banding per side, grain per piece, project versions.
+- **Thickness is enough**: the wood type is optional (for colour, grain and finer checks). Sheet and length sizes, edge banding per side, grain per piece, project versions.
   **Prices and costs are optional**: turn them on from the ⋯ menu if you want them.
 
 | | |
 |---|---|
 | ![Templates](docs/screenshot/en/02-templates.png) | ![Chest of drawers](docs/screenshot/en/03-drawers.png) |
-| *Templates: a few sizes, materials and thicknesses and you have all the pieces* | *Drawers on runners, flush fronts, handles* |
+| *Templates: a few sizes and thicknesses and you have all the pieces* | *Drawers on runners, flush fronts, handles* |
 | ![Place](docs/screenshot/en/08-place.png) | ![2D drawing](docs/screenshot/en/07-2d-drawing.png) |
 | *Place a leg under the top and type the distance from the edges* | *2D drawing with solid shapes, holes and pockets* |
 | ![Cutting layout](docs/screenshot/en/04-cutting-layout.png) | ![Screws and checks](docs/screenshot/en/05-screws-checks.png) |

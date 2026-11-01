@@ -52,8 +52,8 @@ function lastre(pezzi, m, { lama, rifilo }, avanzi = []) {
     fogli.push(f);
   }
   for (const p of ordinati) {
-    // venatura lungo la larghezza: il pezzo va messo già ruotato; "libera": si può ruotare
-    const forzaRuota = m.venatura && p.vena === 'W', ruota = !m.venatura || p.vena === 'libera';
+    // venatura (scelta sul pezzo, predefinita dal materiale): lungo la larghezza il pezzo va messo già ruotato; "libera": si può ruotare
+    const forzaRuota = p.vena === 'W', ruota = p.vena === 'libera';
     const w = (forzaRuota ? p.W : p.L) + lama, h = (forzaRuota ? p.L : p.W) + lama;
     const cerca = f => { const c = f.cerca(w, h, ruota); if (c && forzaRuota) c.ruotato = !c.ruotato; return c; };
     let posto = null, foglio = null;

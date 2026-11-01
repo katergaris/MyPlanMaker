@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.15.0-alpha.1 — 2026-11-01
+**Wood type is now optional: thickness is enough.**
+- New pieces, ready-made models and drawers start as a plain **“Panel 18 mm”** or **“Batten 45×45”**: no need to
+  pick a product that you might not find in your shop. Cut list, cutting layout and shopping list group pieces by
+  thickness (or section).
+- Under the thickness, **quick buttons with the common shop sizes** (3–30 mm for panels, 40×20 to 100×100 for battens).
+- The wood type moved to a collapsed **“Wood type: not specified”** section of the piece panel: choose one only if you
+  want its colour, grain or more precise weight and sag checks. Changing it keeps the piece's thickness.
+- **Grain** is chosen piece by piece (“Doesn't matter”, along the length, along the width); with no wood type, pieces
+  may rotate on the sheet to save material.
+- Ready-made models ask only for **thicknesses**; drawers ask for the box and front thickness.
+- Offcuts in the stock list take a thickness (or section), so they match pieces with the same size.
+- With prices hidden, the ⋯ menu shows **“Sheets and lengths”** instead of “Materials and prices”.
+- Existing projects keep their materials.
+
 ## 0.14.0-alpha.1 — 2026-11-01
 First **alpha** for testers: everything works, but sizes, screws and stability checks are indicative.
 - **Projects screen at start-up**: the app no longer reopens the last project by itself. Projects are cards with a

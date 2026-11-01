@@ -66,8 +66,8 @@ export function creaCassetti(pr, v) {
           pezzo(pr, { ...base, nome: `${nome} · ${t('fronte')}`, tipo: 'pannello', mat: v.matCassone, ...v.extraCassone, L: xb - xa - 2 * tc, W: hf, rot: 'frontale', pos: [xa + tc, yf, zf - tc] }),
           pezzo(pr, { ...base, nome: `${nome} · ${t('retro')}`, tipo: 'pannello', mat: v.matCassone, ...v.extraCassone, L: xb - xa - 2 * tc, W: hf, rot: 'frontale', pos: [xa + tc, yf, zf - lg] }),
           dentro
-            ? pezzo(pr, { ...base, nome: `${nome} · ${t('fondo')}`, tipo: 'pannello', mat: 'hdf3', L: xb - xa - 2 * tc, W: lg, rot: 'orizzontale', pos: [xa + tc, yc, zf] })
-            : pezzo(pr, { ...base, nome: `${nome} · ${t('fondo')}`, tipo: 'pannello', mat: 'hdf3', L: xb - xa, W: lg, rot: 'orizzontale', pos: [xa, yc - 3, zf] }),
+            ? pezzo(pr, { ...base, nome: `${nome} · ${t('fondo')}`, tipo: 'pannello', mat: 'pan', spessore: 3, L: xb - xa - 2 * tc, W: lg, rot: 'orizzontale', pos: [xa + tc, yc, zf] })
+            : pezzo(pr, { ...base, nome: `${nome} · ${t('fondo')}`, tipo: 'pannello', mat: 'pan', spessore: 3, L: xb - xa, W: lg, rot: 'orizzontale', pos: [xa, yc - 3, zf] }),
         ];
       })(),
     );
@@ -83,7 +83,7 @@ export function creaCassetti(pr, v) {
       // listelli di scorrimento: fissi alle pareti del mobile (non fanno parte del cassetto), il fianco ci appoggia sopra
       const lungo = Math.min(v.profondita, lg + 20), dz = v.frontale === 'filo' ? tf : 0;
       for (const [lato, x] of [[t('sinistro'), v.x0], [t('destro'), v.x1 - lLargo]]) {
-        nuovi.push(pezzo(pr, { nome: `${nome} · ${t('listello di scorrimento {lato}', { lato })}`, tipo: 'listello', mat: 'ab2040', sezione: [lAlto, lLargo], L: lungo, rot: 'profondita', pos: [x, yc - lAlto, zf - dz] }));
+        nuovi.push(pezzo(pr, { nome: `${nome} · ${t('listello di scorrimento {lato}', { lato })}`, tipo: 'listello', mat: 'lis', sezione: [lAlto, lLargo], L: lungo, rot: 'profondita', pos: [x, yc - lAlto, zf - dz] }));
       }
     }
   }

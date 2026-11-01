@@ -323,15 +323,27 @@ for (const m of MODELLI) {
   const a = mod.nuovoPezzo(pr, 'pannello'), b = mod.nuovoPezzo(pr, 'pannello');
   b.mat = 'al27'; b.spessore = 40;
   const mb = materialePezzo(b);
-  prova('spessore su misura: lamellare 40, prezzo in proporzione', mod.dimensioni(b).T === 40 && mb.nome === 'Lamellare abete 40 (su misura)' && vicino(mb.prezzoM2, 32 * 40 / 27, 0.01) && materialePezzo(a).id === 'mb18', `${mb.nome} ${mb.prezzoM2}`);
+  prova('spessore su misura: lamellare 40, prezzo in proporzione', mod.dimensioni(b).T === 40 && mb.nome === 'Lamellare abete 40' && vicino(mb.prezzoM2, 32 * 40 / 27, 0.01) && materialePezzo(a).id === 'pan', `${mb.nome} ${mb.prezzoM2}`);
   const g = geometriaPezzo(b);
   prova('spessore su misura: il solido è alto 40', vicino(g.max[2] - g.min[2], 40, 0.01));
   const righe = righeDistinta(pr);
-  prova('distinta: T 40 e materiale su misura', righe[1].T === 40 && /su misura/.test(righe[1].materiale));
+  prova('distinta: T 40 e materiale su misura', righe[1].T === 40 && righe[1].materiale === 'Lamellare abete 40');
   const gruppi = schemaDiTaglio(pr);
   prova('schema di taglio: il su misura ha la sua lastra', gruppi.length === 2 && gruppi.some(x => x.materiale.id === 'al27@40'), gruppi.map(x => x.materiale.id).join(', '));
   const l = mod.nuovoPezzo(pr, 'listello'); l.mat = 'ab6060'; l.sezione = [70, 50];
-  prova('listello con sezione 70×50', mod.dimensioni(l).W === 70 && mod.dimensioni(l).T === 50 && materialePezzo(l).nome === 'Abete 70×50 (su misura)', materialePezzo(l).nome);
+  prova('listello con sezione 70×50', mod.dimensioni(l).W === 70 && mod.dimensioni(l).T === 50 && materialePezzo(l).nome === 'Abete 70×50', materialePezzo(l).nome);
+
+  // Tipo di legno facoltativo: pezzi nuovi generici, il nome è la misura, venatura libera nello schema di taglio
+  const { materialeDaId } = await import('./js/materiali.js');
+  const pg = mod.nuovoProgetto(), g1 = mod.nuovoPezzo(pg, 'pannello'), g2 = mod.nuovoPezzo(pg, 'pannello'), gl = mod.nuovoPezzo(pg, 'listello');
+  g2.spessore = 12; gl.sezione = [40, 20];
+  prova('generici: «Pannello 18 mm», «Pannello 12 mm», «Listello 40×20»', materialePezzo(g1).nome === 'Pannello 18 mm' && materialePezzo(g2).nome === 'Pannello 12 mm' && materialePezzo(g2).id === 'pan@12' && materialePezzo(gl).nome === 'Listello 40×20', [g1, g2, gl].map(x => materialePezzo(x).nome).join(', '));
+  prova('materialeDaId: pan@12 e lis@40x20', materialeDaId('pan@12').T === 12 && materialeDaId('lis@40x20').W === 40 && materialeDaId('mb18').nome === 'Multistrato betulla 18');
+  g1.L = 2000; g1.W = 1000;
+  const sg = schemaDiTaglio(pg).find(x => x.materiale.id === 'pan');
+  prova('generico: venatura libera (il pezzo può ruotare sulla lastra)', righeDistinta(pg).find(r => r.n === g1.n).vena === 'libera' && sg.fuori.length === 0, JSON.stringify(sg.fuori));
+  const vt = valoriDefault(MODELLI.find(m => m.id === 'tavolo'));
+  prova('modelli: materiali generici con lo spessore del modello', vt.mat === 'pan' && vt.matT === 27 && vt.matL === 'lis' && vt.matLW === 60, JSON.stringify(vt));
 
   const tav = MODELLI.find(m => m.id === 'tavolo'), v = { ...valoriDefault(tav), matT: 40, matLW: 80, matLT: 80, rientro: 100 };
   const pt = mod.nuovoProgetto(); tav.crea(pt, v, 0);

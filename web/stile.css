@@ -378,3 +378,8 @@ details.sezione .corpo > .group > h3:first-child { display: none; }
 dialog .toast { position: sticky; left: auto; bottom: 12px; margin: 0 16px 12px; width: fit-content; max-width: calc(100% - 32px); box-shadow: 0 6px 20px rgba(60, 40, 20, .18); }
 .tendina .versione { padding: 8px 12px 6px; font-size: 12px; color: var(--muted); }
 .tendina .versione b { color: var(--warn); }
+/* Misure rapide (spessori e sezioni che si trovano in negozio) sotto i campi del pezzo. */
+.rapide { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.rapide button { min-width: 44px; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 14px; font-variant-numeric: tabular-nums; }
+.rapide button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sotto-titolo { font-size: 14px; color: var(--muted); font-weight: 600; margin-top: 4px; }

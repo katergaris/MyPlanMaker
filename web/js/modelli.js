@@ -3,7 +3,7 @@
 // Ogni parametro 'mat' ha anche lo spessore (v[k + 'T']) e, per i listelli, la larghezza della sezione (v[k + 'W']):
 // se l'utente li cambia, i pezzi diventano «su misura» (vedi materialePezzo).
 import { adatta, nuovoId, rotazioneDa } from './modello.js';
-import { materiale } from './materiali.js';
+import { materiale, GENERICO } from './materiali.js';
 import { creaCassetti } from './cassetti.js';
 import { t, tr } from './lingua.js';
 
@@ -45,7 +45,7 @@ function cassa(pr, v, x0, { zoccolo = 0, cielo = 'tra', schienale = true, nome =
   let top = null;
   if (cielo === 'tra') top = pezzo(pr, { nome: `${nome}Cielo`, tipo: 'pannello', ...M.r, L: L - 2 * T, W: P - dietro, rot: 'orizzontale', pos: [T, H - T, 0] }, x0);
   if (zoccolo > 0) pezzo(pr, { nome: `${nome}Zoccolo`, tipo: 'pannello', ...M.r, L: L - 2 * T, W: zoccolo, rot: 'frontale', pos: [T, 0, -40] }, x0);
-  if (schienale && v.schienale !== 'no') pezzo(pr, { nome: `${nome}Schienale`, tipo: 'pannello', mat: 'hdf3', L: L, W: H - zoccolo, rot: 'frontale', pos: [0, zoccolo, -P - 3] }, x0);
+  if (schienale && v.schienale !== 'no') pezzo(pr, { nome: `${nome}Schienale`, tipo: 'pannello', mat: 'pan', spessore: 3, L: L, W: H - zoccolo, rot: 'frontale', pos: [0, zoccolo, -P - 3] }, x0);
   return { fs, fd, base, top, T, yBase: zoccolo + T, yTop: cielo === 'tra' ? H - T : H, xi0: x0 + T, xi1: x0 + L - T };
 }
 
@@ -67,7 +67,7 @@ function ante(pr, v, x0, y0, y1, quante, T, nome = 'Anta') {
 export const MODELLI = [
   {
     id: 'libreria', nome: tr('Libreria'), descr: tr('Fianchi, base con zoccolo, cielo, ripiani e schienale.'),
-    parametri: [mm('L', tr('Larghezza'), 800, 300, 2400), mm('H', tr('Altezza'), 1800, 400, 2700), mm('P', tr('Profondità'), 300, 150, 600), num('n', tr('Ripiani'), 4, 0, 12), mm('zoccolo', tr('Zoccolo'), 60, 0, 150), scelta('schienale', tr('Schienale'), 'si', { si: tr('Sì'), no: tr('No') }), mat('mat', tr('Materiale'), 'mb18')],
+    parametri: [mm('L', tr('Larghezza'), 800, 300, 2400), mm('H', tr('Altezza'), 1800, 400, 2700), mm('P', tr('Profondità'), 300, 150, 600), num('n', tr('Ripiani'), 4, 0, 12), mm('zoccolo', tr('Zoccolo'), 60, 0, 150), scelta('schienale', tr('Schienale'), 'si', { si: tr('Sì'), no: tr('No') }), mat('mat', tr('Pannelli'), 'mb18')],
     crea(pr, v, x0) {
       const c = cassa(pr, v, x0, { zoccolo: v.zoccolo });
       ripiani(pr, v, x0, c.yBase, c.yTop, v.n, c.T, v.P - (v.schienale === 'no' ? 20 : 23));
@@ -75,7 +75,7 @@ export const MODELLI = [
   },
   {
     id: 'base', nome: tr('Mobile base con ante'), descr: tr('Mobile da terra (cucina, bagno, ingresso) con ante, ripiano e piano sopra.'),
-    parametri: [mm('L', tr('Larghezza'), 800, 300, 1200), mm('H', tr('Altezza (senza piano)'), 720, 400, 1000), mm('P', tr('Profondità'), 560, 250, 650), scelta('ante', tr('Ante'), '2', { 1: tr('1 anta'), 2: tr('2 ante') }), num('n', tr('Ripiani'), 1, 0, 3), mm('zoccolo', tr('Zoccolo'), 100, 0, 150), mm('spD', tr('Sporgenza del piano davanti'), 30, 0, 100), mm('spL', tr('Sporgenza del piano ai lati'), 10, 0, 300), mat('mat', tr('Materiale cassa'), 'mb18'), mat('matAnte', tr('Materiale ante'), 'mdf18'), mat('matPiano', tr('Piano'), 'al27')],
+    parametri: [mm('L', tr('Larghezza'), 800, 300, 1200), mm('H', tr('Altezza (senza piano)'), 720, 400, 1000), mm('P', tr('Profondità'), 560, 250, 650), scelta('ante', tr('Ante'), '2', { 1: tr('1 anta'), 2: tr('2 ante') }), num('n', tr('Ripiani'), 1, 0, 3), mm('zoccolo', tr('Zoccolo'), 100, 0, 150), mm('spD', tr('Sporgenza del piano davanti'), 30, 0, 100), mm('spL', tr('Sporgenza del piano ai lati'), 10, 0, 300), mat('mat', tr('Cassa'), 'mb18'), mat('matAnte', tr('Ante'), 'mdf18'), mat('matPiano', tr('Piano'), 'al27')],
     crea(pr, v, x0) {
       const c = cassa(pr, v, x0, { zoccolo: v.zoccolo });
       ripiani(pr, v, x0, c.yBase, c.yTop, v.n, c.T, v.P - 60);
@@ -85,7 +85,7 @@ export const MODELLI = [
   },
   {
     id: 'pensile', nome: tr('Pensile'), descr: tr('Mobile da appendere con ante e ripiani.'),
-    parametri: [mm('L', tr('Larghezza'), 600, 300, 1200), mm('H', tr('Altezza'), 720, 300, 1000), mm('P', tr('Profondità'), 320, 200, 450), scelta('ante', tr('Ante'), '1', { 1: tr('1 anta'), 2: tr('2 ante') }), num('n', tr('Ripiani'), 2, 0, 4), mat('mat', tr('Materiale'), 'mb18'), mat('matAnte', tr('Materiale ante'), 'mdf18')],
+    parametri: [mm('L', tr('Larghezza'), 600, 300, 1200), mm('H', tr('Altezza'), 720, 300, 1000), mm('P', tr('Profondità'), 320, 200, 450), scelta('ante', tr('Ante'), '1', { 1: tr('1 anta'), 2: tr('2 ante') }), num('n', tr('Ripiani'), 2, 0, 4), mat('mat', tr('Pannelli'), 'mb18'), mat('matAnte', tr('Ante'), 'mdf18')],
     crea(pr, v, x0) {
       const c = cassa(pr, v, x0, { zoccolo: 0 });
       ripiani(pr, v, x0, c.yBase, c.yTop, v.n, c.T, v.P - 23);
@@ -94,7 +94,7 @@ export const MODELLI = [
   },
   {
     id: 'cassettiera', nome: tr('Cassettiera'), descr: tr('Cassa con cassetti su guide a sfere e piano sopra.'),
-    parametri: [mm('L', tr('Larghezza'), 600, 300, 1200), mm('H', tr('Altezza'), 800, 300, 1400), mm('P', tr('Profondità'), 450, 300, 650), num('n', tr('Cassetti'), 4, 1, 8), mm('zoccolo', tr('Zoccolo'), 60, 0, 150), mat('mat', tr('Materiale cassa'), 'mb18'), mat('matCassone', tr('Materiale cassetti'), 'mb12'), mat('matAnte', tr('Materiale frontali'), 'mb18')],
+    parametri: [mm('L', tr('Larghezza'), 600, 300, 1200), mm('H', tr('Altezza'), 800, 300, 1400), mm('P', tr('Profondità'), 450, 300, 650), num('n', tr('Cassetti'), 4, 1, 8), mm('zoccolo', tr('Zoccolo'), 60, 0, 150), mat('mat', tr('Cassa'), 'mb18'), mat('matCassone', tr('Cassetti'), 'mb12'), mat('matAnte', tr('Frontali'), 'mb18')],
     crea(pr, v, x0) {
       const c = cassa(pr, v, x0, { zoccolo: v.zoccolo });
       const C = scelto(v, 'matCassone'), F = scelto(v, 'matAnte');
@@ -137,7 +137,7 @@ export const MODELLI = [
   },
   {
     id: 'panca', nome: tr('Panca'), descr: tr('Seduta con due fianchi pieni e un traverso sotto.'),
-    parametri: [mm('L', tr('Lunghezza'), 1200, 400, 2400), mm('P', tr('Profondità'), 350, 250, 500), mm('H', tr('Altezza'), 450, 300, 600), mm('rientro', tr('Rientro dei fianchi'), 60, 0, 300), mm('hT', tr('Altezza del traverso'), 120, 40, 300), mat('mat', tr('Materiale'), 'al27')],
+    parametri: [mm('L', tr('Lunghezza'), 1200, 400, 2400), mm('P', tr('Profondità'), 350, 250, 500), mm('H', tr('Altezza'), 450, 300, 600), mm('rientro', tr('Rientro dei fianchi'), 60, 0, 300), mm('hT', tr('Altezza del traverso'), 120, 40, 300), mat('mat', tr('Pannelli'), 'al27')],
     crea(pr, v, x0) {
       const M = scelto(v, 'mat'), T = M.T, rientro = v.rientro;
       if (v.L - 2 * (rientro + T) < 100) throw new Error(t('Fianchi troppo rientrati per questa lunghezza.'));
@@ -153,6 +153,15 @@ export const MODELLI = [
 
 export const modello = id => MODELLI.find(m => m.id === id);
 
+// I materiali dei modelli partono generici: del materiale indicato nel modello si prende solo lo spessore (e la sezione).
 export function valoriDefault(m) {
-  return Object.fromEntries(m.parametri.map(p => [p.k, p.def]));
+  const v = {};
+  for (const p of m.parametri) {
+    if (p.tipo !== 'mat') { v[p.k] = p.def; continue; }
+    const d = materiale(p.def);
+    v[p.k] = GENERICO[p.filtro];
+    v[p.k + 'T'] = d.T;
+    if (p.filtro === 'listello') v[p.k + 'W'] = d.W;
+  }
+  return v;
 }

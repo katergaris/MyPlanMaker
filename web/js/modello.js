@@ -48,8 +48,8 @@ const pulisci = v => { const r = Math.round(v * 1000) / 1000; return Object.is(r
 
 export function nuovoPezzo(progetto, tipo, vicinoA) {
   const p = tipo === 'listello'
-    ? { tipo, mat: 'ab4545', forma: 'rett', L: 700, rot: rotazioneDa('verticale') }
-    : { tipo, mat: 'mb18', forma: 'rett', L: 800, W: 400, D: 800, r: 0, rot: rotazioneDa('orizzontale') };
+    ? { tipo, mat: 'lis', forma: 'rett', L: 700, rot: rotazioneDa('verticale') }
+    : { tipo, mat: 'pan', forma: 'rett', L: 800, W: 400, D: 800, r: 0, rot: rotazioneDa('orizzontale') };
   p.id = nuovoId();
   p.n = progetto.prossimoN++;
   p.nome = `${t(tipo === 'listello' ? 'Listello' : 'Pannello')} ${p.n}`;

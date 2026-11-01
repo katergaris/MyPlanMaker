@@ -14,7 +14,7 @@ tuo server di casa: i progetti restano tuoi.
 qualunque angolo, anche curvi. Non è un CAD da imparare: le misure si scrivono a numero e i comandi sono pochi.
 
 - **Modelli pronti** come punto di partenza: libreria, mobile base con ante, pensile, cassettiera, scaffale,
-  tavolo (anche rotondo), panca. Misure, materiali e spessori si scelgono prima; dopo, ogni pezzo si cambia come
+  tavolo (anche rotondo), panca. Misure e spessori si scelgono prima; dopo, ogni pezzo si cambia come
   se l'avessi fatto a mano.
 - **Sposta e ruota trascinando**, con passo di 5 mm e aggancio magnetico ai pezzi vicini; selezione multipla,
   copia specchiata, gruppi, scorciatoie da tastiera.
@@ -38,7 +38,7 @@ qualunque angolo, anche curvi. Non è un CAD da imparare: le misure si scrivono 
   con la tabella dei fori, **dime 1:1** su fogli A4, etichette, **istruzioni di montaggio**, **modalità
   laboratorio** per il tablet con i pezzi da spuntare.
 - **Esportazioni**: PDF (stampa), CSV per i centri di taglio, DXF per CNC e laser, STL, PNG, file di progetto.
-- **I tuoi materiali** con misure di lastre e barre, bordatura per lato, venatura per pezzo, versioni del
+- **Basta lo spessore**: il tipo di legno è facoltativo (serve per colore, venatura e controlli più fini). Misure di lastre e barre, bordatura per lato, venatura per pezzo, versioni del
   progetto. **Prezzi e costi sono facoltativi**: si accendono dal menu ⋯.
 
 | | |

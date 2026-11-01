@@ -5,7 +5,13 @@ import { t, tr } from './lingua.js';
 // venatura da rispettare (allora i pezzi non si ruotano sulla lastra). Listelli: sezione W×T (mm), prezzo al
 // metro e lunghezza della barra commerciale. E = modulo elastico (N/mm², valori medi indicativi), densita in
 // kg/m³, viscosita = quanto aumenta la freccia nel tempo sotto carico.
+// I primi due sono generici («tipo di legno non specificato», dal 0.15.0 la scelta predefinita): conta solo lo spessore
+// (o la sezione). Per i controlli valori da legno medio (multistrato, massello: con truciolare o MDF i ripiani si piegano circa il
+// doppio, e lo dice chi sceglie quel tipo di legno), lastra e barra delle misure più comuni,
+// venatura libera (si sceglie pezzo per pezzo).
 export const MATERIALI = [
+  { id: 'pan', generico: true, tipo: 'pannello', nome: tr('Pannello'), T: 18, prezzoM2: 20, lastra: [2800, 2070], venatura: false, E: 8000, densita: 650, viscosita: 1.5, colore: '#e6cfa6' },
+  { id: 'lis', generico: true, tipo: 'listello', nome: tr('Listello'), W: 45, T: 45, prezzoM: 3.2, barra: 3000, E: 9000, densita: 500, viscosita: 1.5, colore: '#e8cd9c' },
   { id: 'mb18', tipo: 'pannello', nome: tr('Multistrato betulla 18'), T: 18, prezzoM2: 38, lastra: [2500, 1250], venatura: true, E: 9000, densita: 680, viscosita: 1.5, colore: '#e3c79b' },
   { id: 'mb12', tipo: 'pannello', nome: tr('Multistrato betulla 12'), T: 12, prezzoM2: 29, lastra: [2500, 1250], venatura: true, E: 9000, densita: 680, viscosita: 1.5, colore: '#e6cca3' },
   { id: 'tn18', tipo: 'pannello', nome: tr('Truciolare nobilitato bianco 18'), T: 18, prezzoM2: 13, lastra: [2800, 2070], venatura: false, E: 2500, densita: 650, viscosita: 2.0, colore: '#f1efe9' },
@@ -39,17 +45,38 @@ export const materialiPer = tipo => MATERIALI.filter(m => m.tipo === tipo);
 // Materiale effettivo di un pezzo: quello del catalogo, oppure una sua variante con spessore (pannelli) o sezione
 // (listelli) su misura. La variante ha un id proprio, così distinta e schema di taglio la tengono separata, e un
 // prezzo proporzionale (indicativo) al volume.
+export const GENERICO = { pannello: 'pan', listello: 'lis' };
+// Misure che si trovano facilmente in negozio, per i pulsanti rapidi.
+export const SPESSORI_COMUNI = [3, 6, 10, 12, 15, 16, 18, 22, 25, 30];
+export const SEZIONI_COMUNI = [[40, 20], [30, 30], [45, 45], [60, 40], [60, 60], [80, 80], [100, 100]];
+
 export function materialePezzo(p) {
   const m = materiale(p.mat);
   const W = m.tipo === 'listello' ? (p.sezione?.[0] || m.W) : m.W, T = (m.tipo === 'listello' ? p.sezione?.[1] : p.spessore) || m.T;
-  if (W === m.W && T === m.T) return m;
   const n = s => String(Math.round(s * 10) / 10).replace('.', ',');
+  // Generico: il nome è la misura («Pannello 18 mm», «Listello 45×45»), niente «su misura».
+  if (m.generico) {
+    const id = W === m.W && T === m.T ? m.id : m.tipo === 'listello' ? `${m.id}@${W}x${T}` : `${m.id}@${T}`;
+    const k = m.tipo === 'listello' ? (W * T) / (m.W * m.T) : T / m.T;
+    return { ...m, id, base: m.id, W, T, ...(m.tipo === 'listello' ? { prezzoM: m.prezzoM * k } : { prezzoM2: m.prezzoM2 * k }),
+      nome: m.tipo === 'listello' ? t('Listello {w}×{t}', { w: n(W), t: n(T) }) : t('Pannello {s} mm', { s: n(T) }) };
+  }
+  if (W === m.W && T === m.T) return m;
+  // Tipo di legno scelto con una misura diversa da quella del catalogo: il nome prende la misura vera.
   if (m.tipo === 'listello') {
     const prima = `${m.W}×${m.T}`, dopo = `${n(W)}×${n(T)}`;
     return { ...m, id: `${m.id}@${W}x${T}`, base: m.id, W, T, prezzoM: m.prezzoM * (W * T) / (m.W * m.T),
-      nome: t('{nome} (su misura)', { nome: m.nome.includes(prima) ? m.nome.replace(prima, dopo) : `${m.nome} → ${dopo}` }) };
+      nome: m.nome.includes(prima) ? m.nome.replace(prima, dopo) : `${m.nome} ${dopo}` };
   }
   const re = new RegExp(`(^|\\s)${m.T}(?=\\s|$)`);
   return { ...m, id: `${m.id}@${T}`, base: m.id, T, prezzoM2: m.prezzoM2 * T / m.T,
-    nome: t('{nome} (su misura)', { nome: re.test(m.nome) ? m.nome.replace(re, `$1${n(T)}`) : t('{nome} → spessore {s}', { nome: m.nome, s: n(T) }) }) };
+    nome: re.test(m.nome) ? m.nome.replace(re, `$1${n(T)}`) : t('{nome}, {s} mm', { nome: m.nome, s: n(T) }) };
+}
+
+// Materiale da un id di materialePezzo («pan@12», «lis@40x20», «mb18»): per gli avanzi del magazzino.
+export function materialeDaId(id) {
+  const [base, misura] = String(id).split('@'), m = materiale(base);
+  if (!misura) return materialePezzo({ mat: base });
+  if (m.tipo === 'listello') return materialePezzo({ mat: base, sezione: misura.split('x').map(Number) });
+  return materialePezzo({ mat: base, spessore: Number(misura) });
 }
