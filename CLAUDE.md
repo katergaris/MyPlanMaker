@@ -46,6 +46,13 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     Unità dell'interfaccia (`unita.u` mm/cm, `fmtU`, `leggiMisura`): nel progetto tutto resta in mm.
   - Spessore su misura: `p.spessore` (pannelli) e `p.sezione = [W, T]` (listelli); `materialePezzo(p)` in
     `materiali.js` dà la variante (id `mat@T`, prezzo proporzionale) usata da dimensioni, distinta, taglio, disegni.
+  - **Riempi** (dal 0.16.0, comando `riempi`, tasto K): tocco in un vano → `vanoDa(faccia)` → dialogo `#dlg-vano`
+    (`apriVano`, `pezziVano`, `riempiVano`): ripiani, divisori, schienale, ante, cassetti (→ `apriCassetto`). Pezzi nel
+    sistema girato del vano poi girati con `v.ruota`. `vanoDa` dà anche `copre` (fin dove arrivano le ante: fianco esterno
+    tutto, parete condivisa metà, 3 mm di fuga; in altezza solo i pezzi che arrivano davanti) e `cerniere` sx/dx
+    (`sovrapposta`/`semi`). `cmd:cassetto` (prove) apre direttamente i cassetti (`stato.soloCassetto`).
+  - **Attrezzi** (dal 0.16.0): a sinistra solo quelli che creano; Accosta, Adatta, Dividi nella barra della selezione
+    (`COMANDI_SEL`, restano visibili mentre sono attivi), Copia specchiata / Più pezzi / Blocca nel menu `#altro-sel`.
   - **Tipo di legno facoltativo** (dal 0.15.0, scelta di Salvo: «basta lo spessore»): materiali generici `pan` e `lis`
     (`generico: true`, nome = misura «Pannello 18 mm» / «Listello 45×45», controlli con valori da legno medio, venatura
     libera) sono il predefinito di pezzi nuovi, modelli (`valoriDefault` prende solo lo spessore del materiale indicato nel
@@ -125,13 +132,16 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   la shell (la riga contiene la parola). Usare il PID.
 
 ## Stato
+**0.16.0-alpha.1** (2026-11-01): Riempi (vano → ripiani, divisori, schienale, ante, cassetti) e attrezzi riorganizzati,
+proposte 1 e 3 scelte da Salvo. Restano da scegliere: ridimensiona tutto il mobile, intestazione più pulita (mm/cm nel
+menu, Esporta PDF normale), tablet verticale, «Segnala un problema» (serve il canale).
 **0.15.0-alpha.1** (2026-11-01): tipo di legno facoltativo, conta lo spessore; prezzi già facoltativi (menu «Lastre e
 barre» se spenti). Salvo: «semplicità d'uso e velocità di realizzazione sono le nostre caratteristiche più attese».
 **0.14.0-alpha.1** (2026-11-01): prima alpha per i tester; schermata Progetti (miniature, Continua, Rinomina, Duplica,
 elimina anche l'aperto con Annulla), apertura molto più veloce (cache e gzip del server). Studio UX in
 `docs/STUDIO-UX-2026-11.md`, proposte A-F **non ancora scelte** (A attrezzi grigi che spiegano, B «Segnala un problema»
 — serve decidere il canale, C tablet verticale, D aiuto chiudibile, E benvenuto nella schermata Progetti, F pulizia visiva).
-Release su GitHub come pre-release (`v0.14.0-alpha.1`, `v0.15.0-alpha.1`) con la portable allegata; finché il repository è privato i tester
+Release su GitHub come pre-release (`v0.14.0-alpha.1`, `v0.15.0-alpha.1`, `v0.16.0-alpha.1`) con la portable allegata; finché il repository è privato i tester
 non la vedono: lo zip va dato a mano.
 **0.13.0** (2026-10-31): maniglie alla Tinkercad, quote da scrivere sul pezzo, calamita dal vivo, lastra per progetto (0.12.0 5 lingue, prezzi facoltativi, repository in inglese; 0.11.0 disegno 2D; 0.10.0 spessori su misura, spostamento libero, nuovo Accosta/Adatta, mm/cm); vedi `CHANGELOG.md`. Repository privato `katergaris/MyPlanMaker`, branch `main`, pronto per
 la pubblicazione (README, screenshot, licenza, CI) ma **ancora privato**: renderlo pubblico solo se Salvo lo chiede.

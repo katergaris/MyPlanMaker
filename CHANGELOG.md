@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.16.0-alpha.1 — 2026-11-01
+**Build a cabinet in a few taps.**
+- **Fill** (left toolbar, key K): tap inside an opening of a cabinet and choose **shelves**, **dividers**, a **back
+  panel**, **doors** or **drawers**. The walls, top and bottom are found by themselves and the new pieces are already
+  cut to size, evenly spaced, with a preview of the gaps before adding them. Works on cabinets turned by 90°.
+- **Doors** from Fill cover the whole front between the pieces that reach the front (shelves set back are ignored):
+  full overlay on outer sides, half overlay on a divider shared with another opening, 3 mm gaps, hinges and handles
+  included. One or two doors.
+- **Simpler toolbars**: the left column only has the tools that create (Panel, Batten, Drawing, Models, Fill,
+  Measure). **Place, Fit and Divide** moved to the bar that appears when a piece is selected, so they are never greyed
+  out; press them again to leave. Mirrored copy, multiple selection and Lock are in its **⋯** menu.
+- Drawer replaced by Fill → Drawers in the left column.
+
 ## 0.15.0-alpha.1 — 2026-11-01
 **Wood type is now optional: thickness is enough.**
 - New pieces, ready-made models and drawers start as a plain **“Panel 18 mm”** or **“Batten 45×45”**: no need to

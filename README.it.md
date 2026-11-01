@@ -16,6 +16,8 @@ qualunque angolo, anche curvi. Non è un CAD da imparare: le misure si scrivono 
 - **Modelli pronti** come punto di partenza: libreria, mobile base con ante, pensile, cassettiera, scaffale,
   tavolo (anche rotondo), panca. Misure e spessori si scelgono prima; dopo, ogni pezzo si cambia come
   se l'avessi fatto a mano.
+- **Riempi un vano**: premi Riempi e tocca dentro il mobile: ripiani, divisori, schienale, ante (con cerniere e
+  maniglie, coprenti o semicoprenti) o cassetti nascono già a misura di quel vano.
 - **Sposta e ruota trascinando**, con passo di 5 mm e aggancio magnetico ai pezzi vicini; selezione multipla,
   copia specchiata, gruppi, scorciatoie da tastiera.
 - **Disegno 2D** del pannello come in LightBurn: rettangoli, ellissi, poligoni e linee, ognuno pieno, foro passante

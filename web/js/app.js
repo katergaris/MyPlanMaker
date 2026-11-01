@@ -13,7 +13,7 @@ import { FISSAGGI, descriviGiunto, descriviTipo, unioni } from './unioni.js';
 import { INTERASSI, LATI, MODELLI_CERNIERA, cerniere, maniglia } from './ferramenta.js';
 import { listaSpesa } from './spesa.js';
 import { MODELLI, modello, valoriDefault } from './modelli.js';
-import { TIPI_GUIDA, creaCassetti, lunghezzaPer } from './cassetti.js';
+import { FUGA, TIPI_GUIDA, creaCassetti, lunghezzaPer } from './cassetti.js';
 import { apriEditorSagoma } from './sagome.js';
 import { apriDisegno2D, formeDaPezzo } from './disegno2d.js';
 import { htmlDima, htmlDisegno, htmlEtichette } from './disegni.js';
@@ -112,6 +112,7 @@ function aggiornaAttrezzi() {
   });
   $('#annulla').disabled = !storico.indietro.length;
   $('#ripeti').disabled = !storico.avanti.length;
+  disegnaBarraSel();
 }
 
 function esciModo() {
@@ -151,16 +152,18 @@ function comando(cmd) {
   } else if (cmd === 'modelli') {
     esciModo();
     apriModelli();
-  } else if (cmd === 'cassetto') {
-    if (stato.modo === cmd) return esciModo();
-    stato.modo = cmd; stato.accostaDa = null; stato.accostato = null;
-    aggiornaAttrezzi();
-    avvisa(t('Tocca dentro il vano dove va il cassetto (la faccia interna di un fianco, il fondo o il retro): trovo io le pareti. Esc per annullare.'), false, 0);
+  } else if (cmd === 'riempi' || cmd === 'cassetto') {
+    if (stato.modo === 'riempi') return esciModo();
+    stato.soloCassetto = cmd === 'cassetto';
+    stato.modo = 'riempi'; stato.accostaDa = null; stato.accostato = null;
+    seleziona(null); aggiorna();
+    avvisa(t('Tocca dentro il vano da riempire (la faccia interna di un fianco, il fondo o il retro): trovo io le pareti. Esc per annullare.'), false, 0);
   } else if (cmd === 'accosta' || cmd === 'adatta' || cmd === 'dividi') {
     if (!p) return;
-    if (stato.modo === cmd) return esciModo();
+    if (stato.modo === cmd) { esciModo(); return disegnaBarraSel(); }
     stato.modo = cmd;
     aggiornaAttrezzi();
+    disegnaBarraSel();
     stato.accostaDa = null;
     stato.accostato = null;
     avvisa(t(cmd === 'accosta'
@@ -202,6 +205,9 @@ function comando(cmd) {
     avvisa(blocca
       ? t('Bloccato: non si sposta per sbaglio, e i pezzi che lo attraversano ricevono gli intagli da soli.') + (intagliati.length ? ' ' + t('Intagliati: {nomi}.', { nomi: intagliati.map(x => `«${x.nome}»`).join(', ') }) : '')
       : t('Sbloccato: gli intagli che faceva negli altri pezzi sono spariti.'), false, 6000);
+  } else if (cmd === 'altro-sel') {
+    $('#altro-sel').hidden = !$('#altro-sel').hidden;
+    disegnaBarraSel();
   } else if (cmd === 'multipla') {
     stato.aggiungiSel = !stato.aggiungiSel;
     disegnaBarraSel();
@@ -227,12 +233,12 @@ function tocco(id, faccia, evento) {
     return aggiorna();
   }
   if (stato.modo === 'accosta') return toccoAccosta(id, faccia);
-  if (stato.modo === 'cassetto') {
+  if (stato.modo === 'riempi') {
     if (!id) return avvisa(t('Tocca dentro il vano, su un pezzo del mobile. Esc per annullare.'), true, 4000);
     const v = vanoDa(faccia);
     if (!v.ok) return avvisa(v.msg, true, 6000);
     stato.modo = null; aggiornaAttrezzi(); $('#toast').hidden = true;
-    return apriCassetto(v);
+    return stato.soloCassetto ? apriCassetto(v) : apriVano(v);
   }
   if (stato.modo === 'adatta' && p && id === p.id) {
     const asse = mod.assePerFaccia(p, faccia.normale);
@@ -510,14 +516,19 @@ function ridimensionato(id, esiti) {
   avvisa(msg, false, 3500);
 }
 
+// Comandi che lavorano sul pezzo scelto: stanno nella barra della selezione, che resta visibile mentre sono attivi
+// (si ripremono per uscire).
+const COMANDI_SEL = ['accosta', 'adatta', 'dividi'];
 function disegnaBarraSel() {
-  const b = $('#barra-sel'), n = selezione().size;
-  b.hidden = !n || !!stato.modo;
-  if (b.hidden) return;
-  b.querySelector('[data-cmd="sposta"]').classList.toggle('on', stato.gizmo === 'translate');
-  b.querySelector('[data-cmd="ruota"]').classList.toggle('on', stato.gizmo === 'rotate');
-  b.querySelector('[data-cmd="multipla"]').classList.toggle('on', stato.aggiungiSel);
-  b.querySelector('[data-cmd="blocca"]').classList.toggle('on', pezziSel().every(p => p.bloccato));
+  const b = $('#barra-sel'), a = $('#altro-sel'), n = selezione().size;
+  b.hidden = !n || (!!stato.modo && !COMANDI_SEL.includes(stato.modo));
+  if (b.hidden) { a.hidden = true; return; }
+  b.querySelector('[data-cmd="sposta"]').classList.toggle('on', stato.gizmo === 'translate' && !stato.modo);
+  b.querySelector('[data-cmd="ruota"]').classList.toggle('on', stato.gizmo === 'rotate' && !stato.modo);
+  for (const c of COMANDI_SEL) b.querySelector(`[data-cmd="${c}"]`).classList.toggle('on', stato.modo === c);
+  b.querySelector('[data-cmd="altro-sel"]').classList.toggle('on', !a.hidden || stato.aggiungiSel);
+  a.querySelector('[data-cmd="multipla"]').classList.toggle('on', stato.aggiungiSel);
+  a.querySelector('[data-cmd="blocca"]').classList.toggle('on', pezziSel().every(p => p.bloccato));
   b.querySelector('.conta').textContent = n > 1 ? t('{n} pezzi', { n }) : '';
 }
 
@@ -606,9 +617,10 @@ function vanoDa(faccia) {
   const Q = faccia.punto.clone().addScaledVector(faccia.normale.clone().normalize(), 2);
   const box = stato.progetto.pezzi.map(p => ({ p, B: ingombroMondo(p) }));
   const assi = ['x', 'y', 'z'];
-  const colpo = (k, s) => {
+  const colpo = (k, s, filtro = () => true) => {
     let meglio = null;
     for (const { p, B } of box) {
+      if (!filtro(B)) continue;
       if (!assi.every(j => j === k || (B.min[j] < Q[j] - 0.5 && B.max[j] > Q[j] + 0.5))) continue;
       const d = s > 0 ? B.min[k] - Q[k] : Q[k] - B.max[k];
       if (d < -0.5) continue;
@@ -638,9 +650,35 @@ function vanoDa(faccia) {
   const interno = [pa.c, pb.c].map(c => { const q = new Vector3(); q[larg] = c; return q.dot(u); }).sort((a, b) => a - b);
   const zf = (() => { const q = new Vector3(); q[prof] = fronte; return q.dot(f); })(), zb = (() => { const q = new Vector3(); q[prof] = fondoMobile; return q.dot(f); })();
   const spessore = Math.min(...pareti.map(B => { const [a, b] = lato(B); return b - a; }));
-  if (interno[1] - interno[0] < 100) return { ok: false, msg: t('Spazio troppo stretto per un cassetto.') };
+  if (interno[1] - interno[0] < 60) return { ok: false, msg: t('Spazio troppo stretto.') };
   const r2 = x => Math.round(x * 100) / 100;
-  return { ok: true, x0: r2(interno[0]), x1: r2(interno[1]), y0: r2(y0), y1: r2(y1), zFronte: r2(zf), profondita: r2(zf - zb), spessore: r2(spessore), ruota, pareti: [pa.p.nome, pb.p.nome] };
+  // Fin dove arrivano le ante (sistema girato): un fianco esterno si copre tutto (3 mm di fuga), una parete condivisa
+  // con un altro vano (divisorio, ripiano) solo fino a metà. «Esterno» = nessun pezzo subito oltre, che arrivi davanti.
+  const su0 = u[larg], uInt = B => { const [a, b] = lato(B); return [Math.min(a * su0, b * su0), Math.max(a * su0, b * su0)]; };
+  const davantiB = B => (segno > 0 ? B.max[prof] >= fronte - 5 : B.min[prof] <= fronte + 5);
+  const altri = escluso => box.filter(x => x.p !== escluso && davantiB(x.B));
+  const pareteU = [pa, pb].map(w => ({ w, i: uInt(w.B) })).sort((a, b) => a.i[0] - b.i[0]);
+  const spazioY = B => B.max.y > y0 + 1 && B.min.y < y1 - 1;
+  const esternoU = (w, verso) => !altri(w.w.p).some(({ B }) => {
+    if (!spazioY(B)) return false;
+    const i = uInt(B);
+    return verso < 0 ? i[1] <= w.i[0] + 0.5 && i[1] >= w.i[0] - 100 : i[0] >= w.i[1] - 0.5 && i[0] <= w.i[1] + 100;
+  });
+  const dentroU = B => { const i = uInt(B); return i[1] > interno[0] + 1 && i[0] < interno[1] - 1; };
+  const esternoY = (c, verso) => !altri(c.p).some(({ B }) => dentroU(B) && (verso < 0 ? B.max.y <= c.B.min.y + 0.5 && B.max.y >= c.B.min.y - 100 : B.min.y >= c.B.max.y - 0.5 && B.min.y <= c.B.max.y + 100));
+  const [sx, dx] = pareteU, sxEst = esternoU(sx, -1), dxEst = esternoU(dx, 1);
+  // In altezza le ante si fermano ai pezzi che arrivano davanti (base, cielo, traversi), non ai ripiani arretrati.
+  const giuF = colpo('y', -1, davantiB), suF = colpo('y', 1, davantiB);
+  const giuEst = giuF ? esternoY(giuF, -1) : true, suEst = suF ? esternoY(suF, 1) : true;
+  const yA = giuF ? giuF.c : Math.max(...pareti.map(B => B.min.y)), yB = suF ? suF.c : Math.min(...pareti.map(B => B.max.y));
+  const copre = {
+    x0: sxEst ? sx.i[0] + 3 : (sx.i[0] + sx.i[1]) / 2 + 1.5,
+    x1: dxEst ? dx.i[1] - 3 : (dx.i[0] + dx.i[1]) / 2 - 1.5,
+    y0: giuF ? (giuEst ? giuF.B.min.y + 1.5 : (giuF.B.min.y + giuF.B.max.y) / 2 + 1.5) : yA + 1.5,
+    y1: suF ? (suEst ? suF.B.max.y - 1.5 : (suF.B.min.y + suF.B.max.y) / 2 - 1.5) : yB - 1.5,
+  };
+  return { ok: true, x0: r2(interno[0]), x1: r2(interno[1]), y0: r2(y0), y1: r2(y1), zFronte: r2(zf), profondita: r2(zf - zb), spessore: r2(spessore), ruota, pareti: [pa.p.nome, pb.p.nome],
+    copre: Object.fromEntries(Object.entries(copre).map(([k, x]) => [k, r2(x)])), cerniere: { sx: sxEst ? 'sovrapposta' : 'semi', dx: dxEst ? 'sovrapposta' : 'semi' }, retro: !!(segno > 0 ? dietro : davanti) };
 }
 
 const valoriGuida = tipo => ({ ...TIPI_GUIDA[tipo] });
@@ -679,6 +717,109 @@ function creaCassettiOra() {
   modifica(() => { const x = creaCassetti(stato.progetto, v); stato.multi = new Set(x.nuovi.map(p => p.id)); stato.sel = x.nuovi.at(-1).id; });
   $('#dlg-cassetto').close();
   avvisa(r.tipo === 'legno' ? tn(v.n, 'Creato il cassetto su listelli di scorrimento.', 'Creati {n} cassetti su listelli di scorrimento.') : tn(v.n, 'Creato il cassetto con guide da {g} mm.', 'Creati {n} cassetti con guide da {g} mm.', { g: r.guida }));
+}
+
+// ---------- Riempi il vano ----------
+// Un tocco dentro un vano (comando Riempi) → ripiani, divisori, schienale, ante o cassetti già a misura del vano.
+// I pezzi si costruiscono nel sistema girato del vano (davanti verso +Z, vedi vanoDa) e poi si girano al loro posto.
+let vanoScelto = null, sceltaVano = 'ripiani';
+const SCELTE_VANO = { ripiani: tr('Ripiani'), divisori: tr('Divisori'), schienale: tr('Schienale'), ante: tr('Ante'), cassetti: tr('Cassetti') };
+function apriVano(v) {
+  vanoScelto = v;
+  disegnaFormVano();
+  $('#dlg-vano').showModal();
+}
+function valoriVano() {
+  const q = k => document.querySelector(`#form-vano [data-vano="${k}"]`);
+  return { n: Math.max(1, Math.min(20, Math.round(numero(q('n')?.value) || 1))), T: mod.leggiMisura(q('T')?.value ?? '') || vanoScelto.spessore, ante: q('ante')?.dataset.valore || '1' };
+}
+function disegnaFormVano(prima = {}) {
+  const v = vanoScelto, s = sceltaVano, largo = v.x1 - v.x0, alto = v.y1 - v.y0;
+  const T = prima.T ?? v.spessore, n = prima.n ?? 1, ante = prima.ante ?? (largo > 600 ? '2' : '1');
+  const quanti = `<div class="field"><label>${t('Quanti')}</label><div class="stepper"><button class="btn icon" data-vano-meno>−</button><div class="input"><input data-vano="n" inputmode="numeric" value="${n}"></div><button class="btn icon" data-vano-piu>+</button></div></div>`;
+  const spessore = `<div class="field"><label>${t('Spessore')}</label><div class="input"><input data-vano="T" inputmode="decimal" value="${esc(fU(T))}"><small>${U()}</small></div></div>`;
+  const corpo = s === 'cassetti' ? `<p class="nota">${t('Guide, numero dei cassetti e spessori nel passo dopo.')}</p>`
+    : s === 'ante' ? `<div class="field"><label>${t('Quante ante')}</label><div class="seg" data-vano="ante" data-valore="${ante}"><button data-ante="1" class="${ante === '1' ? 'on' : ''}">${t('1 anta')}</button><button data-ante="2" class="${ante === '2' ? 'on' : ''}">${t('2 ante')}</button></div></div>${spessore}`
+    : s === 'schienale' ? spessore : `<div class="row">${quanti}${spessore}</div>`;
+  $('#form-vano').innerHTML = `<p>${t('Vano tra «{a}» e «{b}»: largo <b>{largo}</b>, alto <b>{alto}</b>, profondo {prof}.', { a: esc(v.pareti[0]), b: esc(v.pareti[1]), largo: mod.fmtU(largo, true), alto: mod.fmtU(alto, true), prof: mod.fmtU(v.profondita, true) })}</p>
+    <div class="seg scelte-vano">${Object.entries(SCELTE_VANO).map(([k, x]) => `<button data-scelta-vano="${k}" class="${k === s ? 'on' : ''}">${t(x)}</button>`).join('')}</div>
+    ${corpo}<div id="esito-vano" class="ok"></div>
+    <div class="azioni"><button class="btn" data-chiudi-vano>${t('Annulla')}</button><button class="btn primary" id="vano-ok">${s === 'cassetti' ? t('Continua') : t('Aggiungi')}</button></div>`;
+  anteprimaVano();
+}
+// Pezzi per la scelta attuale, nel sistema girato del vano: [{ nome, L, W, T, rot, pos, ... }] oppure { errore }.
+function pezziVano() {
+  const v = vanoScelto, { n, T, ante } = valoriVano(), largo = v.x1 - v.x0, alto = v.y1 - v.y0, P = v.profondita, zf = v.zFronte;
+  if (sceltaVano === 'ripiani') {
+    const passo = (alto - n * T) / (n + 1);
+    if (passo < 20) return { errore: t('Troppi ripiani per questa altezza.') };
+    return { luce: passo, pezzi: Array.from({ length: n }, (_, i) => ({ nome: tr('Ripiano'), L: largo, W: P, T, rot: 'orizzontale', pos: [v.x0, v.y0 + (i + 1) * passo + i * T, zf] })) };
+  }
+  if (sceltaVano === 'divisori') {
+    const passo = (largo - n * T) / (n + 1);
+    if (passo < 20) return { errore: t('Troppi divisori per questa larghezza.') };
+    return { luce: passo, pezzi: Array.from({ length: n }, (_, i) => ({ nome: tr('Divisorio'), L: alto, W: P, T, rot: 'fianco', pos: [v.x0 + (i + 1) * passo + (i + 1) * T, v.y0, zf] })) };
+  }
+  if (sceltaVano === 'schienale') {
+    if (T >= P) return { errore: t('Lo schienale è più spesso della profondità del vano.') };
+    return { pezzi: [{ nome: tr('Schienale'), L: largo, W: alto, T, rot: 'frontale', pos: [v.x0, v.y0, zf - P] }] };
+  }
+  if (sceltaVano === 'ante') {
+    const c = v.copre, quante = +ante, l = (c.x1 - c.x0 - FUGA * (quante - 1)) / quante, h = c.y1 - c.y0;
+    if (l < 100 || h < 100) return { errore: t('Vano troppo piccolo per un\'anta.') };
+    const maniglia = { tipo: 'maniglia', interasse: 128, posizione: (c.y0 + c.y1) / 2 > 1400 ? 'inizio' : 'fine', direzione: 'parallela' };
+    return { pezzi: Array.from({ length: quante }, (_, i) => ({ nome: quante === 1 ? tr('Anta') : i === 0 ? tr('Anta sinistra') : tr('Anta destra'), L: l, W: h, T, rot: 'frontale', pos: [c.x0 + i * (l + FUGA), c.y0, zf],
+      ferramenta: [{ tipo: 'cerniere', lato: i === 0 ? 'A' : 'B', modello: i === 0 ? v.cerniere.sx : v.cerniere.dx }, maniglia] })) };
+  }
+  return { pezzi: [] };
+}
+function anteprimaVano() {
+  const e = $('#esito-vano'), ok = $('#vano-ok');
+  if (sceltaVano === 'cassetti') { e.textContent = ''; ok.disabled = false; return; }
+  const r = pezziVano();
+  ok.disabled = !!r.errore;
+  e.className = r.errore ? 'avviso' : 'ok';
+  if (r.errore) { e.textContent = r.errore; return; }
+  const p = r.pezzi[0], n = r.pezzi.length, misure = `${mod.fmtU(p.L)} × ${mod.fmtU(p.W, true)}`;
+  e.textContent = sceltaVano === 'ripiani' ? tn(n, 'Un ripiano da {m}, luce sopra e sotto {luce}.', '{n} ripiani da {m}, luce tra uno e l\'altro {luce}.', { m: misure, luce: mod.fmtU(r.luce, true) })
+    : sceltaVano === 'divisori' ? tn(n, 'Un divisorio da {m}, due spazi da {luce}.', '{n} divisori da {m}, spazi da {luce}.', { m: misure, luce: mod.fmtU(r.luce, true) })
+    : sceltaVano === 'schienale' ? t('Schienale da {m}, dentro il vano contro il fondo.', { m: misure })
+    : tn(n, 'Un\'anta da {m}, con cerniere e maniglia.', '{n} ante da {m}, con cerniere e maniglie.', { m: misure });
+}
+function riempiVano() {
+  if (sceltaVano === 'cassetti') { $('#dlg-vano').close(); return apriCassetto(vanoScelto); }
+  const r = pezziVano();
+  if (r.errore) return avvisa(r.errore, true);
+  const R = vanoScelto.ruota ? new Matrix4().makeRotationY(vanoScelto.ruota) : null;
+  modifica(() => {
+    const pr = stato.progetto, nuovi = r.pezzi.map(({ nome, T, rot, ...dati }) => {
+      const d1 = v => Math.round(v * 10) / 10;
+      const x = { id: mod.nuovoId(), n: pr.prossimoN++, tipo: 'pannello', mat: 'pan', forma: 'rett', r: 0, tagli: [], rot: mod.rotazioneDa(rot), ...dati, L: d1(dati.L), W: d1(dati.W), pos: dati.pos.map(d1) };
+      x.nome = `${t(nome)} ${x.n}`;
+      impostaMisura(x, null, T);
+      if (R) mod.trasforma(x, R);
+      pr.pezzi.push(x);
+      return x;
+    });
+    stato.multi = new Set(nuovi.map(x => x.id)); stato.sel = nuovi.at(-1).id;
+  });
+  $('#dlg-vano').close();
+  avvisa(t('Aggiunto. Per un altro vano premi di nuovo Riempi; con ↶ torni indietro.'));
+}
+function eventiVano() {
+  const d = $('#dlg-vano');
+  d.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const prima = valoriVano();
+    if (b.dataset.sceltaVano) { sceltaVano = b.dataset.sceltaVano; return disegnaFormVano({ T: sceltaVano === 'ante' || sceltaVano === 'schienale' ? undefined : prima.T }); }
+    if (b.dataset.ante) return disegnaFormVano({ ...prima, ante: b.dataset.ante });
+    if (b.hasAttribute('data-vano-meno') || b.hasAttribute('data-vano-piu')) { $('#form-vano [data-vano="n"]').value = Math.max(1, prima.n + (b.hasAttribute('data-vano-piu') ? 1 : -1)); return anteprimaVano(); }
+    if (b.hasAttribute('data-chiudi-vano')) return d.close();
+    if (b.id === 'vano-ok') riempiVano();
+  });
+  d.addEventListener('input', anteprimaVano);
+  d.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); riempiVano(); } });
 }
 
 // ---------- Dividi ----------
@@ -1720,6 +1861,7 @@ async function avvio() {
     onRidimensiona: ridimensionato, onQuota: quotaScritta,
   });
   $('#barra-sel').addEventListener('click', e => { const b = e.target.closest('button'); if (b) comando(b.dataset.cmd); });
+  $('#altro-sel').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; $('#altro-sel').hidden = true; comando(b.dataset.cmd); });
   document.querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => comando(b.dataset.cmd)));
   $('#viste').addEventListener('click', e => {
     const b = e.target.closest('button');
@@ -1752,13 +1894,14 @@ async function avvio() {
       const d = { ArrowLeft: [-passo, 0, 0], ArrowRight: [passo, 0, 0], ArrowUp: [0, 0, -passo], ArrowDown: [0, 0, passo], PageUp: [0, passo, 0], PageDown: [0, -passo, 0] }[e.key];
       modifica(() => sel.forEach(p => mod.sposta(p, d)));
     } else {
-      const tasti = { b: 'blocca', p: 'pannello', l: 'listello', c: 'accosta', a: 'adatta', d: 'dividi', m: 'misura', g: 'sposta', r: 'ruota', s: 'specchia', t: 'modelli', k: 'cassetto' };
+      const tasti = { b: 'blocca', p: 'pannello', l: 'listello', c: 'accosta', a: 'adatta', d: 'dividi', m: 'misura', g: 'sposta', r: 'ruota', s: 'specchia', t: 'modelli', k: 'riempi' };
       if (tasti[k]) { e.preventDefault(); comando(tasti[k]); }
     }
   });
   eventiProprieta();
   eventiAccostato();
   eventiDialoghi();
+  eventiVano();
   eventiMagazzino();
   eventiVersioni();
   eventiLaboratorio();
@@ -1780,7 +1923,10 @@ async function avvio() {
   });
   $('#menu-altro').addEventListener('click', e => { e.stopPropagation(); $('#tendina').hidden = !$('#tendina').hidden; });
   $('#tendina').addEventListener('click', e => { const b = e.target.closest('[data-menu]'); if (b) { $('#tendina').hidden = true; menuAltro(b.dataset.menu); } else e.stopPropagation(); });
-  document.addEventListener('click', () => { $('#tendina').hidden = true; });
+  document.addEventListener('click', e => {
+    $('#tendina').hidden = true;
+    if (!e.target.closest('#barra-sel, #altro-sel') && !$('#altro-sel').hidden) { $('#altro-sel').hidden = true; disegnaBarraSel(); }
+  });
   if (!localStorage.getItem('mpm:guida-vista')) { localStorage.setItem('mpm:guida-vista', '1'); setTimeout(() => $('#dlg-guida').showModal(), 600); }
   window.addEventListener('online', () => archivio.sincronizza());
 

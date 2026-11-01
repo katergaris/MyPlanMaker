@@ -17,6 +17,8 @@ and there are few commands.
 - **Ready-made templates** as a starting point: bookcase, base cabinet with doors, wall cabinet, chest of drawers,
   open shelving, table (also round), bench. Every size and thickness can be changed, and afterwards each
   piece can be edited as if you had made it by hand.
+- **Fill an opening**: press Fill and tap inside a cabinet: shelves, dividers, a back panel, doors (with hinges and
+  handles, full or half overlay) or drawers are added already cut to the size of that opening.
 - **Drag pieces directly in 3D**, like in Tinkercad: 5 mm steps, magnetic snapping to nearby pieces, an arrow to
   raise or lower them. Multiple selection, mirrored copy, groups, keyboard shortcuts.
 - **Place**: tap the face of a piece, then the point on another piece where it goes; then type the distance from

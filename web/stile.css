@@ -383,3 +383,14 @@ dialog .toast { position: sticky; left: auto; bottom: 12px; margin: 0 16px 12px;
 .rapide button { min-width: 44px; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 14px; font-variant-numeric: tabular-nums; }
 .rapide button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .sotto-titolo { font-size: 14px; color: var(--muted); font-weight: 600; margin-top: 4px; }
+/* Barra della selezione: icone piccole dei comandi del pezzo e menu «⋯» (Copia specchiata, Più pezzi, Blocca). */
+.barra-sel button { display: inline-flex; align-items: center; gap: 6px; }
+.barra-sel .ic, .altro-sel .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.barra-sel button.icona { font-size: 20px; padding: 0 12px; }
+.altro-sel { position: absolute; z-index: 4; bottom: 76px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 5px; box-shadow: 0 10px 28px rgba(60,40,20,.16); }
+.altro-sel button { height: 40px; border: 0; border-radius: 10px; background: none; padding: 0 12px; font-size: 14px; font-weight: 500; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.altro-sel button:hover { background: var(--bg); }
+.altro-sel button.on { background: var(--accent-soft); color: var(--accent); }
+/* Riempi il vano: le cinque scelte su una riga che va a capo sui telefoni. */
+.scelte-vano { flex-wrap: wrap; }
+.scelte-vano button { flex: 1 1 auto; }
