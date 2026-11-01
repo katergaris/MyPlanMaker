@@ -2,24 +2,32 @@
 // Regola: vince la versione con `aggiornato` più recente.
 import { t } from './lingua.js';
 const PREF = 'mpm:progetto:';
+// Progetti eliminati senza rete: si ricordano finché il server non conferma, così non ricompaiono.
+const ELIMINATI = 'mpm:eliminati';
+const eliminati = () => { try { return JSON.parse(localStorage.getItem(ELIMINATI) || '[]'); } catch { return []; } };
+const segnaEliminati = ids => localStorage.setItem(ELIMINATI, JSON.stringify(ids));
 
 const locali = () => Object.keys(localStorage).filter(k => k.startsWith(PREF)).map(k => JSON.parse(localStorage.getItem(k)));
 const scriviLocale = (p, sporco) => localStorage.setItem(PREF + p.id, JSON.stringify({ ...p, _sporco: sporco }));
 const pulito = p => { const { _sporco, ...resto } = p; return resto; };
 
 async function api(metodo, url, corpo) {
-  const r = await fetch(url, { method: metodo, headers: corpo ? { 'Content-Type': 'application/json' } : {}, body: corpo ? JSON.stringify(corpo) : undefined });
+  // Senza risposta entro pochi secondi si va avanti con la copia locale (tablet con rete debole).
+  const r = await fetch(url, { signal: AbortSignal.timeout(metodo === 'GET' ? 5000 : 15000), method: metodo, headers: corpo ? { 'Content-Type': 'application/json' } : {}, body: corpo ? JSON.stringify(corpo) : undefined });
   if (r.status === 409) return { conflitto: await r.json() };
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
 
-export async function elenco() {
-  const mappa = new Map(locali().map(p => [p.id, { id: p.id, nome: p.nome, aggiornato: p.aggiornato }]));
-  try {
+// `soloLocale`: elenco immediato dalle copie del dispositivo, senza aspettare il server.
+export async function elenco({ soloLocale = false } = {}) {
+  const via = new Set(eliminati());
+  const mappa = new Map(locali().filter(p => !via.has(p.id)).map(p => [p.id, { id: p.id, nome: p.nome, aggiornato: p.aggiornato, anteprima: p.anteprima }]));
+  if (!soloLocale) try {
     for (const s of await api('GET', '/api/projects')) {
+      if (via.has(s.id)) continue;
       const l = mappa.get(s.id);
-      if (!l || s.updated > l.aggiornato) mappa.set(s.id, { id: s.id, nome: s.name, aggiornato: s.updated });
+      if (!l || s.updated > l.aggiornato) mappa.set(s.id, { id: s.id, nome: s.name, aggiornato: s.updated, anteprima: s.preview || l?.anteprima });
     }
   } catch { /* senza rete: solo le copie locali */ }
   return [...mappa.values()].sort((a, b) => b.aggiornato - a.aggiornato);
@@ -54,11 +62,34 @@ async function invia(progetto) {
 
 export async function sincronizza() {
   for (const p of locali().filter(p => p._sporco)) await invia(pulito(p));
+  for (const id of eliminati()) await eliminaDalServer(id);
+}
+
+async function eliminaDalServer(id) {
+  try {
+    await api('DELETE', `/api/projects/${id}`);
+    segnaEliminati(eliminati().filter(x => x !== id));
+  } catch { /* si riprova alla prossima sincronizzazione */ }
 }
 
 export async function elimina(id) {
   localStorage.removeItem(PREF + id);
-  try { await api('DELETE', `/api/projects/${id}`); } catch { /* verrà rimosso solo in locale */ }
+  segnaEliminati([...new Set([...eliminati(), id])]);
+  await eliminaDalServer(id);
+}
+
+// Ripristina un progetto appena eliminato (pulsante Annulla).
+export async function ripristina(progetto) {
+  segnaEliminati(eliminati().filter(x => x !== progetto.id));
+  return salva(progetto);
+}
+
+export async function rinomina(id, nome) {
+  const p = await carica(id);
+  if (!p) return null;
+  p.nome = nome;
+  await salva(p);
+  return p;
 }
 
 // File di progetto (.mpm.json): per passare progetti tra portable, server e tablet, o prepararli a parte.

@@ -5,13 +5,16 @@ localStorage.setItem('mpm:guida-vista', '1');
 // Lingua: ?lingua=en (altrimenti italiano, anche se il browser headless è in inglese).
 localStorage.setItem('mpm:lingua', new URLSearchParams(location.search).get('lingua') || 'it');
 // Pilota l'app per le prove con chromium headless. Passi nell'hash, separati da virgole:
-// esempio:N  sel:Nome  cmd:comando  tocca:Nome  vista:nome  distinta  schema  ferramenta  progetti
+// home (lascia la schermata Progetti dell'avvio)  esempio:N  sel:Nome  cmd:comando  tocca:Nome  vista:nome  distinta  schema  ferramenta  progetti
 // tracciaSu:selettore:x0:y0:x1:y1 (trascina col mouse sull'elemento, in pixel dal suo angolo)  trascina:Nome:dx:dy[:ox:oy] (mouse dal centro del pezzo, in pixel)  maniglia:i:dx:dy  quota:asse:valore  blocca:Nome  sposta:Nome:dx:dy:dz  stato  faccia:Nome:nx:ny:nz (tocca il centro della faccia del pezzo che guarda in quella direzione)  unita:cm
 const f = document.getElementById('f');
 const attendi = ms => new Promise(r => setTimeout(r, ms));
 f.onload = async () => {
   let w; for (let i = 0; i < 100 && !(w = f.contentWindow).mpm; i++) await attendi(50);
   const { stato, tocco, comando } = w.mpm, d = w.document;
+  // All'avvio l'app mostra la schermata Progetti: senza il passo «home» si parte dall'esempio 1 come prima.
+  const passi = location.hash.slice(1).split(',');
+  if (stato.inAttesa && passi[0] !== 'home' && !passi.some(p => p.startsWith('esempio:'))) { d.querySelector('[data-esempio="0"]').click(); await attendi(300); }
   const pezzo = nome => stato.progetto.pezzi.find(x => x.nome === decodeURIComponent(nome)).id;
   for (const p of location.hash.slice(1).split(',')) {
     if (p.startsWith('esempio:')) { d.getElementById('apri-progetti').click(); await attendi(300); d.querySelector(`[data-esempio="${p.slice(8)}"]`).click(); }

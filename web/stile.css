@@ -352,3 +352,29 @@ details.sezione .corpo > .group > h3:first-child { display: none; }
 .azioni.a-capo .btn { flex: 1 1 auto; }
 .lav-righe select, .lav-righe input { font-size: 14px; }
 .lav-righe .mini-sel small { display: none; }
+
+/* Schermata Progetti (anche all'avvio): schede con miniatura, tocco sulla miniatura o sul nome = apri. */
+.dlg.home { width: min(980px, 96vw); }
+.home-azioni { display: flex; flex-wrap: wrap; gap: 10px; }
+.home-azioni #continua { flex: 1 1 100%; height: 52px; font-size: 17px; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 50px; }
+.schede-progetti { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.schede-progetti .vuoto { grid-column: 1 / -1; padding: 16px; border: 1px dashed var(--line); border-radius: 12px; }
+.scheda-progetto { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
+.scheda-progetto.attivo { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.scheda-progetto.apro { opacity: .6; }
+.scheda-progetto .miniatura { display: block; border: 0; padding: 0; background: var(--bg); aspect-ratio: 16 / 10; width: 100%; }
+.scheda-progetto .miniatura img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scheda-progetto .miniatura svg { width: 44px; height: 44px; fill: none; stroke: #c9bfb0; stroke-width: 1.5; }
+.scheda-progetto .info { padding: 10px 14px 4px; min-width: 0; }
+.scheda-progetto .nome { display: block; font-weight: 600; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scheda-progetto .info span { font-size: 13px; color: var(--muted); }
+.scheda-progetto em { font-style: normal; color: var(--accent); font-weight: 600; margin-left: 4px; }
+.scheda-progetto .rinomina { width: 100%; height: 40px; font: inherit; font-weight: 600; padding: 0 10px; border: 1px solid var(--accent); border-radius: 8px; background: #fff; }
+.azioni-scheda { display: flex; align-items: center; gap: 6px; padding: 8px 10px 10px; }
+.azioni-scheda .btn { height: 40px; padding: 0 12px; }
+.azioni-scheda .btn.icon { width: 40px; font-size: 16px; }
+.azioni-scheda .sp { flex: 1; }
+/* Avviso dentro una finestra aperta (vedi avvisa() in app.js): resta in fondo anche scorrendo. */
+dialog .toast { position: sticky; left: auto; bottom: 12px; margin: 0 16px 12px; width: fit-content; max-width: calc(100% - 32px); box-shadow: 0 6px 20px rgba(60, 40, 20, .18); }
+.tendina .versione { padding: 8px 12px 6px; font-size: 12px; color: var(--muted); }
+.tendina .versione b { color: var(--warn); }

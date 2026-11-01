@@ -850,5 +850,19 @@ export default {
  "La testa fissata con le viti è rimasta ferma: il pezzo è cambiato dall'altra parte.": "Das verschraubte Ende ist geblieben: das Teil hat sich auf der anderen Seite geändert.",
  "Tutte e due le teste sono fissate con le viti: ho mosso la testa B (o il bordo alto). Controlla le unioni.": "Beide Enden sind verschraubt: ich habe Ende B (oder die obere Kante) bewegt. Prüfe die Verbindungen.",
  "Lunghezza del cassetto": "Schubladenlänge",
- "Lunghezza delle guide": "Auszugslänge"
+ "Lunghezza delle guide": "Auszugslänge",
+ "Apri «{nome}»": "„{nome}“ öffnen",
+ "Continua «{nome}»": "„{nome}“ fortsetzen",
+ "Creato «{nome}».": "„{nome}“ erstellt.",
+ "Eliminare «{nome}»?": "„{nome}“ löschen?",
+ "Eliminato «{nome}».": "„{nome}“ gelöscht.",
+ "Modelli pronti…": "Fertige Modelle…",
+ "Nessun progetto salvato: comincia da un progetto vuoto, da un modello pronto o da un esempio.": "Noch keine gespeicherten Projekte: beginne mit einem leeren Projekt, einem fertigen Modell oder einem Beispiel.",
+ "Non riesco a leggere questo progetto.": "Dieses Projekt lässt sich nicht lesen.",
+ "Rinomina": "Umbenennen",
+ "Ripristinato «{nome}».": "„{nome}“ wiederhergestellt.",
+ "aperto ora": "jetzt geöffnet",
+ "ultimo aperto": "zuletzt geöffnet",
+ "{nome} (copia)": "{nome} (Kopie)",
+ "versione di prova": "Testversion"
 };

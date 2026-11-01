@@ -51,6 +51,25 @@ class ProveServer(unittest.TestCase):
         self.assertEqual(s, 409)
         self.assertEqual(json.loads(b)["data"], {"x": 2})
 
+    def test_file_statici_etag_e_gzip(self):
+        r = urllib.request.Request(self.base + "/js/app.js", headers={"Accept-Encoding": "gzip"})
+        with urllib.request.urlopen(r) as resp:
+            etag, enc, corpo = resp.headers["ETag"], resp.headers["Content-Encoding"], resp.read()
+        self.assertEqual(enc, "gzip")
+        import gzip
+        self.assertIn(b"import", gzip.decompress(corpo))
+        r = urllib.request.Request(self.base + "/js/app.js", headers={"If-None-Match": etag})
+        with self.assertRaises(urllib.error.HTTPError) as e:
+            urllib.request.urlopen(r)
+        self.assertEqual(e.exception.code, 304)
+
+    def test_elenco_con_anteprima(self):
+        self.req("PUT", "/api/projects/ant", {"name": "A", "data": {"anteprima": "data:image/jpeg;base64,xx"}, "updated": 1})
+        self.req("PUT", "/api/projects/sen", {"name": "B", "data": {"anteprima": "javascript:x"}, "updated": 1})
+        el = {p["id"]: p for p in json.loads(self.req("GET", "/api/projects")[1])}
+        self.assertEqual(el["ant"]["preview"], "data:image/jpeg;base64,xx")
+        self.assertIsNone(el["sen"]["preview"])
+
     def test_impostazioni(self):
         self.assertEqual(json.loads(self.req("GET", "/api/settings")[1]), {})
         self.assertEqual(self.req("PUT", "/api/settings", {"avanzi": [1], "aggiornato": 5})[0], 200)

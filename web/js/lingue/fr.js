@@ -850,5 +850,19 @@ export default {
  "La testa fissata con le viti è rimasta ferma: il pezzo è cambiato dall'altra parte.": "Le bout fixé par des vis n'a pas bougé : la pièce a changé de l'autre côté.",
  "Tutte e due le teste sono fissate con le viti: ho mosso la testa B (o il bordo alto). Controlla le unioni.": "Les deux bouts sont fixés par des vis : j'ai déplacé le bout B (ou le chant haut). Vérifiez les assemblages.",
  "Lunghezza del cassetto": "Longueur du tiroir",
- "Lunghezza delle guide": "Longueur des coulisses"
+ "Lunghezza delle guide": "Longueur des coulisses",
+ "Apri «{nome}»": "Ouvrir « {nome} »",
+ "Continua «{nome}»": "Continuer « {nome} »",
+ "Creato «{nome}».": "« {nome} » créé.",
+ "Eliminare «{nome}»?": "Supprimer « {nome} » ?",
+ "Eliminato «{nome}».": "« {nome} » supprimé.",
+ "Modelli pronti…": "Modèles prêts…",
+ "Nessun progetto salvato: comincia da un progetto vuoto, da un modello pronto o da un esempio.": "Aucun projet enregistré : commencez par un projet vide, un modèle prêt ou un exemple.",
+ "Non riesco a leggere questo progetto.": "Impossible de lire ce projet.",
+ "Rinomina": "Renommer",
+ "Ripristinato «{nome}».": "« {nome} » restauré.",
+ "aperto ora": "ouvert",
+ "ultimo aperto": "dernier ouvert",
+ "{nome} (copia)": "{nome} (copie)",
+ "versione di prova": "version d’essai"
 };

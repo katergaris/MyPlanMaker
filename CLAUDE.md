@@ -18,12 +18,14 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   (pezzi, viti, costo) in basso. Le direzioni B e C restano in `design/` solo come confronto.
 
 ## Struttura
+- `docs/STUDIO-UX-2026-11.md` — studio sull'uso (attriti, priorità, proposte A-F da scegliere).
 - `docs/PIANO.md` — requisiti, funzioni per fase, decisioni tecniche, avanzamento. `docs/screenshot/` — immagini del
   README (rifarle con `web/prove-ui.html`, finestra 1440×900).
 - `design/` — studi dell'interfaccia (A banco chiaro scelto, B e C solo confronto), `scena.js` isometria SVG.
 - `server/server.py` — sola libreria standard: file di `web/` + API `/api/projects[/<id>]` (GET/PUT/DELETE, vince
   `updated` più recente, altrimenti 409), `/api/settings` (magazzino avanzi e catalogo materiali, vince `aggiornato`),
-  `/api/ping`. Variabili `MPM_PORT` (8099), `MPM_DATA` (`./data`, esclusa da git), `MPM_PASSWORD` (HTTP Basic).
+  `/api/ping`. File statici con ETag (304), gzip in memoria e HTTP/1.1 persistente (dal 0.14.0: prima ~2,7 MB a ogni
+  apertura); l'elenco dei progetti dà anche `preview` (miniatura salvata nel progetto). Variabili `MPM_PORT` (8099), `MPM_DATA` (`./data`, esclusa da git), `MPM_PASSWORD` (HTTP Basic).
   `crea_server()` è usato anche dalla portable.
 - `web/` — web app senza compilazione (moduli ES, import map per `three`). **Ogni nuovo file JS va aggiunto a
   `sw.js`** (e cambiata `VERSIONE`).
@@ -80,7 +82,14 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     e `lato` per gli scassi; geometria in `geometria.js`: `contornoForma`, `sezioniDisegno`, `ingombroDisegno`,
     `poligoniDisegno`; il pezzo = unione dei pieni − vuoti passanti, estruso, − scassi). `js/esporta.js` — CSV (;), DXF R12, STL.
     `js/montaggio.js` — istruzioni di montaggio. `js/archivio.js` — progetti e impostazioni (locale + server),
-    file `.mpm.json`. `js/esempi.js` — mobiletto con leggio, tavolo rotondo.
+    file `.mpm.json`; richieste con tempo massimo (GET 5 s); `elenco({ soloLocale })`, `rinomina`, `ripristina`;
+    eliminazioni senza rete in `mpm:eliminati`, ripetute da `sincronizza()`. `js/esempi.js` — mobiletto con leggio, tavolo rotondo.
+  - **Schermata Progetti** (`#dlg-progetti`, dal 0.14.0): si apre all'avvio con `stato.inAttesa` (scena vuota non salvata,
+    `inAttesa()` in app.js; la prima `modifica()` la trasforma in progetto nuovo). Schede con miniatura (`p.anteprima`,
+    JPEG da `vista.miniatura()`, rifatta al salvataggio ogni 15 s al massimo), «Continua», Rinomina in linea, Duplica,
+    Elimina anche il progetto aperto (avviso con Annulla: `avvisaAnnulla`). Chiusa senza scelta → `dopoHome()` riapre
+    l'ultimo. `avvisa()` mette l'avviso dentro la finestra aperta. In prove-ui il passo `home` lascia la schermata,
+    altrimenti si parte dall'esempio 1.
   - `prove.html` — prove automatiche (135, "TUTTE OK"); `prove-ui.html#passo,passo` — pilota l'app per gli
     screenshot (esempio:N, modello:id, crea, sel:Nome, cmd:x, tocca:Nome, faccia:Nome:nx:ny:nz, trascina:Nome:dx:dy[:ox:oy], maniglia:i:dx:dy, quota:asse:valore, stato (JSON dei pezzi),
     tracciaSu:selettore:x0:y0:x1:y1, unita:cm, vista:x, distinta, schema, ferramenta, disegni, menu:x, clic:selettore, fissaggio:tipo, progetti).
@@ -96,6 +105,8 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   `myplanmaker`, porta **8098**, dati in `/DATA/AppData/myplanmaker`). Lo stesso compose è registrato tra le app di ZimaOS
   (`casaos-cli app-management install`, 2026-10-30), copia in `Homelab/zimaos/compose/myplanmaker.yml`. Voce `myplanmaker`
   in The Hook (`Homelab/the-hook/services.json`, guida `the-hook/docs/myplanmaker.md`).
+- Versione in 4 posti: `windows/VERSIONE`, `VERSIONE` in `web/sw.js`, `.versione` nel menu e titolo della guida in
+  `index.html`, `CHANGELOG.md`. Release: tag `v<versione>`, pre-release su GitHub con lo zip della portable.
 - `.github/workflows/prove.yml` — prove del server e `prove.html` in Chrome headless a ogni push.
 - **Repository in inglese** (richiesta del 2026-10-31): `README.md` (inglese, screenshot in `docs/screenshot/en/`),
   `README.it.md` (italiano, screenshot in `docs/screenshot/`), `CHANGELOG.md` in inglese, messaggi di commit in
@@ -108,6 +119,12 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   la shell (la riga contiene la parola). Usare il PID.
 
 ## Stato
+**0.14.0-alpha.1** (2026-11-01): prima alpha per i tester; schermata Progetti (miniature, Continua, Rinomina, Duplica,
+elimina anche l'aperto con Annulla), apertura molto più veloce (cache e gzip del server). Studio UX in
+`docs/STUDIO-UX-2026-11.md`, proposte A-F **non ancora scelte** (A attrezzi grigi che spiegano, B «Segnala un problema»
+— serve decidere il canale, C tablet verticale, D aiuto chiudibile, E benvenuto nella schermata Progetti, F pulizia visiva).
+Release su GitHub come pre-release `v0.14.0-alpha.1` con la portable allegata; finché il repository è privato i tester
+non la vedono: lo zip va dato a mano.
 **0.13.0** (2026-10-31): maniglie alla Tinkercad, quote da scrivere sul pezzo, calamita dal vivo, lastra per progetto (0.12.0 5 lingue, prezzi facoltativi, repository in inglese; 0.11.0 disegno 2D; 0.10.0 spessori su misura, spostamento libero, nuovo Accosta/Adatta, mm/cm); vedi `CHANGELOG.md`. Repository privato `katergaris/MyPlanMaker`, branch `main`, pronto per
 la pubblicazione (README, screenshot, licenza, CI) ma **ancora privato**: renderlo pubblico solo se Salvo lo chiede.
 **Installato su ZimaOS il 2026-10-29**: `http://192.168.0.20:8098` (LAN), `http://10.77.0.201:8098` (rete interna). HTTPS
@@ -116,8 +133,7 @@ al codice: rilanciare `deploy/pubblica-zimaos.sh` (i dati restano).
 Per preparare un progetto per Salvo: costruirlo con le funzioni di `modello.js`/`modelli.js` (come `esempi.js`),
 controllarlo con `prove-ui.html` e consegnarlo come `.mpm.json` in `MyPlanMaker/progetti/`.
 Limiti noti: cambiando la misura si muovono solo i tagli della testa che cresce (testa B dal campo, quella trascinata dalle maniglie); Adatta non allunga sagome e cerchi; i cassetti
-solo in mobili girati di 90° in 90° (il vano si cerca con gli ingombri); viti, frecce e stabilità con regole indicative; un progetto eliminato senza rete
-ricompare dal server.
+solo in mobili girati di 90° in 90° (il vano si cerca con gli ingombri); viti, frecce e stabilità con regole indicative.
 **Punto in cui ci siamo fermati (2026-10-31)**: 0.13.0 su richiesta di Salvo (Accosta/Adatta macchinosi, misure come in
 Tinkercad, lastra del taglio da scegliere; caso concreto: pannello 800 nei campi ma 755 finito per un taglio rimasto).
 Salvo ha detto **no** alla traduzione in inglese di commenti e nomi interni del codice: restano in italiano (i nomi

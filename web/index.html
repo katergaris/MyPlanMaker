@@ -40,6 +40,7 @@
         <div class="lingue" id="menu-lingue" aria-label="Lingua"></div>
         <hr>
         <button data-menu="guida">❓ <span data-t>Guida rapida e scorciatoie</span></button>
+        <div class="versione">MyPlanMaker 0.14.0 · <b>alpha</b> · <span data-t>versione di prova</span></div>
       </div>
     </div>
   </header>
@@ -82,14 +83,13 @@
   <footer id="piede"></footer>
 </div>
 
-<dialog id="dlg-progetti" class="dlg">
-  <div class="dlg-testa"><h2 data-t>Progetti</h2><button class="btn icon" data-chiudi>✕</button></div>
+<dialog id="dlg-progetti" class="dlg home">
+  <div class="dlg-testa"><h2 data-t>Progetti</h2><button class="btn icon" data-chiudi aria-label="Chiudi">✕</button></div>
   <div class="dlg-corpo">
-    <button class="btn primary" id="nuovo-progetto" data-t>+ Nuovo progetto vuoto</button>
-    <div class="azioni"><button class="btn" id="importa" data-t>Importa da file…</button><button class="btn" id="esporta-file" data-t>Esporta questo progetto</button></div>
+    <div class="azioni home-azioni"><button class="btn primary" id="continua" hidden></button><button class="btn" id="nuovo-progetto" data-t>+ Nuovo progetto vuoto</button><button class="btn" id="home-modelli" data-t>Modelli pronti…</button><button class="btn" id="importa" data-t>Importa da file…</button></div>
     <input type="file" id="file-importa" accept=".json,application/json" hidden>
     <h3 data-t>I tuoi progetti</h3>
-    <ul class="lista" id="lista-progetti"></ul>
+    <ul class="schede-progetti" id="lista-progetti"></ul>
     <h3 data-t>Parti da un esempio</h3>
     <ul class="lista" id="lista-esempi"></ul>
   </div>
@@ -134,7 +134,7 @@
 </dialog>
 
 <dialog id="dlg-guida" class="dlg larga">
-  <div class="dlg-testa"><h2><span data-t>Benvenuto in MyPlanMaker</span> <small class="nota">0.13.0</small></h2><span class="sp"></span><button class="btn icon" data-chiudi>✕</button></div>
+  <div class="dlg-testa"><h2><span data-t>Benvenuto in MyPlanMaker</span> <small class="nota">0.14.0 alpha</small></h2><span class="sp"></span><button class="btn icon" data-chiudi>✕</button></div>
   <div class="dlg-corpo guida">
     <div class="guida-colonne">
       <section><h3 data-t>1 · Parti</h3><p data-t>Da un <b>modello pronto</b> (libreria, cassettiera, tavolo…) oppure aggiungi <b>Pannelli</b> e <b>Listelli</b> uno alla volta. Le misure si scrivono nel pannello a destra.</p></section>

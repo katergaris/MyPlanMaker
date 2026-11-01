@@ -1,6 +1,11 @@
 MyPlanMaker {VERSIONE} - versione portable per Windows
 ======================================================
 
+VERSIONE DI PROVA (ALPHA): funziona, ma è ancora in sviluppo. Le misure, le viti e i controlli
+di stabilità sono indicativi: controllali sempre prima di tagliare. Problemi, idee e cose poco
+chiare vanno segnalati a chi ti ha dato il programma: servono proprio a migliorarlo.
+Ogni tanto esporta i progetti importanti (menu ⋯ > Esporta file del progetto).
+
 Non serve installare niente. La cartella si può tenere ovunque, anche su una chiavetta USB.
 
 AVVIO
@@ -20,3 +25,20 @@ PROBLEMI
 CONTENUTO
   python\   Python 3.13 embeddable ufficiale (python.org)
   app\      l'app (server, pagine, three.js, Manifold)
+
+
+------------------------------------------------------
+ENGLISH
+
+ALPHA TEST VERSION: it works, but it is still in development. Sizes, screws and stability checks
+are indicative: always check them before cutting. Please report problems, ideas and anything
+unclear to whoever gave you the program. Export important projects now and then (menu ⋯ >
+Export project file).
+
+START: double-click "MyPlanMaker.bat". A window opens with the app (Microsoft Edge, or Chrome if
+installed). Close the window to quit: the program stops by itself. If Windows shows "Windows
+protected your PC", choose "More info" and then "Run anyway" (it happens with downloaded files).
+The language can be changed from the ⋯ menu.
+
+PROJECTS are saved in the "dati" folder next to this file (myplanmaker.sqlite): copy that folder to
+back them up, or copy the whole folder to move everything to another PC.

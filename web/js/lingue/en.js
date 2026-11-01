@@ -850,5 +850,19 @@ export default {
  "La testa fissata con le viti è rimasta ferma: il pezzo è cambiato dall'altra parte.": "The end fixed with screws stayed put: the piece changed on the other side.",
  "Tutte e due le teste sono fissate con le viti: ho mosso la testa B (o il bordo alto). Controlla le unioni.": "Both ends are fixed with screws: I moved end B (or the top edge). Check the joints.",
  "Lunghezza del cassetto": "Drawer length",
- "Lunghezza delle guide": "Runner length"
+ "Lunghezza delle guide": "Runner length",
+ "Apri «{nome}»": "Open “{nome}”",
+ "Continua «{nome}»": "Continue “{nome}”",
+ "Creato «{nome}».": "Created “{nome}”.",
+ "Eliminare «{nome}»?": "Delete “{nome}”?",
+ "Eliminato «{nome}».": "Deleted “{nome}”.",
+ "Modelli pronti…": "Ready-made models…",
+ "Nessun progetto salvato: comincia da un progetto vuoto, da un modello pronto o da un esempio.": "No saved projects yet: start from an empty project, a ready-made model or an example.",
+ "Non riesco a leggere questo progetto.": "I can't read this project.",
+ "Rinomina": "Rename",
+ "Ripristinato «{nome}».": "Restored “{nome}”.",
+ "aperto ora": "open now",
+ "ultimo aperto": "last opened",
+ "{nome} (copia)": "{nome} (copy)",
+ "versione di prova": "test version"
 };

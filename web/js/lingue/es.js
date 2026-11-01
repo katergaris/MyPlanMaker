@@ -850,5 +850,19 @@ export default {
  "La testa fissata con le viti è rimasta ferma: il pezzo è cambiato dall'altra parte.": "La testa fijada con tornillos se ha quedado quieta: la pieza ha cambiado por el otro lado.",
  "Tutte e due le teste sono fissate con le viti: ho mosso la testa B (o il bordo alto). Controlla le unioni.": "Las dos testas están fijadas con tornillos: he movido la testa B (o el canto superior). Revisa las uniones.",
  "Lunghezza del cassetto": "Longitud del cajón",
- "Lunghezza delle guide": "Longitud de las guías"
+ "Lunghezza delle guide": "Longitud de las guías",
+ "Apri «{nome}»": "Abrir «{nome}»",
+ "Continua «{nome}»": "Continuar «{nome}»",
+ "Creato «{nome}».": "Creado «{nome}».",
+ "Eliminare «{nome}»?": "¿Eliminar «{nome}»?",
+ "Eliminato «{nome}».": "Eliminado «{nome}».",
+ "Modelli pronti…": "Modelos listos…",
+ "Nessun progetto salvato: comincia da un progetto vuoto, da un modello pronto o da un esempio.": "Ningún proyecto guardado: empieza con un proyecto vacío, un modelo listo o un ejemplo.",
+ "Non riesco a leggere questo progetto.": "No consigo leer este proyecto.",
+ "Rinomina": "Renombrar",
+ "Ripristinato «{nome}».": "Restaurado «{nome}».",
+ "aperto ora": "abierto ahora",
+ "ultimo aperto": "último abierto",
+ "{nome} (copia)": "{nome} (copia)",
+ "versione di prova": "versión de prueba"
 };

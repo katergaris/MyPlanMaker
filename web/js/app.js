@@ -59,6 +59,8 @@ function verticiMondo(p) {
 }
 
 function modifica(fn) {
+  // Si comincia a lavorare sulla scena vuota dell'avvio: diventa un progetto nuovo vero.
+  if (stato.inAttesa) { stato.inAttesa = false; localStorage.setItem('mpm:ultimo', stato.progetto.id); }
   storico.salva(stato.progetto);
   const r = fn();
   aggiorna();
@@ -79,8 +81,8 @@ function aggiorna() {
   document.querySelector('[data-vista="esploso"]')?.classList.toggle('on', stato.esploso);
   disegnaBarraSel();
   document.querySelector('[data-vista="viti"]')?.classList.toggle('on', stato.mostraViti);
-  $('#nome-progetto').textContent = stato.progetto.nome;
-  document.title = `${stato.progetto.nome} — MyPlanMaker`;
+  $('#nome-progetto').textContent = stato.inAttesa ? '—' : stato.progetto.nome;
+  document.title = stato.inAttesa ? 'MyPlanMaker' : `${stato.progetto.nome} — MyPlanMaker`;
   disegnaProprieta();
   disegnaPiede();
   aggiornaAttrezzi();
@@ -90,6 +92,10 @@ function aggiorna() {
 let timerToast;
 function avvisa(testo, errore = false, durata = 5000) {
   const t = $('#toast');
+  // Con una finestra aperta il resto della pagina non si tocca: l'avviso va dentro la finestra.
+  const dlg = [...document.querySelectorAll('dialog[open]')].at(-1) || $('main');
+  if (t.parentElement !== dlg) dlg.append(t);
+  $('#toast-chiudi').hidden = true;
   $('#toast-testo').textContent = testo;
   t.classList.toggle('errore', errore);
   t.hidden = false;
@@ -1212,7 +1218,13 @@ function salvaPresto() {
   timerSalva = setTimeout(salvaOra, 700);
 }
 
+let ultimaMiniatura = 0;
 async function salvaOra() {
+  if (stato.inAttesa) return;
+  // Miniatura per l'elenco dei progetti, rifatta al massimo ogni 15 secondi.
+  if (stato.progetto.pezzi.length && Date.now() - ultimaMiniatura > 15000) {
+    try { stato.progetto.anteprima = vista.miniatura(); ultimaMiniatura = Date.now(); } catch { /* resta quella di prima */ }
+  }
   const r = await archivio.salva(stato.progetto);
   const s = $('#stato-salvataggio');
   s.classList.toggle('attenzione', r !== 'salvato');
@@ -1226,6 +1238,7 @@ async function salvaOra() {
 }
 
 function apri(progetto) {
+  stato.inAttesa = false;
   stato.progetto = progetto;
   seleziona(null);
   stato.modo = null;
@@ -1233,6 +1246,7 @@ function apri(progetto) {
   stato.esploso = false;
   storico.indietro = []; storico.avanti = [];
   chiavePannello = '';
+  ultimaMiniatura = progetto.anteprima ? Date.now() : 0;
   localStorage.setItem('mpm:ultimo', progetto.id);
   aggiorna();
   vista.vista('3d');
@@ -1241,41 +1255,148 @@ function apri(progetto) {
 
 function crea(progetto) {
   progetto.id = mod.nuovoId();
+  delete progetto.anteprima;
   apri(progetto);
   salvaOra();
 }
 
+// Nessun progetto aperto (avvio, o progetto aperto appena eliminato): scena vuota finché non se ne sceglie uno.
+function inAttesa() {
+  clearTimeout(timerSalva);
+  stato.progetto = mod.nuovoProgetto();
+  stato.progetto.id = mod.nuovoId();
+  seleziona(null);
+  stato.modo = null;
+  storico.indietro = []; storico.avanti = [];
+  chiavePannello = '';
+  stato.inAttesa = true;
+  aggiorna();
+  $('#stato-salvataggio').textContent = '';
+}
+
+// Finestra Progetti: all'avvio è la schermata iniziale (si sceglie cosa aprire, o si continua l'ultimo).
+let elencoProgetti = [];
 async function dialogoProgetti() {
   const d = $('#dlg-progetti');
-  const lista = await archivio.elenco();
-  $('#lista-progetti').innerHTML = lista.map(p => `<li class="${p.id === stato.progetto.id ? 'attivo' : ''}"><span class="nome"><b>${esc(p.nome)}</b><span>${new Date(p.aggiornato).toLocaleString(lingua.locale, { dateStyle: 'medium', timeStyle: 'short' })}</span></span>
-    <button class="btn" data-apri="${p.id}">${t('Apri')}</button><button class="btn icon danger" data-elimina="${p.id}" title="${t('Elimina')}">✕</button></li>`).join('') || `<li><span class="nome nota">${t('Nessun progetto salvato.')}</span></li>`;
+  if (!stato.inAttesa && stato.progetto.pezzi.length && !stato.progetto.anteprima) { await salvaOra(); }
+  const ultimo = localStorage.getItem('mpm:ultimo');
+  disegnaProgetti(await archivio.elenco({ soloLocale: true }), ultimo);
   $('#lista-esempi').innerHTML = ESEMPI.map((e, i) => `<li><span class="nome"><b>${esc(t(e.nome))}</b><span>${esc(t(e.nota))}</span></span><button class="btn" data-esempio="${i}">${t('Usa')}</button></li>`).join('');
   if (!d.open) d.showModal();
+  // Poi l'elenco completo dal server (progetti fatti su altri dispositivi), senza far aspettare.
+  archivio.elenco().then(l => { if (d.open && !d.querySelector('.rinomina')) disegnaProgetti(l, ultimo); });
+}
+
+function disegnaProgetti(lista, ultimo) {
+  elencoProgetti = lista;
+  const aperto = stato.inAttesa ? null : stato.progetto.id;
+  const continua = stato.inAttesa && lista.find(p => p.id === ultimo);
+  $('#continua').hidden = !continua;
+  if (continua) $('#continua').textContent = t('Continua «{nome}»', { nome: continua.nome });
+  $('#continua').dataset.apri = continua ? continua.id : '';
+  $('#nuovo-progetto').classList.toggle('primary', !continua);
+  const data = v => new Date(v).toLocaleString(lingua.locale, { dateStyle: 'medium', timeStyle: 'short' });
+  const segno = p => p.id === aperto ? `<em>${t('aperto ora')}</em>` : p.id === ultimo && stato.inAttesa ? `<em>${t('ultimo aperto')}</em>` : '';
+  $('#lista-progetti').innerHTML = lista.map(p => `<li class="scheda-progetto${p.id === aperto ? ' attivo' : ''}" data-id="${p.id}">
+    <button class="miniatura" data-apri="${p.id}" aria-label="${esc(t('Apri «{nome}»', { nome: p.nome }))}">${p.anteprima ? `<img src="${esc(p.anteprima)}" alt="">` : '<svg viewBox="0 0 32 32"><rect x="6" y="4" width="20" height="24" rx="1.5"/><path d="M6 12h20M6 20h20"/></svg>'}</button>
+    <div class="info"><b class="nome" data-apri="${p.id}">${esc(p.nome)}</b><span>${data(p.aggiornato)} ${segno(p)}</span></div>
+    <div class="azioni-scheda"><button class="btn" data-rinomina="${p.id}">${t('Rinomina')}</button><button class="btn" data-duplica="${p.id}">${t('Duplica')}</button><span class="sp"></span><button class="btn icon danger" data-elimina="${p.id}" title="${t('Elimina')}" aria-label="${t('Elimina')}">✕</button></div>
+  </li>`).join('') || `<li class="vuoto nota">${t('Nessun progetto salvato: comincia da un progetto vuoto, da un modello pronto o da un esempio.')}</li>`;
+}
+
+let apreUltimo = false;
+async function dopoHome() {
+  if (!stato.inAttesa || apreUltimo || $('#dlg-modelli').open) return;
+  apreUltimo = true;
+  try {
+    const ultimo = localStorage.getItem('mpm:ultimo'), l = elencoProgetti;
+    const id = l.find(p => p.id === ultimo)?.id || l[0]?.id;
+    const p = id ? await archivio.carica(id) : null;
+    if (stato.inAttesa) p ? apri(p) : crea(mod.nuovoProgetto());
+  } finally { apreUltimo = false; }
+}
+
+function avvisaAnnulla(testo, azione, durata = 8000) {
+  avvisa(testo, false, durata);
+  const b = $('#toast-chiudi');
+  b.hidden = false;
+  b.onclick = () => { b.hidden = true; $('#toast').hidden = true; azione(); };
+  setTimeout(() => { b.hidden = true; }, durata);
+}
+
+function rinominaInLinea(id) {
+  const li = $(`.scheda-progetto[data-id="${id}"]`), b = li.querySelector('.nome');
+  const vecchio = elencoProgetti.find(p => p.id === id)?.nome || b.textContent;
+  const inp = document.createElement('input');
+  inp.className = 'rinomina'; inp.value = vecchio; inp.setAttribute('aria-label', t('Nome del progetto'));
+  b.replaceWith(inp);
+  inp.focus(); inp.select();
+  let fatto = false;
+  const fine = async salva => {
+    if (fatto) return;
+    fatto = true;
+    const nome = inp.value.trim();
+    if (salva && nome && nome !== vecchio) {
+      if (id === stato.progetto.id && !stato.inAttesa) modifica(() => { stato.progetto.nome = nome; });
+      else await archivio.rinomina(id, nome);
+    }
+    dialogoProgetti();
+  };
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); fine(true); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fine(false); }
+  });
+  inp.addEventListener('blur', () => fine(true));
+}
+
+async function duplicaProgetto(id) {
+  const p = id === stato.progetto.id && !stato.inAttesa ? structuredClone(stato.progetto) : await archivio.carica(id);
+  if (!p) return avvisa(t('Non riesco a leggere questo progetto.'), true);
+  p.id = mod.nuovoId();
+  p.nome = t('{nome} (copia)', { nome: p.nome });
+  await archivio.salva(p);
+  dialogoProgetti();
+  avvisa(t('Creato «{nome}».', { nome: p.nome }));
+}
+
+async function eliminaProgetto(id) {
+  const nome = elencoProgetti.find(p => p.id === id)?.nome || '';
+  if (!confirm(t('Eliminare «{nome}»?', { nome }))) return;
+  const aperto = id === stato.progetto.id && !stato.inAttesa;
+  const copia = aperto ? structuredClone(stato.progetto) : await archivio.carica(id);
+  await archivio.elimina(id);
+  if (aperto) inAttesa();
+  dialogoProgetti();
+  avvisaAnnulla(t('Eliminato «{nome}».', { nome }), async () => {
+    if (!copia) return;
+    await archivio.ripristina(copia);
+    if ($('#dlg-progetti').open) dialogoProgetti();
+    avvisa(t('Ripristinato «{nome}».', { nome }));
+  });
 }
 
 function eventiDialoghi() {
   document.querySelectorAll('[data-chiudi]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
   $('#apri-progetti').addEventListener('click', dialogoProgetti);
   $('#nuovo-progetto').addEventListener('click', () => { $('#dlg-progetti').close(); crea(mod.nuovoProgetto()); });
+  $('#home-modelli').addEventListener('click', () => { $('#dlg-progetti').close(); apriModelli(); });
+  // Chiusa la schermata iniziale senza scegliere (✕, Esc, clic fuori): si riapre l'ultimo progetto, o uno nuovo.
+  $('#dlg-progetti').addEventListener('close', dopoHome);
+  $('#dlg-progetti [data-chiudi]').addEventListener('click', dopoHome);
   $('#dlg-progetti').addEventListener('click', async e => {
-    const b = e.target.closest('button');
+    const b = e.target.closest('button, [data-apri]');
     if (!b) return;
-    if (b.dataset.apri) { const p = await archivio.carica(b.dataset.apri); $('#dlg-progetti').close(); if (p) apri(p); }
-    if (b.dataset.esempio) { $('#dlg-progetti').close(); crea(ESEMPI[+b.dataset.esempio].crea()); }
-    if (b.dataset.elimina) {
-      if (b.dataset.elimina === stato.progetto.id) return avvisa(t('Non puoi eliminare il progetto aperto: aprine prima un altro.'), true);
-      if (!confirm(t('Eliminare questo progetto? Non si può annullare.'))) return;
-      await archivio.elimina(b.dataset.elimina);
-      dialogoProgetti();
+    if (b.dataset.apri) {
+      if (b.dataset.apri === stato.progetto.id && !stato.inAttesa) return $('#dlg-progetti').close();
+      b.closest('li')?.classList.add('apro');
+      const p = await archivio.carica(b.dataset.apri);
+      if (!p) return avvisa(t('Non riesco a leggere questo progetto.'), true);
+      apri(p); $('#dlg-progetti').close();
     }
-  });
-  $('#esporta-file').addEventListener('click', () => {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([archivio.versoFile(stato.progetto)], { type: 'application/json' }));
-    a.download = `${stato.progetto.nome.replace(/[\\/:*?"<>|]+/g, '-')}.mpm.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    if (b.dataset.esempio) { stato.inAttesa = false; $('#dlg-progetti').close(); crea(ESEMPI[+b.dataset.esempio].crea()); }
+    if (b.dataset.rinomina) rinominaInLinea(b.dataset.rinomina);
+    if (b.dataset.duplica) duplicaProgetto(b.dataset.duplica);
+    if (b.dataset.elimina) eliminaProgetto(b.dataset.elimina);
   });
   $('#importa').addEventListener('click', () => $('#file-importa').click());
   $('#file-importa').addEventListener('change', async e => {
@@ -1625,11 +1746,9 @@ async function avvio() {
   if (!localStorage.getItem('mpm:guida-vista')) { localStorage.setItem('mpm:guida-vista', '1'); setTimeout(() => $('#dlg-guida').showModal(), 600); }
   window.addEventListener('online', () => archivio.sincronizza());
 
-  const ultimo = localStorage.getItem('mpm:ultimo');
-  let p = ultimo ? await archivio.carica(ultimo) : null;
-  if (!p) { const l = await archivio.elenco(); if (l.length) p = await archivio.carica(l[0].id); }
-  if (p) apri(p);
-  else { crea(ESEMPI[0].crea()); avvisa(t('Ti ho aperto un esempio: tocca un pezzo per vedere come è fatto. Nuovi progetti dal menu Progetto.'), false, 9000); }
+  // All'avvio si sceglie cosa aprire: «Continua» riapre l'ultimo progetto con un tocco.
+  inAttesa();
+  await dialogoProgetti();
   archivio.sincronizza();
   // Segnale di vita: la versione portable per Windows si chiude da sola quando nessuna pagina è aperta.
   setInterval(() => fetch('/api/ping', { cache: 'no-store' }).catch(() => {}), 60000);

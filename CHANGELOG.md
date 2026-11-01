@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.14.0-alpha.1 — 2026-11-01
+First **alpha** for testers: everything works, but sizes, screws and stability checks are indicative.
+- **Projects screen at start-up**: the app no longer reopens the last project by itself. Projects are cards with a
+  picture, date and “open now / last opened”; tap the picture or the name to open, **Continue “…”** reopens the last
+  one with one tap. Closing the screen without choosing reopens the last project.
+- **Rename and Duplicate** on every project card; the **open project can be deleted** too, with **Undo** in the message.
+- A project deleted while offline no longer comes back from the server (the deletion is retried when online).
+- First start no longer saves the example as one of your projects (no more duplicate “Cabinet with lectern”).
+- **Faster loading**, especially on tablets over a VPN: the server sends unchanged files as “not modified”, compresses
+  them and keeps connections open; requests that get no answer within 5 s fall back to the copy on the device.
+- Messages shown while a window is open now appear inside that window (they used to be hidden behind it).
+- Version and “alpha” shown in the ⋯ menu and in the guide; the Windows portable read-me has an English section.
+
 ## 0.13.0 — 2026-10-31
 - **Resize handles like Tinkercad**: blue squares on the ends, edges and corners of the selected piece change its
   length and width by dragging. They stop against the faces of other pieces; when the face is slanted the piece also

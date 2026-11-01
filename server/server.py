@@ -7,6 +7,7 @@ Variabili d'ambiente:
   MPM_PASSWORD  se impostata, la pagina chiede utente qualsiasi + questa password (HTTP Basic)
 """
 import base64
+import gzip
 import hmac
 import json
 import mimetypes
@@ -27,6 +28,20 @@ mimetypes.add_type("application/wasm", ".wasm")
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 mimetypes.add_type("image/svg+xml", ".svg")
+
+
+def anteprima(data):
+    """Miniatura del progetto (data URL JPEG salvata dall'app), per l'elenco dei progetti."""
+    try:
+        a = json.loads(data).get("anteprima")
+    except (ValueError, AttributeError):
+        return None
+    return a if isinstance(a, str) and a.startswith("data:image/") else None
+
+
+# File statici compressi, tenuti in memoria finché il file non cambia (chiave: percorso + ETag).
+COMPRIMIBILI = {".html", ".js", ".css", ".webmanifest", ".svg", ".wasm", ".json"}
+_gzip = {}
 
 
 class Store:
@@ -57,8 +72,8 @@ class Store:
 
     def list(self):
         with self.lock:
-            rows = self.db.execute("SELECT id, name, updated FROM projects ORDER BY updated DESC").fetchall()
-        return [{"id": r[0], "name": r[1], "updated": r[2]} for r in rows]
+            rows = self.db.execute("SELECT id, name, updated, data FROM projects ORDER BY updated DESC").fetchall()
+        return [{"id": r[0], "name": r[1], "updated": r[2], "preview": anteprima(r[3])} for r in rows]
 
     def get(self, pid):
         with self.lock:
@@ -89,6 +104,8 @@ class Store:
 def make_handler(store, password):
     class Handler(BaseHTTPRequestHandler):
         server_version = "MyPlanMaker"
+        # Connessioni persistenti: l'app chiede una trentina di file, su Tailscale ogni connessione nuova costa.
+        protocol_version = "HTTP/1.1"
 
         def log_message(self, fmt, *args):
             pass
@@ -107,12 +124,16 @@ def make_handler(store, password):
 
         def _send(self, code, body=b"", ctype="application/json", extra=None):
             self.send_response(code)
-            self.send_header("Content-Type", ctype)
-            self.send_header("Content-Length", str(len(body)))
+            if code >= 400:
+                self.close_connection = True  # un corpo non letto rovinerebbe la connessione successiva
+            if ctype:
+                self.send_header("Content-Type", ctype)
+            if code != 304:
+                self.send_header("Content-Length", str(len(body)))
             for k, v in (extra or {}).items():
                 self.send_header(k, v)
             self.end_headers()
-            if self.command != "HEAD":
+            if self.command != "HEAD" and code != 304:
                 self.wfile.write(body)
 
         def _json(self, code, obj):
@@ -196,9 +217,21 @@ def make_handler(store, password):
             target = (WEB / rel).resolve()
             if WEB not in target.parents or not target.is_file():
                 return self._send(404, b"non trovato", "text/plain")
+            st = target.stat()
+            etag = f'"{st.st_mtime_ns:x}-{st.st_size:x}"'
+            # Il browser chiede sempre se il file è cambiato (no-cache) e, se non lo è, riceve solo «304».
+            testata = {"Cache-Control": "no-cache", "ETag": etag, "Vary": "Accept-Encoding"}
+            if etag in [x.strip() for x in self.headers.get("If-None-Match", "").split(",")]:
+                return self._send(304, b"", None, testata)
             ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
-            cache = "no-cache" if target.suffix in (".html", ".js", ".css", ".webmanifest") else "max-age=86400"
-            self._send(200, target.read_bytes(), ctype, {"Cache-Control": cache})
+            if target.suffix in COMPRIMIBILI and "gzip" in self.headers.get("Accept-Encoding", ""):
+                chiave = (str(target), etag)
+                if chiave not in _gzip:
+                    for k in [k for k in _gzip if k[0] == chiave[0]]:
+                        del _gzip[k]
+                    _gzip[chiave] = gzip.compress(target.read_bytes(), 6)
+                return self._send(200, _gzip[chiave], ctype, {**testata, "Content-Encoding": "gzip"})
+            self._send(200, target.read_bytes(), ctype, testata)
 
     return Handler
 

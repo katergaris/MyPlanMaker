@@ -705,6 +705,22 @@ export class Vista3D {
     return url;
   }
 
+  // Miniatura JPEG per l'elenco dei progetti (ritaglio centrale della vista attuale, ~10 KB).
+  miniatura(w = 320, h = 200) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d'), sw = this.renderer.domElement.width, sh = this.renderer.domElement.height;
+    const k = Math.min(sw / w, sh / h), cw = w * k * 0.8, ch = h * k * 0.8;
+    const hp = this.gizmo.getHelper(), mv = this.maniglie.visible;
+    hp.visible = false; this.maniglie.visible = false;
+    this.renderer.render(this.scena, this.camera);
+    g.fillStyle = '#f4f1ec'; g.fillRect(0, 0, w, h);
+    g.drawImage(this.renderer.domElement, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, w, h);
+    hp.visible = true; this.maniglie.visible = mv;
+    this.disegna();
+    return c.toDataURL('image/jpeg', 0.72);
+  }
+
   disegna() {
     this.scalaManiglie();
     this.renderer.render(this.scena, this.camera);
