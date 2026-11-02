@@ -40,7 +40,7 @@
         <div class="lingue" id="menu-lingue" aria-label="Lingua"></div>
         <hr>
         <button data-menu="guida">❓ <span data-t>Guida rapida e scorciatoie</span></button>
-        <div class="versione">MyPlanMaker 0.16.0 · <b>alpha</b> · <span data-t>versione di prova</span></div>
+        <div class="versione">MyPlanMaker 0.17.0 · <b>alpha</b> · <span data-t>versione di prova</span></div>
       </div>
     </div>
   </header>
@@ -126,6 +126,15 @@
   </div>
 </dialog>
 
+<dialog id="dlg-compositore" class="dlg compositore">
+  <div class="dlg-testa"><h2 data-t>Componi il mobile</h2><span class="sp"></span><button class="btn icon" data-chiudi aria-label="Chiudi">✕</button></div>
+  <div class="dlg-corpo compositore-corpo">
+    <div class="comp-sx" id="comp-sx"></div>
+    <div class="comp-dx"><div id="comp-fronte"></div><div id="comp-esito" class="ok"></div>
+      <div class="azioni"><button class="btn" data-chiudi data-t>Annulla</button><button class="btn primary" id="comp-ok"></button></div></div>
+  </div>
+</dialog>
+
 <dialog id="dlg-cassetto" class="dlg">
   <div class="dlg-testa"><h2 data-t>Cassetti</h2><button class="btn icon" data-chiudi>✕</button></div>
   <div class="dlg-corpo" id="form-cassetto"></div>
@@ -142,7 +151,7 @@
 </dialog>
 
 <dialog id="dlg-guida" class="dlg larga">
-  <div class="dlg-testa"><h2><span data-t>Benvenuto in MyPlanMaker</span> <small class="nota">0.16.0 alpha</small></h2><span class="sp"></span><button class="btn icon" data-chiudi>✕</button></div>
+  <div class="dlg-testa"><h2><span data-t>Benvenuto in MyPlanMaker</span> <small class="nota">0.17.0 alpha</small></h2><span class="sp"></span><button class="btn icon" data-chiudi>✕</button></div>
   <div class="dlg-corpo guida">
     <div class="guida-colonne">
       <section><h3 data-t>1 · Parti</h3><p data-t>Da un <b>modello pronto</b> (libreria, cassettiera, tavolo…) oppure aggiungi <b>Pannelli</b> e <b>Listelli</b> uno alla volta. Le misure si scrivono nel pannello a destra. Poi con <b>Riempi</b> tocchi dentro un vano e aggiungi ripiani, divisori, schienale, ante o cassetti già a misura.</p></section>

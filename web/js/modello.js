@@ -63,6 +63,7 @@ export function nuovoPezzo(progetto, tipo, vicinoA) {
 
 export function duplica(progetto, p) {
   const c = structuredClone(p);
+  delete c.comp; // la copia non fa più parte del mobile composto
   c.id = nuovoId();
   c.n = progetto.prossimoN++;
   c.nome = p.nome.replace(/\s\d+$/, '') + ' ' + c.n;
@@ -276,6 +277,7 @@ export function dividi(progetto, a, spazio, n) {
   const base = a.nome.replace(/\s\d+$/, '');
   for (let i = 1; i <= n; i++) {
     const c = structuredClone(a);
+    delete c.comp; // la copia non fa più parte del mobile composto
     c.id = nuovoId();
     c.n = progetto.prossimoN++;
     c.nome = `${base} ${c.n}`;
@@ -355,6 +357,7 @@ export function copiaSpecchiata(progetto, pezzi, asse) {
   const ids = new Map(pezzi.map(p => [p.id, nuovoId()]));
   return pezzi.map(p => {
     const c = structuredClone(p), { L } = dimensioni(p);
+    delete c.comp;
     c.id = ids.get(p.id);
     c.n = progetto.prossimoN++;
     c.nome = `${p.nome.replace(/\s\d+$/, '')} ${c.n}`;

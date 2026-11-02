@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.17.0-alpha.1 — 2026-11-02
+**Compose a cabinet by levels, without designing it piece by piece.**
+- **Cabinet composer** (Models → *Cabinets by levels*): stack levels from the bottom — plinth, drawers, open
+  compartment with shelves, compartment with doors (and shelves inside), top — and see the **front view** update
+  while you type. Each level has a fixed height or **Auto** (shares the space left); drawers have their number and
+  runner type, doors one, two or automatic. Clear messages when the heights don't add up or a level is too low.
+- Doors and drawer fronts of neighbouring levels line up: they cover the base and top fully and half of a fixed
+  shelf shared with another level with fronts (3 mm gaps).
+- **Gallery** of starting points: chest of drawers, sideboard, bookcase with doors below, bookcase, kitchen base
+  unit, kitchen drawer unit, tall pantry, wall cabinet, wall-hung bathroom unit, from scratch. They replace the old
+  bookcase, base cabinet, wall cabinet and chest of drawers templates (open shelving, table and bench stay).
+- **Recompose**: the cabinet remembers its levels. Select it (or one of its pieces) → *Recompose*, change levels or
+  sizes, and it is rebuilt where it stands, even if you moved or rotated it. If some of its pieces were changed by
+  hand you are warned first (and Undo always works).
+
 ## 0.16.0-alpha.1 — 2026-11-01
 **Build a cabinet in a few taps.**
 - **Fill** (left toolbar, key K): tap inside an opening of a cabinet and choose **shelves**, **dividers**, a **back

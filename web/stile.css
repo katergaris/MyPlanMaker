@@ -394,3 +394,32 @@ dialog .toast { position: sticky; left: auto; bottom: 12px; margin: 0 16px 12px;
 /* Riempi il vano: le cinque scelte su una riga che va a capo sui telefoni. */
 .scelte-vano { flex-wrap: wrap; }
 .scelte-vano button { flex: 1 1 auto; }
+/* Compositore: a sinistra misure e livelli, a destra il disegno di fronte (sotto, sugli schermi stretti). */
+.dlg.compositore { width: min(1240px, 98vw); max-height: 96vh; }
+.compositore-corpo { display: grid; grid-template-columns: minmax(340px, 420px) 1fr; gap: 20px; align-items: start; }
+.comp-sx { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.comp-dx { position: sticky; top: 0; display: flex; flex-direction: column; gap: 12px; }
+#comp-fronte { background: var(--bg); border-radius: 12px; padding: 12px; height: min(62vh, 640px); }
+.fronte-mobile { width: 100%; height: 100%; }
+.fronte-mobile .legno { fill: #e6cfa6; stroke: #a8865a; stroke-width: 2; }
+.fronte-mobile .zoccolo { fill: #c9b18b; stroke: #a8865a; stroke-width: 2; }
+.fronte-mobile .vano { fill: #f7efe2; stroke: none; cursor: pointer; }
+.fronte-mobile .vano.scelto { fill: var(--accent-soft); }
+.fronte-mobile .dentro { fill: none; stroke: #a8865a; stroke-width: 2; stroke-dasharray: 10 8; }
+.fronte-mobile .frontale { fill: #edd9b4; stroke: #8a6a42; stroke-width: 2.5; cursor: pointer; }
+.fronte-mobile .maniglia { stroke: #555; stroke-width: 8; stroke-linecap: round; }
+.fronte-mobile .q-fronte { font-family: system-ui, sans-serif; font-weight: 600; fill: var(--muted); }
+.livelli { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.livelli li { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.livelli li.scelto { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.testa-livello { display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 0; }
+.testa-livello .btn.icon { width: 40px; height: 40px; font-size: 16px; }
+.nome-livello { flex: 1; min-width: 0; text-align: left; border: 0; background: none; padding: 8px 12px; display: flex; flex-direction: column; }
+.nome-livello span { font-size: 13px; color: var(--muted); }
+.editor-livello { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.aggiungi-livello { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.aggiungi-livello .btn { height: 40px; padding: 0 12px; }
+.schede-modelli .titoletto { font-size: 13px; font-weight: 600; color: var(--muted); padding: 8px 4px 2px; }
+.chipline.mobile-comp { background: var(--accent-soft); border-radius: 10px; padding: 8px 12px; }
+.chipline.mobile-comp .azioni-comp { display: flex; gap: 12px; }
+@media (max-width: 900px) { .compositore-corpo { grid-template-columns: 1fr; } .comp-dx { position: static; order: -1; } #comp-fronte { height: 40vh; } }

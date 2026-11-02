@@ -46,6 +46,13 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     Unità dell'interfaccia (`unita.u` mm/cm, `fmtU`, `leggiMisura`): nel progetto tutto resta in mm.
   - Spessore su misura: `p.spessore` (pannelli) e `p.sezione = [W, T]` (listelli); `materialePezzo(p)` in
     `materiali.js` dà la variante (id `mat@T`, prezzo proporzionale) usata da dimensioni, distinta, taglio, disegni.
+  - **Compositore** (dal 0.17.0, `js/compositore.js`): composizione `{ nome, L, H, P, T, schienale, livelli }` con livelli dal
+    basso (`zoccolo` solo primo, `piano` solo ultimo, `cassetti`/`giorno`/`ante` con `h` numero o `'auto'`); `calcola` (quote ed
+    errori), `genera` (cassa + ripiani fissi tra i livelli + contenuto; cassetti con `creaCassetti`, frontali riallineati a
+    `copertura`), `svgFronte` (anteprima), `COMPOSIZIONI` (galleria, nel dialogo Modelli; i vecchi modelli libreria, base,
+    pensile, cassettiera restano in `modelli.js` ma nascosti). In app.js: `apriCompositore`, `confermaCompositore`,
+    `ricomponi`; `progetto.composizioni[id]` con `rifId`/`rifCan` (fianco sinistro, per rimettere il mobile dov'è) e `firma`
+    (`firmaMobile`: se cambia, avviso prima di ricomporre); pezzi con `p.comp` (le copie lo perdono).
   - **Riempi** (dal 0.16.0, comando `riempi`, tasto K): tocco in un vano → `vanoDa(faccia)` → dialogo `#dlg-vano`
     (`apriVano`, `pezziVano`, `riempiVano`): ripiani, divisori, schienale, ante, cassetti (→ `apriCassetto`). Pezzi nel
     sistema girato del vano poi girati con `v.ruota`. `vanoDa` dà anche `copre` (fin dove arrivano le ante: fianco esterno
@@ -103,7 +110,7 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
     Elimina anche il progetto aperto (avviso con Annulla: `avvisaAnnulla`). Chiusa senza scelta → `dopoHome()` riapre
     l'ultimo. `avvisa()` mette l'avviso dentro la finestra aperta. In prove-ui il passo `home` lascia la schermata,
     altrimenti si parte dall'esempio 1.
-  - `prove.html` — prove automatiche (139, "TUTTE OK"); `prove-ui.html#passo,passo` — pilota l'app per gli
+  - `prove.html` — prove automatiche (148, "TUTTE OK"); `prove-ui.html#passo,passo` — pilota l'app per gli
     screenshot (esempio:N, modello:id, crea, sel:Nome, cmd:x, tocca:Nome, faccia:Nome:nx:ny:nz, trascina:Nome:dx:dy[:ox:oy], maniglia:i:dx:dy, quota:asse:valore, stato (JSON dei pezzi),
     tracciaSu:selettore:x0:y0:x1:y1, unita:cm, vista:x, distinta, schema, ferramenta, disegni, menu:x, clic:selettore, fissaggio:tipo, progetti).
   - `vendor/` — three.js 0.186.1 (con OrbitControls e TransformControls) e manifold-3d 3.5.4 (`VERSIONI.txt`).
@@ -132,6 +139,10 @@ dei tagli, schema di taglio, ferramenta, viti e costi. Nata il 2026-10-28. Uso *
   la shell (la riga contiene la parola). Usare il PID.
 
 ## Stato
+**0.17.0-alpha.1** (2026-11-02): compositore di mobili a livelli, fase 1 di 3 concordata con Salvo (mobile ricomponibile con
+avviso). Prossime fasi: 2) colonne in larghezza, moduli affiancati di altezza/profondità diverse, «Salva come mio modello»;
+3) scrivanie (piano tra moduli, scrivania con cassettiera, libreria con fianco prolungato). Salvo: «tenere sempre in mente
+immediatezza d'uso e facilità».
 **0.16.0-alpha.1** (2026-11-01): Riempi (vano → ripiani, divisori, schienale, ante, cassetti) e attrezzi riorganizzati,
 proposte 1 e 3 scelte da Salvo. Restano da scegliere: ridimensiona tutto il mobile, intestazione più pulita (mm/cm nel
 menu, Esporta PDF normale), tablet verticale, «Segnala un problema» (serve il canale).
@@ -141,7 +152,7 @@ barre» se spenti). Salvo: «semplicità d'uso e velocità di realizzazione sono
 elimina anche l'aperto con Annulla), apertura molto più veloce (cache e gzip del server). Studio UX in
 `docs/STUDIO-UX-2026-11.md`, proposte A-F **non ancora scelte** (A attrezzi grigi che spiegano, B «Segnala un problema»
 — serve decidere il canale, C tablet verticale, D aiuto chiudibile, E benvenuto nella schermata Progetti, F pulizia visiva).
-Release su GitHub come pre-release (`v0.14.0-alpha.1`, `v0.15.0-alpha.1`, `v0.16.0-alpha.1`) con la portable allegata; finché il repository è privato i tester
+Release su GitHub come pre-release (`v0.14.0-alpha.1` … `v0.17.0-alpha.1`) con la portable allegata; finché il repository è privato i tester
 non la vedono: lo zip va dato a mano.
 **0.13.0** (2026-10-31): maniglie alla Tinkercad, quote da scrivere sul pezzo, calamita dal vivo, lastra per progetto (0.12.0 5 lingue, prezzi facoltativi, repository in inglese; 0.11.0 disegno 2D; 0.10.0 spessori su misura, spostamento libero, nuovo Accosta/Adatta, mm/cm); vedi `CHANGELOG.md`. Repository privato `katergaris/MyPlanMaker`, branch `main`, pronto per
 la pubblicazione (README, screenshot, licenza, CI) ma **ancora privato**: renderlo pubblico solo se Salvo lo chiede.

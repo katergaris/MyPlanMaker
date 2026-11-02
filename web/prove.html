@@ -510,6 +510,32 @@ for (const m of MODELLI) {
   prova('cassetto nel mobile girato: il frontale guarda verso +X', vicino(q.max.x - q.min.x, 18, 0.01) && q.max.z - q.min.z > 700);
 }
 
+// 23. Compositore: mobili a livelli
+{
+  const { calcola, composizioneDa, genera, nuovoLivello } = await import('./js/compositore.js');
+  const como = composizioneDa('como'), q = calcola(como);
+  // 850 − zoccolo 60 − base e cielo 36 = 754 per i cassetti
+  prova('comò: un livello di cassetti alto 754, sopra la base', q.ok && q.livelli.length === 1 && vicino(q.livelli[0].h, 754, 0.01) && vicino(q.livelli[0].y0, 78, 0.01), JSON.stringify(q.livelli));
+  const pr = mod.nuovoProgetto(), r = genera(pr, como, 'm1');
+  const fronti = r.pezzi.filter(p => p.ruolo === 'frontale').sort((a, b) => a.pos[1] - b.pos[1]);
+  const giu = fronti[0].pos[1], su = fronti.at(-1).pos[1] + fronti.at(-1).W;
+  prova('comò: 4 frontali che coprono base e cielo (1,5 mm di fuga)', r.ok && fronti.length === 4 && vicino(giu, 61.5, 0.01) && vicino(su, 848.5, 0.01), `${giu} ${su}`);
+  prova('comò: tutti i pezzi ricordano il mobile', r.pezzi.every(p => p.comp === 'm1') && r.pezzi.some(p => p.nome === 'Fianco sinistro'));
+  const la = composizioneDa('libreria-ante'), ql = calcola(la), pl = mod.nuovoProgetto(), rl = genera(pl, la, 'm2');
+  const ante = rl.pezzi.filter(p => /^Anta/.test(p.nome)), fisso = rl.pezzi.find(p => /Ripiano fisso/.test(p.nome));
+  // ante: dalla base (coperta tutta) a metà del ripiano fisso (sopra c'è un vano aperto: lo coprono tutto)
+  prova('libreria con ante: ripiano fisso a 878, ante fino al suo bordo alto', ql.ok && fisso && vicino(fisso.pos[1], 878, 0.01) && ante.length === 2 && vicino(ante[0].pos[1] + ante[0].W, 878 + 18 - 1.5, 0.01), JSON.stringify(ante.map(a => [a.pos[1], a.W])));
+  const sbagliata = { ...composizioneDa('credenza') };
+  sbagliata.livelli = sbagliata.livelli.map(l => ({ ...l, h: l.h === 'auto' ? 200 : l.h }));
+  prova('altezze che non tornano: messaggio chiaro', !calcola(sbagliata).ok && /Avanzano/.test(calcola(sbagliata).errori[0]), calcola(sbagliata).errori.join(' '));
+  const bassa = { ...composizioneDa('como'), H: 300 };
+  prova('cassetti in poco spazio: «troppo basso»', !calcola(bassa).ok && /troppo basso/.test(calcola(bassa).errori.join(' ')), calcola(bassa).errori.join(' '));
+  const cuc = composizioneDa('base-cucina'), pc = mod.nuovoProgetto(), rc = genera(pc, cuc, 'm3'), piano = rc.pezzi.find(p => p.nome === 'Piano');
+  prova('base cucina: piano da 40 che sporge 20, cassa alta 860', rc.ok && mod.dimensioni(piano).T === 40 && piano.W === 600 && vicino(piano.pos[1], 860, 0.01), JSON.stringify(piano && [piano.pos, piano.W]));
+  prova('base cucina: nessuna compenetrazione', !controlli(pc).avvisi.some(a => /compenetr/i.test(a)), controlli(pc).avvisi.join(' | '));
+  prova('nuovo livello «ante»: altezza auto, ante auto, un ripiano', JSON.stringify(nuovoLivello('ante')) === JSON.stringify({ tipo: 'ante', h: 'auto', ante: 'auto', ripiani: 1 }));
+}
+
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');
 const ko = esiti.filter(e => !e.ok).length;
 document.getElementById('riassunto').textContent = ko ? `FALLITE ${ko} su ${esiti.length}` : `TUTTE OK (${esiti.length})`;
