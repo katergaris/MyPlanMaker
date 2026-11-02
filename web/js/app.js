@@ -14,7 +14,7 @@ import { INTERASSI, LATI, MODELLI_CERNIERA, cerniere, maniglia } from './ferrame
 import { listaSpesa } from './spesa.js';
 import { MODELLI, modello, valoriDefault } from './modelli.js';
 import { FUGA, TIPI_GUIDA, creaCassetti, lunghezzaPer } from './cassetti.js';
-import { COMPOSIZIONI, TIPI_LIVELLO, calcola, composizioneDa, genera, nuovoLivello, svgFronte } from './compositore.js';
+import { COMPOSIZIONI, TIPI_LIVELLO, calcola, composizioneDa, genera, normalizza, nuovaColonna, nuovoLivello, nuovoModulo, svgFronte } from './compositore.js';
 import { apriEditorSagoma } from './sagome.js';
 import { apriDisegno2D, formeDaPezzo } from './disegno2d.js';
 import { htmlDima, htmlDisegno, htmlEtichette } from './disegni.js';
@@ -726,45 +726,77 @@ function creaCassettiOra() {
 // ---------- Compositore (mobile a livelli) ----------
 // Si compone il mobile a livelli con l'anteprima di fronte; «Aggiungi» crea pezzi veri. La composizione resta in
 // progetto.composizioni[id] e i pezzi hanno p.comp = id: «Ricomponi» la riapre e ricostruisce il mobile dov'è.
-let compo = null, compoSel = -1, compoId = null;
+let compo = null, compoSel = { m: 0, c: 0, l: 0 }, compoId = null;
 const MOBILI_VECCHI = new Set(['libreria', 'base', 'pensile', 'cassettiera']); // ora nella galleria dei mobili a livelli
 function apriCompositore(c, id = null) {
-  compo = c; compoId = id;
-  compoSel = c.livelli.findIndex(l => l.tipo !== 'zoccolo' && l.tipo !== 'piano');
+  compo = normalizza(c); compoId = id;
+  compoSel = { m: 0, c: 0, l: 0 };
   disegnaCompositore();
   $('#dlg-compositore').showModal();
 }
 const campoComp = (attr, nome, v, u = U()) => `<div class="field"><label>${t(nome)}</label><div class="input"><input ${attr} inputmode="decimal" value="${esc(v)}"><small>${u}</small></div></div>`;
 const stepperComp = (k, nome, v, min = 0) => `<div class="field"><label>${t(nome)}</label><div class="stepper"><button class="btn icon" data-meno="${k}" data-min="${min}">−</button><div class="input"><input data-l="${k}" inputmode="numeric" value="${v}"></div><button class="btn icon" data-piu="${k}">+</button></div></div>`;
-function editorLivello(l, q) {
-  const h = q.livelli.find(x => x.i === compoSel)?.h;
-  const altezza = l.tipo === 'zoccolo' ? campoComp('data-l="h"', 'Altezza', fU(l.h))
-    : l.tipo === 'piano' ? `<div class="row3">${campoComp('data-l="h"', 'Spessore', fU(l.h))}${campoComp('data-l="sporge"', 'Sporge davanti', fU(l.sporge || 0))}${campoComp('data-l="lati"', 'Sporge ai lati', fU(l.lati || 0))}</div>`
-    : `<div class="field"><label>${t('Altezza')}</label><div class="seg"><button data-hmodo="auto" class="${l.h === 'auto' ? 'on' : ''}">${t('Auto')}${l.h === 'auto' && h ? ` · ${fU(h)}` : ''}</button><button data-hmodo="mm" class="${l.h !== 'auto' ? 'on' : ''}">${t('Misura')}</button></div></div>
+const segComp = (attr, voci, attivo) => `<div class="seg">${voci.map(([k, x]) => `<button ${attr}="${k}" class="${String(attivo) === String(k) ? 'on' : ''}">${x}</button>`).join('')}</div>`;
+const moduloSel = () => compo.moduli[compoSel.m];
+const colonnaSel = () => moduloSel()?.colonne?.[compoSel.c];
+const livelloSel = () => colonnaSel()?.livelli?.[compoSel.l];
+
+function editorLivello(l, h) {
+  const altezza = `<div class="field"><label>${t('Altezza')}</label>${segComp('data-hmodo', [['auto', `${t('Auto')}${l.h === 'auto' && h ? ` · ${fU(h)}` : ''}`], ['mm', t('Misura')]], l.h === 'auto' ? 'auto' : 'mm')}</div>
       ${l.h !== 'auto' ? campoComp('data-l="h"', 'Altezza utile', fU(l.h)) : ''}`;
   const tipo = l.tipo === 'cassetti' ? `<div class="row">${stepperComp('n', 'Quanti cassetti', l.n || 1, 1)}<div class="field"><label>${t('Guide')}</label><div class="input"><select data-l="guida">${Object.entries(TIPI_GUIDA).map(([k, x]) => `<option value="${k}" ${k === (l.guida || 'sfere') ? 'selected' : ''}>${esc(t(x.nome))}</option>`).join('')}</select><small>▾</small></div></div></div>`
     : l.tipo === 'giorno' ? stepperComp('ripiani', 'Ripiani', l.ripiani || 0)
-    : l.tipo === 'ante' ? `<div class="row"><div class="field"><label>${t('Ante')}</label><div class="seg">${[['auto', t('Auto')], ['1', '1'], ['2', '2']].map(([k, x]) => `<button data-ante-comp="${k}" class="${String(l.ante || 'auto') === k ? 'on' : ''}">${x}</button>`).join('')}</div></div>${stepperComp('ripiani', 'Ripiani dentro', l.ripiani || 0)}</div>` : '';
+    : `<div class="row"><div class="field"><label>${t('Ante')}</label>${segComp('data-ante-comp', [['auto', t('Auto')], ['1', '1'], ['2', '2']], l.ante || 'auto')}</div>${stepperComp('ripiani', 'Ripiani dentro', l.ripiani || 0)}</div>`;
   return `<div class="editor-livello">${altezza}${tipo}</div>`;
 }
-function disegnaCompositore() {
-  const c = compo, q = calcola(c), n = c.livelli.length;
-  const descr = l => { const x = q.livelli.find(y => y.i === c.livelli.indexOf(l)); return l.tipo === 'zoccolo' || l.tipo === 'piano' ? fU(l.h) + ' ' + U() : `${l.h === 'auto' ? t('auto') + ' · ' : ''}${x ? fU(x.h) : '—'} ${U()}`; };
-  const extra = l => l.tipo === 'cassetti' ? tn(l.n || 1, '{n} cassetto', '{n} cassetti') : l.tipo === 'giorno' ? tn(l.ripiani || 0, '{n} ripiano', '{n} ripiani') : l.tipo === 'ante' ? `${l.ante === 'auto' ? t('ante') : tn(+l.ante, '{n} anta', '{n} ante')}${l.ripiani ? ' · ' + tn(l.ripiani, '{n} ripiano', '{n} ripiani') : ''}` : '';
-  const righe = c.livelli.map((l, i) => ({ l, i })).reverse().map(({ l, i }) => {
-    const fisso = l.tipo === 'zoccolo' || l.tipo === 'piano';
-    return `<li class="${i === compoSel ? 'scelto' : ''}"><div class="testa-livello"><button class="nome-livello" data-sel-livello="${i}"><b>${esc(t(TIPI_LIVELLO[l.tipo].nome))}</b><span>${[extra(l), descr(l)].filter(Boolean).join(' · ')}</span></button>
-      ${fisso ? '' : `<button class="btn icon" data-su="${i}" title="${t('Più in alto')}" ${c.livelli[i + 1] && c.livelli[i + 1].tipo !== 'piano' ? '' : 'disabled'}>↑</button><button class="btn icon" data-giu="${i}" title="${t('Più in basso')}" ${i > 0 && c.livelli[i - 1].tipo !== 'zoccolo' ? '' : 'disabled'}>↓</button>`}
+
+function htmlMobileComp(M, qm) {
+  const nc = M.colonne.length, ci = Math.min(compoSel.c, nc - 1), col = M.colonne[ci], qc = qm?.colonne?.[ci];
+  const descr = (l, k) => { const x = qc?.livelli?.[k]; return `${l.h === 'auto' ? t('auto') + ' · ' : ''}${x ? fU(x.h) : '—'} ${U()}`; };
+  const extra = l => l.tipo === 'cassetti' ? tn(l.n || 1, '{n} cassetto', '{n} cassetti') : l.tipo === 'giorno' ? tn(l.ripiani || 0, '{n} ripiano', '{n} ripiani') : `${l.ante === 'auto' ? t('ante') : tn(+l.ante, '{n} anta', '{n} ante')}${l.ripiani ? ' · ' + tn(l.ripiani, '{n} ripiano', '{n} ripiani') : ''}`;
+  const n = col.livelli.length;
+  const righe = col.livelli.map((l, i) => ({ l, i })).reverse().map(({ l, i }) => `<li class="${i === compoSel.l ? 'scelto' : ''}"><div class="testa-livello"><button class="nome-livello" data-sel-livello="${i}"><b>${esc(t(TIPI_LIVELLO[l.tipo].nome))}</b><span>${extra(l)} · ${descr(l, i)}</span></button>
+      <button class="btn icon" data-su="${i}" title="${t('Più in alto')}" ${i < n - 1 ? '' : 'disabled'}>↑</button><button class="btn icon" data-giu="${i}" title="${t('Più in basso')}" ${i > 0 ? '' : 'disabled'}>↓</button>
       <button class="btn icon danger" data-togli-livello="${i}" title="${t('Togli')}">✕</button></div>
-      ${i === compoSel ? editorLivello(l, q) : ''}</li>`;
-  }).join('');
-  const haZ = c.livelli[0]?.tipo === 'zoccolo', haP = c.livelli.at(-1)?.tipo === 'piano';
-  $('#comp-sx').innerHTML = `<div class="field"><label>${t('Nome')}</label><div class="input"><input data-c="nome" value="${esc(c.nome)}"></div></div>
-    <div class="row3">${campoComp('data-c="L"', 'Larghezza', fU(c.L))}${campoComp('data-c="H"', 'Altezza', fU(c.H))}${campoComp('data-c="P"', 'Profondità', fU(c.P))}</div>
-    <div class="row">${campoComp('data-c="T"', 'Spessore pannelli', fU(c.T))}<div class="field"><label>${t('Schienale')}</label><div class="seg"><button data-schienale="1" class="${c.schienale ? 'on' : ''}">${t('Sì')}</button><button data-schienale="0" class="${c.schienale ? '' : 'on'}">${t('No')}</button></div></div></div>
-    <h3>${t('Livelli, dall\'alto')}</h3><ul class="livelli">${righe}</ul>
-    <div class="aggiungi-livello"><span class="nota">${t('Aggiungi:')}</span>${['cassetti', 'giorno', 'ante'].map(k => `<button class="btn" data-aggiungi="${k}">+ ${t(TIPI_LIVELLO[k].nome)}</button>`).join('')}${haZ ? '' : `<button class="btn" data-aggiungi="zoccolo">+ ${t('Zoccolo')}</button>`}${haP ? '' : `<button class="btn" data-aggiungi="piano">+ ${t('Piano sopra')}</button>`}</div>`;
-  void n;
+      ${i === compoSel.l ? editorLivello(l, qc?.livelli?.[i]?.h) : ''}</li>`).join('');
+  const colonne = nc > 1 ? `<div class="schede-colonne">${M.colonne.map((c, k) => `<span class="scheda ${k === ci ? 'on' : ''}"><button data-sel-col="${k}">${t('Colonna {n}', { n: k + 1 })}<small>${c.L === 'auto' ? t('auto') + ' · ' : ''}${qm?.colonne?.[k] ? fU(qm.colonne[k].w) : '—'}</small></button><button class="togli" data-togli-col="${k}" title="${t('Togli')}">✕</button></span>`).join('')}</div>
+      <div class="field"><label>${t('Larghezza della colonna {n}', { n: ci + 1 })}</label>${segComp('data-lmodo', [['auto', `${t('Auto')}${col.L === 'auto' && qc ? ` · ${fU(qc.w)}` : ''}`], ['mm', t('Misura')]], col.L === 'auto' ? 'auto' : 'mm')}</div>
+      ${col.L !== 'auto' ? campoComp('data-col="L"', 'Larghezza utile', fU(col.L)) : ''}` : '';
+  return `<div class="row3">${campoComp('data-m="L"', 'Larghezza', fU(M.L))}${campoComp('data-m="H"', 'Altezza', fU(M.H))}${campoComp('data-m="P"', 'Profondità', fU(M.P))}</div>
+    <div class="row"><div class="field"><label>${t('Zoccolo')}</label>${segComp('data-zoccolo', [['0', t('No')], ['1', t('Sì')]], M.zoccolo ? 1 : 0)}</div>${M.zoccolo ? campoComp('data-m="zoccolo"', 'Altezza zoccolo', fU(M.zoccolo)) : '<div></div>'}</div>
+    <div class="field"><label>${t('Piano sopra')}</label>${segComp('data-piano', [['0', t('No')], ['1', t('Sì')]], M.piano ? 1 : 0)}</div>
+    ${M.piano ? `<div class="row3">${campoComp('data-m="pianoH"', 'Spessore', fU(M.piano.h))}${campoComp('data-m="pianoSporge"', 'Sporge davanti', fU(M.piano.sporge || 0))}${campoComp('data-m="pianoLati"', 'Sporge ai lati', fU(M.piano.lati || 0))}</div>` : ''}
+    <div class="titolo-riga"><h3>${nc > 1 ? t('Colonne') : t('Livelli, dall\'alto')}</h3><button class="btn" data-aggiungi-col>+ ${t('Colonna')}</button></div>
+    ${colonne}
+    ${nc > 1 ? `<h3>${t('Livelli della colonna {n}, dall\'alto', { n: ci + 1 })}</h3>` : ''}
+    <ul class="livelli">${righe}</ul>
+    <div class="aggiungi-livello"><span class="nota">${t('Aggiungi:')}</span>${['cassetti', 'giorno', 'ante'].map(k => `<button class="btn" data-aggiungi="${k}">+ ${t(TIPI_LIVELLO[k].nome)}</button>`).join('')}</div>`;
+}
+
+function htmlScrivaniaComp(S, mi) {
+  const vicino = d => { const M = compo.moduli[mi + d]; return M && M.tipo === 'mobile' && M.H >= S.H - 0.5 ? M : null; };
+  const sostegno = (lato, d) => vicino(d)
+    ? `<p class="nota">${t('Si appoggia al mobile accanto ({n}).', { n: mi + d + 1 })}</p>`
+    : segComp('data-sostegno', [[`${lato}:fianco`, t('Fianco')], [`${lato}:gambe`, t('Gambe')]], `${lato}:${S[lato]}`);
+  const C = S.cassettiera;
+  return `<div class="row3">${campoComp('data-m="L"', 'Lunghezza', fU(S.L))}${campoComp('data-m="H"', 'Altezza del piano', fU(S.H))}${campoComp('data-m="P"', 'Profondità', fU(S.P))}</div>
+    ${campoComp('data-m="Tp"', 'Spessore del piano', fU(S.Tp))}
+    <div class="row"><div class="field"><label>${t('A sinistra')}</label>${sostegno('sx', -1)}</div><div class="field"><label>${t('A destra')}</label>${sostegno('dx', 1)}</div></div>
+    <div class="field"><label>${t('Cassettiera sotto il piano')}</label>${segComp('data-cassettiera', [['no', t('No')], ['sx', t('A sinistra')], ['dx', t('A destra')]], C ? C.lato : 'no')}</div>
+    ${C ? `<div class="row">${stepperComp('cassN', 'Quanti cassetti', C.n || 3, 1)}${campoComp('data-m="cassL"', 'Larghezza', fU(C.L))}</div>` : ''}`;
+}
+
+function disegnaCompositore() {
+  const c = compo, q = calcola(c), nm = c.moduli.length;
+  compoSel.m = Math.min(compoSel.m, nm - 1);
+  const M = moduloSel(), qm = q.moduli[compoSel.m];
+  const nomeMod = (X, i) => `${t(X.tipo === 'scrivania' ? 'Scrivania' : 'Mobile')} ${i + 1}`;
+  const moduli = nm > 1 ? `<div class="schede-colonne moduli">${c.moduli.map((X, i) => `<span class="scheda ${i === compoSel.m ? 'on' : ''}"><button data-sel-mod="${i}">${nomeMod(X, i)}<small>${fU(X.L)} × ${fU(X.H)}</small></button><button class="togli" data-togli-mod="${i}" title="${t('Togli')}">✕</button></span>`).join('')}</div>` : '';
+  $('#comp-sx').innerHTML = `<div class="row"><div class="field"><label>${t('Nome')}</label><div class="input"><input data-c="nome" value="${esc(c.nome)}"></div></div>${campoComp('data-c="T"', 'Spessore pannelli', fU(c.T))}</div>
+    <div class="field"><label>${t('Schienale')}</label>${segComp('data-schienale', [['1', t('Sì')], ['0', t('No')]], c.schienale ? 1 : 0)}</div>
+    ${moduli}
+    ${M ? (M.tipo === 'scrivania' ? htmlScrivaniaComp(M, compoSel.m) : htmlMobileComp(M, qm)) : ''}
+    <div class="aggiungi-livello affianca"><span class="nota">${t('Affianca a destra:')}</span><button class="btn" data-affianca="mobile">+ ${t('Mobile')}</button><button class="btn" data-affianca="scrivania">+ ${t('Scrivania')}</button></div>`;
   disegnaAnteprimaComp();
 }
 function disegnaAnteprimaComp() {
@@ -772,23 +804,35 @@ function disegnaAnteprimaComp() {
   $('#comp-fronte').innerHTML = svgFronte(compo, compoSel);
   const e = $('#comp-esito');
   e.className = q.ok ? 'ok' : 'avviso';
-  e.textContent = q.ok ? t('{l} × {h} × {p} {u}. Tocca un livello nel disegno per cambiarlo.', { l: fU(compo.L), h: fU(compo.H), p: fU(compo.P), u: U() }) : q.errori.join(' ');
+  e.textContent = q.ok ? t('{l} × {h} × {p} {u}. Tocca un livello nel disegno per cambiarlo.', { l: fU(q.L), h: fU(q.H), p: fU(q.Pmax), u: U() }) : q.errori.join(' ');
   $('#comp-ok').disabled = !q.ok;
   $('#comp-ok').textContent = compoId ? t('Aggiorna il mobile') : t('Aggiungi al progetto');
 }
-// Campi scritti: si aggiorna subito l'anteprima (e l'elenco dei livelli quando si esce dal campo).
+// Campi scritti: si aggiorna subito l'anteprima (e il resto quando si esce dal campo).
 function leggiCampoComp(el) {
-  const misura = x => mod.leggiMisura(x);
+  const misura = x => mod.leggiMisura(x), M = moduloSel();
   if (el.dataset.c) {
-    const k = el.dataset.c;
-    if (k === 'nome') { compo.nome = el.value; return; }
-    const v = misura(el.value);
-    if (v && v > 0) compo[k] = v;
+    if (el.dataset.c === 'nome') { compo.nome = el.value; return; }
+    const v = misura(el.value); if (v && v > 0) compo.T = v;
+  } else if (el.dataset.m && M) {
+    const k = el.dataset.m, v = misura(el.value);
+    if (v === null || v < 0) return;
+    if (k === 'pianoH' && M.piano) M.piano.h = v || M.piano.h;
+    else if (k === 'pianoSporge' && M.piano) M.piano.sporge = v;
+    else if (k === 'pianoLati' && M.piano) M.piano.lati = v;
+    else if (k === 'cassL' && M.cassettiera) M.cassettiera.L = v || M.cassettiera.L;
+    else if (k === 'zoccolo') M.zoccolo = v;
+    else if (v > 0) M[k] = v;
+  } else if (el.dataset.col) {
+    const v = misura(el.value); if (v && v > 0) colonnaSel().L = v;
   } else if (el.dataset.l) {
-    const l = compo.livelli[compoSel], k = el.dataset.l;
+    const k = el.dataset.l;
+    if (k === 'cassN') { const v = Math.round(numero(el.value)); if (v >= 1 && M.cassettiera) M.cassettiera.n = Math.min(v, 8); return; }
+    const l = livelloSel();
+    if (!l) return;
     if (k === 'guida') l.guida = el.value;
     else if (k === 'n' || k === 'ripiani') { const v = Math.round(numero(el.value)); if (Number.isFinite(v) && v >= (k === 'n' ? 1 : 0)) l[k] = Math.min(v, 12); }
-    else { const v = misura(el.value); if (v !== null && v >= 0) l[k] = v; }
+    else { const v = misura(el.value); if (v !== null && v > 0) l[k] = v; }
   }
 }
 function eventiCompositore() {
@@ -796,28 +840,42 @@ function eventiCompositore() {
   d.addEventListener('input', e => { if (e.target.matches('input, select')) { leggiCampoComp(e.target); disegnaAnteprimaComp(); } });
   d.addEventListener('change', e => { if (e.target.matches('input, select')) { leggiCampoComp(e.target); disegnaCompositore(); } });
   d.addEventListener('click', e => {
-    const liv = e.target.closest('[data-livello]');
-    if (liv && e.target.closest('#comp-fronte')) { compoSel = +liv.dataset.livello; return disegnaCompositore(); }
-    const b = e.target.closest('button');
-    if (!b) return;
-    const c = compo, l = c.livelli[compoSel];
-    if (b.dataset.selLivello) { compoSel = +b.dataset.selLivello === compoSel ? -1 : +b.dataset.selLivello; return disegnaCompositore(); }
-    if (b.dataset.schienale) { c.schienale = b.dataset.schienale === '1'; return disegnaCompositore(); }
-    if (b.dataset.hmodo && l) { l.h = b.dataset.hmodo === 'auto' ? 'auto' : Math.round(calcola(c).livelli.find(x => x.i === compoSel)?.h || 300); return disegnaCompositore(); }
-    if (b.dataset.anteComp && l) { l.ante = b.dataset.anteComp; return disegnaCompositore(); }
-    if ((b.dataset.piu || b.dataset.meno) && l) { const k = b.dataset.piu || b.dataset.meno; l[k] = Math.max(+(b.dataset.min || 0), Math.min(12, (l[k] || 0) + (b.dataset.piu ? 1 : -1))); return disegnaCompositore(); }
-    if (b.dataset.su || b.dataset.giu) {
-      const i = +(b.dataset.su || b.dataset.giu), j = b.dataset.su ? i + 1 : i - 1;
-      [c.livelli[i], c.livelli[j]] = [c.livelli[j], c.livelli[i]]; compoSel = j; return disegnaCompositore();
-    }
-    if (b.dataset.togliLivello) { c.livelli.splice(+b.dataset.togliLivello, 1); compoSel = -1; return disegnaCompositore(); }
-    if (b.dataset.aggiungi) {
-      const k = b.dataset.aggiungi, nuovo = nuovoLivello(k);
-      if (k === 'zoccolo') { c.livelli.unshift(nuovo); compoSel = 0; }
-      else if (k === 'piano') { c.livelli.push(nuovo); compoSel = c.livelli.length - 1; }
-      else { const i = c.livelli.at(-1)?.tipo === 'piano' ? c.livelli.length - 1 : c.livelli.length; c.livelli.splice(i, 0, nuovo); compoSel = i; }
+    const tocco = e.target.closest('#comp-fronte [data-m]');
+    if (tocco) {
+      compoSel = { m: +tocco.dataset.m, c: tocco.dataset.c !== undefined ? +tocco.dataset.c : 0, l: tocco.dataset.l !== undefined ? +tocco.dataset.l : -1 };
       return disegnaCompositore();
     }
+    const b = e.target.closest('button');
+    if (!b) return;
+    const c = compo, M = moduloSel(), col = colonnaSel(), l = livelloSel(), ds = b.dataset;
+    const fatto = () => disegnaCompositore();
+    if (ds.selMod) { compoSel = { m: +ds.selMod, c: 0, l: 0 }; return fatto(); }
+    if (ds.togliMod) { c.moduli.splice(+ds.togliMod, 1); compoSel = { m: 0, c: 0, l: 0 }; return fatto(); }
+    if (ds.affianca) { c.moduli.push(nuovoModulo(ds.affianca)); compoSel = { m: c.moduli.length - 1, c: 0, l: 0 }; return fatto(); }
+    if (ds.schienale) { c.schienale = ds.schienale === '1'; return fatto(); }
+    if (ds.zoccolo && M) { M.zoccolo = ds.zoccolo === '1' ? 60 : 0; return fatto(); }
+    if (ds.piano && M) { M.piano = ds.piano === '1' ? { h: 30, sporge: 20, lati: 0 } : null; return fatto(); }
+    if (ds.sostegno && M) { const [lato, v] = ds.sostegno.split(':'); M[lato] = v; return fatto(); }
+    if (ds.cassettiera && M) { M.cassettiera = ds.cassettiera === 'no' ? null : { n: 3, L: 420, ...(M.cassettiera || {}), lato: ds.cassettiera }; return fatto(); }
+    if (ds.selCol) { compoSel = { ...compoSel, c: +ds.selCol, l: 0 }; return fatto(); }
+    if (ds.togliCol && M) { if (M.colonne.length > 1) M.colonne.splice(+ds.togliCol, 1); compoSel = { ...compoSel, c: 0, l: 0 }; return fatto(); }
+    if (b.hasAttribute('data-aggiungi-col') && M) { M.colonne.push(nuovaColonna()); compoSel = { ...compoSel, c: M.colonne.length - 1, l: 0 }; return fatto(); }
+    if (ds.lmodo && col) { col.L = ds.lmodo === 'auto' ? 'auto' : Math.round(calcola(c).moduli[compoSel.m].colonne[compoSel.c].w || 400); return fatto(); }
+    if (ds.selLivello) { compoSel = { ...compoSel, l: +ds.selLivello === compoSel.l ? -1 : +ds.selLivello }; return fatto(); }
+    if (ds.hmodo && l) { l.h = ds.hmodo === 'auto' ? 'auto' : Math.round(calcola(c).moduli[compoSel.m].colonne[compoSel.c].livelli[compoSel.l]?.h || 300); return fatto(); }
+    if (ds.anteComp && l) { l.ante = ds.anteComp; return fatto(); }
+    if (ds.piu || ds.meno) {
+      const k = ds.piu || ds.meno, dir = ds.piu ? 1 : -1;
+      if (k === 'cassN' && M?.cassettiera) M.cassettiera.n = Math.max(1, Math.min(8, (M.cassettiera.n || 3) + dir));
+      else if (l) l[k] = Math.max(+(ds.min || 0), Math.min(12, (l[k] || 0) + dir));
+      return fatto();
+    }
+    if ((ds.su || ds.giu) && col) {
+      const i = +(ds.su || ds.giu), j = ds.su ? i + 1 : i - 1;
+      [col.livelli[i], col.livelli[j]] = [col.livelli[j], col.livelli[i]]; compoSel = { ...compoSel, l: j }; return fatto();
+    }
+    if (ds.togliLivello && col) { col.livelli.splice(+ds.togliLivello, 1); compoSel = { ...compoSel, l: -1 }; return fatto(); }
+    if (ds.aggiungi && col) { col.livelli.push(nuovoLivello(ds.aggiungi)); compoSel = { ...compoSel, l: col.livelli.length - 1 }; return fatto(); }
     if (b.id === 'comp-ok') confermaCompositore();
   });
 }

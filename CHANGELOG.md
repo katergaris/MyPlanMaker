@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.18.0-alpha.1 — 2026-11-03
+**Columns, modules side by side and desks in the composer.**
+- **Columns**: “+ Column” splits a cabinet in width (e.g. drawers on the left, doors on the right), each column with
+  its own levels and an Auto or fixed width. Fronts cover the outer sides fully and half of a divider between columns.
+- **Modules side by side**: “Add on the right: + Cabinet / + Desk” builds a row of modules with different widths,
+  heights and depths, backs aligned to the wall.
+- **Desks**: top on side panels or legs, a modesty panel at the back, optional drawer unit under the top (left or
+  right). Next to a cabinet at least as tall as the desk, the top rests on the cabinet's side on a batten; if the
+  cabinet is much shallower, a front leg holds the corner.
+- New starting points: sideboard with drawers, two-column bookcase, desk, desk with drawer unit, bookcase with desk.
+- Cabinets composed with 0.17 open and recompose as before.
+
 ## 0.17.0-alpha.1 — 2026-11-02
 **Compose a cabinet by levels, without designing it piece by piece.**
 - **Cabinet composer** (Models → *Cabinets by levels*): stack levels from the bottom — plinth, drawers, open

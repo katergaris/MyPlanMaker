@@ -510,30 +510,53 @@ for (const m of MODELLI) {
   prova('cassetto nel mobile girato: il frontale guarda verso +X', vicino(q.max.x - q.min.x, 18, 0.01) && q.max.z - q.min.z > 700);
 }
 
-// 23. Compositore: mobili a livelli
+// 23. Compositore: mobili a livelli, colonne, moduli affiancati, scrivanie
 {
-  const { calcola, composizioneDa, genera, nuovoLivello } = await import('./js/compositore.js');
+  const { calcola, composizioneDa, genera, nuovoLivello, normalizza } = await import('./js/compositore.js');
+  const liv = (q, m = 0, c = 0) => q.moduli[m].colonne[c].livelli;
   const como = composizioneDa('como'), q = calcola(como);
   // 850 − zoccolo 60 − base e cielo 36 = 754 per i cassetti
-  prova('comò: un livello di cassetti alto 754, sopra la base', q.ok && q.livelli.length === 1 && vicino(q.livelli[0].h, 754, 0.01) && vicino(q.livelli[0].y0, 78, 0.01), JSON.stringify(q.livelli));
+  prova('comò: un livello di cassetti alto 754, sopra la base', q.ok && liv(q).length === 1 && vicino(liv(q)[0].h, 754, 0.01) && vicino(liv(q)[0].y0, 78, 0.01), JSON.stringify(liv(q)));
   const pr = mod.nuovoProgetto(), r = genera(pr, como, 'm1');
   const fronti = r.pezzi.filter(p => p.ruolo === 'frontale').sort((a, b) => a.pos[1] - b.pos[1]);
   const giu = fronti[0].pos[1], su = fronti.at(-1).pos[1] + fronti.at(-1).W;
-  prova('comò: 4 frontali che coprono base e cielo (1,5 mm di fuga)', r.ok && fronti.length === 4 && vicino(giu, 61.5, 0.01) && vicino(su, 848.5, 0.01), `${giu} ${su}`);
+  prova('comò: 4 frontali che coprono base e cielo (1,5 mm di fuga)', r.ok && fronti.length === 4 && vicino(giu, 61.5, 0.01) && vicino(su, 848.5, 0.01) && vicino(fronti[0].L, 997, 0.01), `${giu} ${su} ${fronti[0].L}`);
   prova('comò: tutti i pezzi ricordano il mobile', r.pezzi.every(p => p.comp === 'm1') && r.pezzi.some(p => p.nome === 'Fianco sinistro'));
-  const la = composizioneDa('libreria-ante'), ql = calcola(la), pl = mod.nuovoProgetto(), rl = genera(pl, la, 'm2');
+  const la = composizioneDa('libreria-ante'), pl = mod.nuovoProgetto(), rl = genera(pl, la, 'm2');
   const ante = rl.pezzi.filter(p => /^Anta/.test(p.nome)), fisso = rl.pezzi.find(p => /Ripiano fisso/.test(p.nome));
-  // ante: dalla base (coperta tutta) a metà del ripiano fisso (sopra c'è un vano aperto: lo coprono tutto)
-  prova('libreria con ante: ripiano fisso a 878, ante fino al suo bordo alto', ql.ok && fisso && vicino(fisso.pos[1], 878, 0.01) && ante.length === 2 && vicino(ante[0].pos[1] + ante[0].W, 878 + 18 - 1.5, 0.01), JSON.stringify(ante.map(a => [a.pos[1], a.W])));
-  const sbagliata = { ...composizioneDa('credenza') };
-  sbagliata.livelli = sbagliata.livelli.map(l => ({ ...l, h: l.h === 'auto' ? 200 : l.h }));
+  prova('libreria con ante: ripiano fisso a 878, ante fino al suo bordo alto', rl.ok && fisso && vicino(fisso.pos[1], 878, 0.01) && ante.length === 2 && vicino(ante[0].pos[1] + ante[0].W, 878 + 18 - 1.5, 0.01), JSON.stringify(ante.map(a => [a.pos[1], a.W])));
+  const sbagliata = composizioneDa('credenza');
+  sbagliata.moduli[0].colonne[0].livelli.forEach(l => { if (l.h === 'auto') l.h = 200; });
   prova('altezze che non tornano: messaggio chiaro', !calcola(sbagliata).ok && /Avanzano/.test(calcola(sbagliata).errori[0]), calcola(sbagliata).errori.join(' '));
-  const bassa = { ...composizioneDa('como'), H: 300 };
+  const bassa = composizioneDa('como'); bassa.moduli[0].H = 300;
   prova('cassetti in poco spazio: «troppo basso»', !calcola(bassa).ok && /troppo basso/.test(calcola(bassa).errori.join(' ')), calcola(bassa).errori.join(' '));
   const cuc = composizioneDa('base-cucina'), pc = mod.nuovoProgetto(), rc = genera(pc, cuc, 'm3'), piano = rc.pezzi.find(p => p.nome === 'Piano');
   prova('base cucina: piano da 40 che sporge 20, cassa alta 860', rc.ok && mod.dimensioni(piano).T === 40 && piano.W === 600 && vicino(piano.pos[1], 860, 0.01), JSON.stringify(piano && [piano.pos, piano.W]));
   prova('base cucina: nessuna compenetrazione', !controlli(pc).avvisi.some(a => /compenetr/i.test(a)), controlli(pc).avvisi.join(' | '));
   prova('nuovo livello «ante»: altezza auto, ante auto, un ripiano', JSON.stringify(nuovoLivello('ante')) === JSON.stringify({ tipo: 'ante', h: 'auto', ante: 'auto', ripiani: 1 }));
+  // composizioni salvate con la 0.17 (livelli con zoccolo e piano): stessi pezzi
+  const vecchia = { nome: 'X', L: 600, H: 900, P: 580, T: 18, schienale: true, livelli: [{ tipo: 'zoccolo', h: 100 }, nuovoLivello('ante'), { tipo: 'piano', h: 40, sporge: 20, lati: 0 }] };
+  const nv = normalizza(vecchia), pv = mod.nuovoProgetto(), rv = genera(pv, vecchia, 'v');
+  prova('composizione della 0.17: diventa un modulo con zoccolo e piano', nv.moduli[0].zoccolo === 100 && nv.moduli[0].piano.h === 40 && nv.moduli[0].colonne[0].livelli.length === 1 && rv.ok && rv.pezzi.some(p => p.nome === 'Piano'));
+  // colonne: cassetti a sinistra, ante a destra; frontali e ante si dividono il divisorio a metà
+  const madia = composizioneDa('madia'), qm = calcola(madia), pm = mod.nuovoProgetto(), rm = genera(pm, madia, 'm4');
+  const div = rm.pezzi.find(p => /Divisorio/.test(p.nome)), fr = rm.pezzi.filter(p => p.ruolo === 'frontale'), an = rm.pezzi.filter(p => /^Anta/.test(p.nome));
+  const xDiv = qm.moduli[0].colonne[0].x1; // 18 + 450
+  prova('madia: due colonne, divisorio tra 468 e 486', qm.ok && div && vicino(div.pos[0], xDiv + 18, 0.01) && vicino(qm.moduli[0].colonne[1].w, 1400 - 36 - 18 - 450, 0.01), JSON.stringify(div?.pos));
+  prova('madia: frontali fino a metà divisorio, ante da metà divisorio (3 mm tra loro)', fr.length === 4 && vicino(fr[0].pos[0] + fr[0].L, xDiv + 9 - 1.5, 0.01) && vicino(Math.min(...an.map(a => a.pos[0])), xDiv + 9 + 1.5, 0.01), JSON.stringify([fr[0].pos[0], fr[0].L, an.map(a => a.pos[0])]));
+  prova('madia: nessuna compenetrazione', !controlli(pm).avvisi.some(a => /compenetr/i.test(a)), controlli(pm).avvisi.join(' | '));
+  // libreria con scrivania: la scrivania si appoggia alla libreria (meno profonda: gamba davanti) e sta a filo del muro
+  const ls = composizioneDa('libreria-scrivania'), qs = calcola(ls), ps = mod.nuovoProgetto(), rs = genera(ps, ls, 'm5');
+  const pianoS = rs.pezzi.find(p => p.nome === 'Piano della scrivania'), listello = rs.pezzi.find(p => /Listello di appoggio sinistro/.test(p.nome));
+  const gambe = rs.pezzi.filter(p => /^Gamba/.test(p.nome)), fianco = rs.pezzi.find(p => p.nome === 'Fianco sinistro');
+  prova('libreria con scrivania: appoggio «mobile + gamba», 3 gambe, listello lungo 310', qs.ok && qs.moduli[1].so.sx === 'mobile+gamba' && gambe.length === 3 && listello?.L === 310, JSON.stringify([qs.moduli[1].so, gambe.length, listello?.L]));
+  const bL = mod.ingombro(fianco), bS = mod.ingombro(pianoS);
+  prova('libreria con scrivania: retro allineato, piano accanto alla libreria a 725', vicino(bL.min.z, bS.min.z, 0.01) && vicino(bS.min.x, 800, 0.01) && vicino(bS.min.y, 725, 0.01), JSON.stringify([bL.min, bS.min]));
+  prova('libreria con scrivania: nessuna compenetrazione', !controlli(ps).avvisi.some(a => /compenetr/i.test(a)), controlli(ps).avvisi.join(' | '));
+  const sc = composizioneDa('scrivania-cassettiera'), pk = mod.nuovoProgetto(), rk = genera(pk, sc, 'm6');
+  prova('scrivania con cassettiera: 3 frontali sotto il piano, nessuna compenetrazione', rk.ok && rk.pezzi.filter(p => p.ruolo === 'frontale').length === 3 && !controlli(pk).avvisi.some(a => /compenetr/i.test(a)), controlli(pk).avvisi.join(' | '));
+  const troppa = composizioneDa('scrivania-cassettiera'); troppa.moduli[0].cassettiera.L = 1300;
+  prova('cassettiera troppo larga: messaggio chiaro', !calcola(troppa).ok && /non sta sotto/.test(calcola(troppa).errori.join(' ')));
 }
 
 document.getElementById('esiti').innerHTML = esiti.map(e => `<li class="${e.ok ? 'ok' : 'ko'}">${e.ok ? '✓' : '✗'} ${e.nome} <small>${e.dettaglio}</small></li>`).join('');

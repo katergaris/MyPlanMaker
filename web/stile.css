@@ -423,3 +423,18 @@ dialog .toast { position: sticky; left: auto; bottom: 12px; margin: 0 16px 12px;
 .chipline.mobile-comp { background: var(--accent-soft); border-radius: 10px; padding: 8px 12px; }
 .chipline.mobile-comp .azioni-comp { display: flex; gap: 12px; }
 @media (max-width: 900px) { .compositore-corpo { grid-template-columns: 1fr; } .comp-dx { position: static; order: -1; } #comp-fronte { height: 40vh; } }
+/* Compositore: schede di moduli e colonne, riga titolo con pulsante, quote dentro i vani. */
+.schede-colonne { display: flex; flex-wrap: wrap; gap: 6px; }
+.schede-colonne .scheda { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); overflow: hidden; }
+.schede-colonne .scheda.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.schede-colonne .scheda button { border: 0; background: none; padding: 6px 10px; display: flex; flex-direction: column; align-items: flex-start; font-weight: 600; font-size: 14px; }
+.schede-colonne .scheda small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.schede-colonne .scheda .togli { color: #a3342a; padding: 0 10px; justify-content: center; border-left: 1px solid var(--line); font-weight: 400; }
+.schede-colonne.moduli .scheda.on { background: var(--accent-soft); }
+.titolo-riga { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.titolo-riga h3 { margin: 0; }
+.titolo-riga .btn { height: 36px; padding: 0 12px; }
+.fronte-mobile .q-dentro { font-family: system-ui, sans-serif; font-weight: 600; fill: #b8a27e; pointer-events: none; }
+.fronte-mobile .scelto { fill: var(--accent-soft); }
+.fronte-mobile .frontale.scelto { stroke: var(--accent); }
+.aggiungi-livello.affianca { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
