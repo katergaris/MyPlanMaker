@@ -900,8 +900,9 @@ function confermaCompositore() {
   if (!r0.ok) return avvisa(r0.msg, true, 8000);
   if (compoId && pr.composizioni?.[compoId] && firmaMobile(pr, compoId) !== pr.composizioni[compoId].firma
     && !confirm(t('Alcuni pezzi di questo mobile sono stati cambiati a mano: ricomponendolo quei cambi si perdono (puoi sempre annullare con ↶). Continuo?'))) return;
-  const id = compoId || 'mobile-' + mod.nuovoId(), aggiorna = !!compoId;
+  const id = compoId || 'mobile-' + mod.nuovoId(), aggiorna = !!compoId, nuovoProgetto = stato.inAttesa;
   modifica(() => {
+    if (nuovoProgetto) pr.nome = compo.nome; // dalla schermata iniziale: il progetto prende il nome del mobile
     let M;
     if (aggiorna && pr.composizioni?.[id]) { M = posizioneMobile(pr, id); pr.pezzi = pr.pezzi.filter(p => p.comp !== id); }
     else M = new Matrix4().makeTranslation(pr.pezzi.length ? Math.round(Math.max(...pr.pezzi.map(x => ingombroMondo(x).max.x)) + 200) : 0, 0, 0);
