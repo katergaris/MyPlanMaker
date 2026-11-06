@@ -157,8 +157,8 @@ elimina anche l'aperto con Annulla), apertura molto più veloce (cache e gzip de
 — serve decidere il canale, C tablet verticale, D aiuto chiudibile, E benvenuto nella schermata Progetti, F pulizia visiva).
 Release su GitHub come pre-release (`v0.14.0-alpha.1` … `v0.18.0-alpha.1`) con la portable allegata. **Repository pubblico dal 2026-11-06**: i tester scaricano lo zip
 dalla pagina Releases senza account.
-**0.13.0** (2026-10-31): maniglie alla Tinkercad, quote da scrivere sul pezzo, calamita dal vivo, lastra per progetto (0.12.0 5 lingue, prezzi facoltativi, repository in inglese; 0.11.0 disegno 2D; 0.10.0 spessori su misura, spostamento libero, nuovo Accosta/Adatta, mm/cm); vedi `CHANGELOG.md`. Repository `katergaris/MyPlanMaker` (pubblico dal 2026-11-06), branch `main`, pronto per
-la pubblicazione (README, screenshot, licenza, CI) ma **ancora privato**: renderlo pubblico solo se Salvo lo chiede.
+**0.13.0** (2026-10-31): maniglie alla Tinkercad, quote da scrivere sul pezzo, calamita dal vivo, lastra per progetto (0.12.0 5 lingue, prezzi facoltativi, repository in inglese; 0.11.0 disegno 2D; 0.10.0 spessori su misura, spostamento libero, nuovo Accosta/Adatta, mm/cm); vedi `CHANGELOG.md`. Repository `katergaris/MyPlanMaker` (pubblico dal 2026-11-06), branch `main`, con README,
+screenshot, licenza MIT e CI; reso pubblico su richiesta di Salvo.
 **Installato su ZimaOS il 2026-10-29**: `http://192.168.0.20:8098` (LAN), `http://10.77.0.201:8098` (rete interna). HTTPS
 Tailscale `https://pve.van-pike.ts.net:8098` (dal 2026-10-30, `tailscale serve` su pve). Dopo ogni modifica
 al codice: rilanciare `deploy/pubblica-zimaos.sh` (i dati restano).
